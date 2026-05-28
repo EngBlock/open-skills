@@ -16,16 +16,16 @@ Supports **OpenCode**, **Claude Code**, **Codex**, **Cursor**, and [51 more](#su
 npx skills add vercel-labs/agent-skills
 ```
 
-## Run a Skill Without Installing
+## Use a Skill Without Installing
 
 Generate a prompt for one skill, or start a supported coding agent interactively:
 
 ```bash
-npx skills run vercel-labs/agent-skills@nextjs | claude
-npx skills run vercel-labs/agent-skills --skill nextjs --agent claude-code
+npx skills use vercel-labs/agent-skills@nextjs | claude
+npx skills use vercel-labs/agent-skills --skill nextjs --agent claude-code
 ```
 
-`skills run` resolves sources the same way as `skills add`, writes the selected skill files to a temporary directory, and prints only the generated prompt to stdout unless `--agent` is provided. With `--agent`, it starts one supported agent interactively with the generated prompt.
+`skills use` resolves sources the same way as `skills add`, writes the selected skill files to a temporary directory, and prints only the generated prompt to stdout unless `--agent` is provided. With `--agent`, it starts one supported agent interactively with the generated prompt.
 
 ### Source Formats
 
@@ -109,7 +109,7 @@ When installing interactively, you can choose:
 
 | Command                      | Description                                   |
 | ---------------------------- | --------------------------------------------- |
-| `npx skills run <source>`    | Run one skill with a coding agent             |
+| `npx skills use <source>`    | Use one skill without installing              |
 | `npx skills list`            | List installed skills (alias: `ls`)           |
 | `npx skills find [query]`    | Search for skills interactively or by keyword |
 | `npx skills remove [skills]` | Remove installed skills from agents           |

@@ -5,23 +5,23 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { runCli } from './test-utils.ts';
 import {
-  buildRunPrompt,
-  materializeRunSkill,
-  parseRunOptions,
-  runAgentInteractively,
+  buildUsePrompt,
+  materializeUseSkill,
+  parseUseOptions,
+  launchAgentInteractively,
   type AgentProcess,
   type AgentSpawn,
-  type RunSkill,
-} from './run.ts';
+  type UseSkill,
+} from './use.ts';
 
-describe('run command', () => {
+describe('use command', () => {
   let testDir: string;
   const cleanupDirs: string[] = [];
 
   beforeEach(() => {
     testDir = join(
       tmpdir(),
-      `skills-run-test-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      `skills-use-test-${Date.now()}-${Math.random().toString(36).slice(2)}`
     );
     mkdirSync(testDir, { recursive: true });
   });
@@ -37,9 +37,9 @@ describe('run command', () => {
     }
   });
 
-  describe('parseRunOptions', () => {
+  describe('parseUseOptions', () => {
     it('parses owner/repo@skill as the source', () => {
-      const result = parseRunOptions(['vercel-labs/agent-skills@nextjs']);
+      const result = parseUseOptions(['vercel-labs/agent-skills@nextjs']);
 
       expect(result.source).toEqual(['vercel-labs/agent-skills@nextjs']);
       expect(result.options.skill).toBeUndefined();
@@ -47,8 +47,8 @@ describe('run command', () => {
     });
 
     it('parses --skill and -s selectors', () => {
-      const longFlag = parseRunOptions(['vercel-labs/agent-skills', '--skill', 'nextjs']);
-      const shortFlag = parseRunOptions(['vercel-labs/agent-skills', '-s', 'nextjs']);
+      const longFlag = parseUseOptions(['vercel-labs/agent-skills', '--skill', 'nextjs']);
+      const shortFlag = parseUseOptions(['vercel-labs/agent-skills', '-s', 'nextjs']);
 
       expect(longFlag.options.skill).toBe('nextjs');
       expect(shortFlag.options.skill).toBe('nextjs');
@@ -57,7 +57,7 @@ describe('run command', () => {
     });
 
     it('rejects repeated skill selectors and unknown flags', () => {
-      const result = parseRunOptions([
+      const result = parseUseOptions([
         'vercel-labs/agent-skills',
         '--skill',
         'one',
@@ -71,8 +71,8 @@ describe('run command', () => {
     });
 
     it('parses --agent and -a values', () => {
-      const longFlag = parseRunOptions(['vercel-labs/agent-skills', '--agent', 'claude-code']);
-      const shortFlag = parseRunOptions(['vercel-labs/agent-skills', '-a', 'codex']);
+      const longFlag = parseUseOptions(['vercel-labs/agent-skills', '--agent', 'claude-code']);
+      const shortFlag = parseUseOptions(['vercel-labs/agent-skills', '-a', 'codex']);
 
       expect(longFlag.options.agent).toEqual(['claude-code']);
       expect(shortFlag.options.agent).toEqual(['codex']);
@@ -81,23 +81,23 @@ describe('run command', () => {
     });
 
     it('rejects wildcard, missing, invalid, and multiple agents', () => {
-      const wildcard = parseRunOptions(['source', '--agent', '*']);
-      const missing = parseRunOptions(['source', '--agent', '--skill', 'nextjs']);
-      const invalid = parseRunOptions(['source', '--agent', 'not-an-agent']);
-      const multiple = parseRunOptions(['source', '--agent', 'claude-code', 'codex']);
+      const wildcard = parseUseOptions(['source', '--agent', '*']);
+      const missing = parseUseOptions(['source', '--agent', '--skill', 'nextjs']);
+      const invalid = parseUseOptions(['source', '--agent', 'not-an-agent']);
+      const multiple = parseUseOptions(['source', '--agent', 'claude-code', 'codex']);
 
       expect(wildcard.errors).toContain(
-        "skills run --agent does not support '*'; specify exactly one agent."
+        "skills use --agent does not support '*'; specify exactly one agent."
       );
       expect(missing.errors).toContain('--agent requires an agent name');
       expect(invalid.errors.join('\n')).toContain('Invalid agents: not-an-agent');
-      expect(multiple.errors).toContain('skills run --agent accepts exactly one agent.');
+      expect(multiple.errors).toContain('skills use --agent accepts exactly one agent.');
     });
   });
 
-  describe('buildRunPrompt', () => {
+  describe('buildUsePrompt', () => {
     it('inlines SKILL.md without support directory when there are no supporting files', () => {
-      const prompt = buildRunPrompt({
+      const prompt = buildUsePrompt({
         skillMd: '# Skill\nDo the thing.',
         hasSupportingFiles: false,
       });
@@ -107,20 +107,20 @@ describe('run command', () => {
     });
 
     it('includes support directory when supporting files exist', () => {
-      const prompt = buildRunPrompt({
+      const prompt = buildUsePrompt({
         skillMd: '# Skill',
-        supportDir: '/tmp/skills-run-abc/my-skill',
+        supportDir: '/tmp/skills-use-abc/my-skill',
         hasSupportingFiles: true,
       });
 
-      expect(prompt).toContain('/tmp/skills-run-abc/my-skill');
+      expect(prompt).toContain('/tmp/skills-use-abc/my-skill');
       expect(prompt).toContain('When the SKILL.md references relative paths');
     });
   });
 
-  describe('materializeRunSkill', () => {
-    it('writes blob-shaped files to a skills-run temp directory', async () => {
-      const skill: RunSkill = {
+  describe('materializeUseSkill', () => {
+    it('writes blob-shaped files to a skills-use temp directory', async () => {
+      const skill: UseSkill = {
         kind: 'blob',
         name: 'Blob Skill',
         directoryName: 'Blob Skill',
@@ -131,18 +131,18 @@ describe('run command', () => {
         ],
       };
 
-      const materialized = await materializeRunSkill(skill);
+      const materialized = await materializeUseSkill(skill);
       cleanupDirs.push(materialized.tempRoot);
 
-      expect(materialized.skillDir).toContain('skills-run-');
+      expect(materialized.skillDir).toContain('skills-use-');
       expect(readFileSync(join(materialized.skillDir, 'scripts', 'run.sh'), 'utf-8')).toBe(
         'echo hi'
       );
       expect(materialized.hasSupportingFiles).toBe(true);
     });
 
-    it('writes well-known-shaped files to a skills-run temp directory', async () => {
-      const skill: RunSkill = {
+    it('writes well-known-shaped files to a skills-use temp directory', async () => {
+      const skill: UseSkill = {
         kind: 'well-known',
         name: 'Well Known Skill',
         directoryName: 'well-known-skill',
@@ -153,7 +153,7 @@ describe('run command', () => {
         ]),
       };
 
-      const materialized = await materializeRunSkill(skill);
+      const materialized = await materializeUseSkill(skill);
       cleanupDirs.push(materialized.tempRoot);
 
       expect(readFileSync(join(materialized.skillDir, 'reference.md'), 'utf-8')).toBe('Reference');
@@ -161,13 +161,13 @@ describe('run command', () => {
     });
   });
 
-  describe('runAgentInteractively', () => {
+  describe('launchAgentInteractively', () => {
     it('starts Claude Code interactively with the prompt argument', async () => {
       const fake = createFakeSpawn({ closeCode: 0 });
 
-      await expect(runAgentInteractively('claude-code', 'prompt body', fake.spawn)).resolves.toBe(
-        0
-      );
+      await expect(
+        launchAgentInteractively('claude-code', 'prompt body', fake.spawn)
+      ).resolves.toBe(0);
 
       expect(fake.calls).toEqual([
         {
@@ -181,7 +181,7 @@ describe('run command', () => {
     it('starts Codex interactively with the prompt argument', async () => {
       const fake = createFakeSpawn({ closeCode: 0 });
 
-      await expect(runAgentInteractively('codex', 'prompt body', fake.spawn)).resolves.toBe(0);
+      await expect(launchAgentInteractively('codex', 'prompt body', fake.spawn)).resolves.toBe(0);
 
       expect(fake.calls[0]).toMatchObject({
         command: 'codex',
@@ -193,23 +193,23 @@ describe('run command', () => {
     it('returns nonzero agent exit codes', async () => {
       const fake = createFakeSpawn({ closeCode: 37 });
 
-      await expect(runAgentInteractively('codex', 'prompt body', fake.spawn)).resolves.toBe(37);
+      await expect(launchAgentInteractively('codex', 'prompt body', fake.spawn)).resolves.toBe(37);
     });
 
     it('reports missing agent executables', async () => {
       const error = Object.assign(new Error('spawn claude ENOENT'), { code: 'ENOENT' });
       const fake = createFakeSpawn({ error });
 
-      await expect(runAgentInteractively('claude-code', 'prompt body', fake.spawn)).rejects.toThrow(
-        'command not found: claude'
-      );
+      await expect(
+        launchAgentInteractively('claude-code', 'prompt body', fake.spawn)
+      ).rejects.toThrow('command not found: claude');
     });
 
     it('rejects valid but unsupported agents', async () => {
       const fake = createFakeSpawn({ closeCode: 0 });
 
       await expect(
-        runAgentInteractively('cursor' as any, 'prompt body', fake.spawn)
+        launchAgentInteractively('cursor' as any, 'prompt body', fake.spawn)
       ).rejects.toThrow('Running Cursor is not supported yet.');
       expect(fake.calls).toEqual([]);
     });
@@ -219,7 +219,7 @@ describe('run command', () => {
     it('prints only the generated prompt for a single local skill', () => {
       writeSkill(join(testDir, 'single'), 'single-skill', 'Single skill body.');
 
-      const result = runCli(['run', testDir], testDir);
+      const result = runCli(['use', testDir], testDir);
 
       expect(result.exitCode).toBe(0);
       expect(result.stderr).toBe('');
@@ -238,7 +238,7 @@ describe('run command', () => {
       mkdirSync(join(skillDir, 'scripts'), { recursive: true });
       writeFileSync(join(skillDir, 'scripts', 'run.sh'), 'echo with-files');
 
-      const result = runCli(['run', testDir, '--skill', 'with-files'], testDir);
+      const result = runCli(['use', testDir, '--skill', 'with-files'], testDir);
       const supportDir = extractSupportDir(result.stdout);
       if (supportDir) cleanupDirs.push(join(supportDir, '..'));
 
@@ -250,7 +250,7 @@ describe('run command', () => {
     it('omits the temp directory section for a skill with only SKILL.md', () => {
       writeSkill(join(testDir, 'single'), 'single-skill', 'Only instructions.');
 
-      const result = runCli(['run', testDir], testDir);
+      const result = runCli(['use', testDir], testDir);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).not.toContain('Supporting files for this skill were downloaded to:');
@@ -260,7 +260,7 @@ describe('run command', () => {
       writeSkill(join(testDir, 'skills', 'one'), 'one', 'One.');
       writeSkill(join(testDir, 'skills', 'two'), 'two', 'Two.');
 
-      const result = runCli(['run', testDir], testDir);
+      const result = runCli(['use', testDir], testDir);
 
       expect(result.exitCode).toBe(1);
       expect(result.stdout).toBe('');
@@ -273,7 +273,7 @@ describe('run command', () => {
       writeSkill(join(testDir, 'skills', 'one'), 'one', 'One.');
       writeSkill(join(testDir, 'skills', 'two'), 'two', 'Two.');
 
-      const result = runCli(['run', testDir, '--skill', 'two'], testDir);
+      const result = runCli(['use', testDir, '--skill', 'two'], testDir);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('Two.');
@@ -282,7 +282,7 @@ describe('run command', () => {
 
     it('fails for conflicting @skill and --skill selectors before downloading', () => {
       const result = runCli(
-        ['run', 'vercel-labs/agent-skills@nextjs', '--skill', 'react-best-practices'],
+        ['use', 'vercel-labs/agent-skills@nextjs', '--skill', 'react-best-practices'],
         testDir
       );
 
@@ -294,8 +294,8 @@ describe('run command', () => {
       writeSkill(testDir, 'root-skill', 'Root.');
       writeSkill(join(testDir, 'nested', 'target'), 'target', 'Nested target.');
 
-      const shallow = runCli(['run', testDir, '--skill', 'target'], testDir);
-      const fullDepth = runCli(['run', testDir, '--skill', 'target', '--full-depth'], testDir);
+      const shallow = runCli(['use', testDir, '--skill', 'target'], testDir);
+      const fullDepth = runCli(['use', testDir, '--skill', 'target', '--full-depth'], testDir);
 
       expect(shallow.exitCode).toBe(1);
       expect(shallow.stderr).toContain('No matching skill found');
@@ -309,14 +309,14 @@ describe('run command', () => {
       expect(result.stdout).toContain('Unknown command: prompt');
     });
 
-    it('does not register use as a command alias', () => {
-      const result = runCli(['use', testDir], testDir);
+    it('does not register run as a command alias', () => {
+      const result = runCli(['run', testDir], testDir);
 
-      expect(result.stdout).toContain('Unknown command: use');
+      expect(result.stdout).toContain('Unknown command: run');
     });
 
     it('blocks OpenClaw sources before network access unless explicitly accepted', () => {
-      const result = runCli(['run', 'openclaw/example@demo'], testDir);
+      const result = runCli(['use', 'openclaw/example@demo'], testDir);
 
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toContain('OpenClaw skills are unverified');

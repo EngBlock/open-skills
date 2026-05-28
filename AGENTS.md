@@ -12,7 +12,7 @@ This file provides guidance to AI coding agents working on the `skills` CLI code
 | ----------------------------- | --------------------------------------------------- |
 | `skills`                      | Show banner with available commands                 |
 | `skills add <pkg>`            | Install skills from git repos, URLs, or local paths |
-| `skills run <pkg>@<skill>`    | Run one skill with a coding agent                   |
+| `skills use <pkg>@<skill>`    | Use one skill without installing                    |
 | `skills experimental_install` | Restore skills from skills-lock.json                |
 | `skills experimental_sync`    | Sync skills from node_modules into agent dirs       |
 | `skills list`                 | List installed skills (alias: `ls`)                 |
@@ -58,8 +58,8 @@ src/
 │   ├── mintlify.ts
 │   └── wellknown.ts
 ├── init.test.ts     # Init command tests
-├── run.ts           # Run command - generate a skill prompt or launch an agent
-├── run.test.ts      # Run command tests
+├── use.ts           # Use command - generate a skill prompt or launch an agent
+├── use.test.ts      # Use command tests
 └── test-utils.ts    # Test utilities
 
 tests/
