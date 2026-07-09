@@ -30,7 +30,23 @@ export function getLockSource(parsedUrl: string, normalizedSource: string | null
   // When normalizedSource is used, parseSource() later resolves it to HTTPS,
   // breaking restore for private repos that require SSH authentication.
   const isSSH = parsedUrl.startsWith('git@') || parsedUrl.startsWith('ssh://');
-  return isSSH ? parsedUrl : normalizedSource;
+  if (isSSH) {
+    return parsedUrl;
+  }
+  if (parsedUrl.startsWith('http://') || parsedUrl.startsWith('https://')) {
+    try {
+      if (new URL(parsedUrl).hostname !== 'github.com') {
+        return parsedUrl;
+      }
+    } catch {
+      return normalizedSource;
+    }
+  }
+  return normalizedSource;
+}
+
+export function getProjectLockSourceUrl(sourceType: string, sourceUrl: string): string | undefined {
+  return sourceType === 'git' || sourceType === 'gitlab' ? sourceUrl : undefined;
 }
 import { cloneRepo, cleanupTempDir, GitCloneError } from './git.ts';
 import { discoverSkills, getSkillDisplayName, filterSkills } from './skills.ts';
@@ -1774,6 +1790,7 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
     const normalizedSource = getOwnerRepo(parsed);
 
     const lockSource = getLockSource(parsed.url, normalizedSource);
+    const projectLockSourceUrl = getProjectLockSourceUrl(parsed.type, parsed.url);
 
     // Only track if we have a valid remote source and it's not a private repo.
     // repoPrivacyPromise was started early (right after parsing) so it has
@@ -1882,6 +1899,7 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
               skill.name,
               {
                 source: lockSource || parsed.url,
+                ...(projectLockSourceUrl && { sourceUrl: projectLockSourceUrl }),
                 ref: parsed.ref,
                 sourceType: parsed.type,
                 ...(skillPathValue && { skillPath: skillPathValue }),

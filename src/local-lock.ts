@@ -15,6 +15,8 @@ const CURRENT_VERSION = 1;
 export interface LocalSkillLockEntry {
   /** Where the skill came from: npm package name, owner/repo, local path, etc. */
   source: string;
+  /** Original remote URL, when source was normalized for lock readability. */
+  sourceUrl?: string;
   /** Branch or tag ref used for installation */
   ref?: string;
   /** The provider/source type (e.g., "github", "node_modules", "local") */

@@ -195,6 +195,62 @@ describe('Update Cleanup Unit Tests', () => {
       expect(p.confirm).not.toHaveBeenCalled();
       expect(remove.removeCommand).not.toHaveBeenCalled();
     });
+
+    it('uses sourceUrl for self-hosted GitLab project updates', async () => {
+      vi.mocked(localLock.readLocalLock).mockResolvedValue({
+        version: 1,
+        skills: {
+          'skill-a': {
+            source: 'acme/skills',
+            sourceUrl: 'https://gitlab.example.com/acme/skills.git',
+            skillPath: 'skills/skill-a/SKILL.md',
+            sourceType: 'git',
+            computedHash: 'abc',
+          },
+        },
+      });
+
+      vi.mocked(git.cloneRepo).mockResolvedValue('/tmp/repo');
+      vi.mocked(skills.discoverSkills).mockResolvedValue([
+        { name: 'skill-a', path: '/tmp/repo/skills/skill-a', description: 'A', rawContent: '' },
+      ]);
+
+      await updateProjectSkills({ yes: true });
+
+      expect(git.cloneRepo).toHaveBeenCalledWith(
+        'https://gitlab.example.com/acme/skills.git',
+        undefined
+      );
+      const installCall = vi
+        .mocked(spawnSync)
+        .mock.calls.find((call) => Array.isArray(call[1]) && call[1].includes('add'));
+      expect(installCall).toBeDefined();
+      const [, argv] = installCall!;
+      expect(argv).toEqual(
+        expect.arrayContaining(['add', 'https://gitlab.example.com/acme/skills.git', '--skill'])
+      );
+      expect(argv).not.toEqual(expect.arrayContaining(['acme/skills']));
+    });
+
+    it('does not reinterpret generic git shorthands as GitHub during project update', async () => {
+      vi.mocked(localLock.readLocalLock).mockResolvedValue({
+        version: 1,
+        skills: {
+          'skill-a': {
+            source: 'acme/skills',
+            skillPath: 'skills/skill-a/SKILL.md',
+            sourceType: 'git',
+            computedHash: 'abc',
+          },
+        },
+      });
+
+      const result = await updateProjectSkills({ yes: true });
+
+      expect(result.failCount).toBe(1);
+      expect(git.cloneRepo).not.toHaveBeenCalled();
+      expect(spawnSync).not.toHaveBeenCalled();
+    });
   });
 
   describe('updateGlobalSkills', () => {
@@ -271,6 +327,45 @@ describe('Update Cleanup Unit Tests', () => {
       expect(localLock.computeSkillFolderHash).toHaveBeenCalledWith(
         join('/tmp/repo', 'skills/skill-a')
       );
+    });
+
+    it('uses sourceUrl when updating global non-GitHub sources with host-stripped source', async () => {
+      vi.mocked(skillLock.readSkillLock).mockResolvedValue({
+        version: 3,
+        skills: {
+          'skill-a': {
+            source: 'acme/skills',
+            sourceUrl: 'https://gitlab.example.com/acme/skills.git',
+            skillPath: 'skills/skill-a/SKILL.md',
+            sourceType: 'git',
+            skillFolderHash: 'old-hash',
+            installedAt: '',
+            updatedAt: '',
+          },
+        },
+      });
+
+      vi.mocked(git.cloneRepo).mockResolvedValue('/tmp/repo');
+      vi.mocked(skills.discoverSkills).mockResolvedValue([
+        { name: 'skill-a', path: '/tmp/repo/skills/skill-a', description: 'A', rawContent: '' },
+      ]);
+      vi.mocked(localLock.computeSkillFolderHash).mockResolvedValue('new-hash');
+
+      await updateGlobalSkills({ yes: true });
+
+      expect(git.cloneRepo).toHaveBeenCalledWith(
+        'https://gitlab.example.com/acme/skills.git',
+        undefined
+      );
+      const installCall = vi
+        .mocked(spawnSync)
+        .mock.calls.find((call) => Array.isArray(call[1]) && call[1].includes('add'));
+      expect(installCall).toBeDefined();
+      const [, argv] = installCall!;
+      expect(argv).toEqual(
+        expect.arrayContaining(['add', 'https://gitlab.example.com/acme/skills.git'])
+      );
+      expect(argv).not.toEqual(expect.arrayContaining(['acme/skills']));
     });
 
     it('spawns the update without a shell so a crafted ref cannot inject commands', async () => {

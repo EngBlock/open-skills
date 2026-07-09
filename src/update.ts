@@ -232,7 +232,7 @@ export async function getProjectSkillsForUpdate(
     if (entry.sourceType === 'node_modules' || entry.sourceType === 'local') {
       continue;
     }
-    skills.push({ name, source: entry.source, entry });
+    skills.push({ name, source: entry.sourceUrl || entry.source, entry });
   }
 
   return skills;
@@ -444,6 +444,13 @@ export async function updateGlobalSkills(
     const safeName = sanitizeMetadata(update.name);
     console.log(`${TEXT}Updating ${safeName}...${RESET}`);
     const installUrl = buildUpdateInstallSource(update.entry);
+    if (!installUrl) {
+      failCount++;
+      console.log(
+        `  ${DIM}✗ Cannot update ${safeName}: lock file is missing sourceUrl for this generic Git source${RESET}`
+      );
+      continue;
+    }
 
     const cliEntry = join(__dirname, '..', 'bin', 'cli.mjs');
     if (!existsSync(cliEntry)) {
@@ -533,7 +540,7 @@ export async function updateProjectSkills(
 
   const bySource = new Map<string, typeof updatable>();
   for (const skill of updatable) {
-    const source = skill.entry.source;
+    const source = skill.entry.sourceUrl || skill.entry.source;
     const existing = bySource.get(source) || [];
     existing.push(skill);
     bySource.set(source, existing);
@@ -549,15 +556,23 @@ export async function updateProjectSkills(
 
   for (const [source, skillsForSource] of bySource) {
     const firstEntry = skillsForSource[0]!.entry;
-    const sourceUrl = firstEntry.source;
+    const sourceUrl = firstEntry.sourceUrl || firstEntry.source;
     const ref = firstEntry.ref;
 
     const allLockedForSource = Object.entries(localLock.skills)
-      .filter(([_, entry]) => entry.source === source)
+      .filter(([_, entry]) => (entry.sourceUrl || entry.source) === source)
       .map(([name, _]) => name);
 
     let tempDir: string | null = null;
     let deletedSkills: string[] = [];
+
+    if (buildLocalUpdateSource(firstEntry) === null) {
+      failCount += skillsForSource.length;
+      console.log(
+        `${DIM}✗ Cannot update ${source}: skills-lock.json is missing sourceUrl for this generic Git source${RESET}`
+      );
+      continue;
+    }
 
     try {
       tempDir = await cloneRepo(sourceUrl, ref);
@@ -589,7 +604,14 @@ export async function updateProjectSkills(
     for (const skill of remainingSkills) {
       const safeName = sanitizeMetadata(skill.name);
       console.log(`${TEXT}Updating ${safeName}...${RESET}`);
-      const installUrl = formatSourceInput(skill.entry.source, skill.entry.ref);
+      const installUrl = buildLocalUpdateSource(skill.entry);
+      if (!installUrl) {
+        failCount++;
+        console.log(
+          `  ${DIM}✗ Cannot update ${safeName}: skills-lock.json is missing sourceUrl for this generic Git source${RESET}`
+        );
+        continue;
+      }
 
       // Preserve Eve subagent placement recorded at install time. The lock stores
       // '' for the root agent, which maps to the `root` keyword for `add --subagent`.
@@ -634,9 +656,15 @@ export function printLegacyProjectSkills(
     `${DIM}${legacy.length} project skill(s) cannot be updated automatically (installed before skillPath tracking):${RESET}`
   );
   for (const skill of legacy) {
-    const reinstall = formatSourceInput(skill.entry.source, skill.entry.ref);
+    const reinstall = buildLocalUpdateSource(skill.entry);
     console.log(`  ${TEXT}•${RESET} ${sanitizeMetadata(skill.name)}`);
-    console.log(`    ${DIM}To refresh: ${TEXT}npx skills add ${reinstall} -y${RESET}`);
+    if (reinstall) {
+      console.log(`    ${DIM}To refresh: ${TEXT}npx skills add ${reinstall} -y${RESET}`);
+    } else {
+      console.log(
+        `    ${DIM}To refresh: reinstall using the original full Git URL; this lock entry only has an ambiguous shorthand.${RESET}`
+      );
+    }
   }
 }
 
