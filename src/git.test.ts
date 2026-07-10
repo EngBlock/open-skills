@@ -91,6 +91,26 @@ describe('git clone fallbacks', () => {
     expect(isGitHubHttpsCloneUrl('https://gitlab.com/Giphy/giphy-codex-skills.git')).toBe(false);
   });
 
+  it('allows the hard-coded LFS filter overrides required for clone', async () => {
+    const clone = vi.fn().mockResolvedValue(undefined);
+    simpleGitMock.mockReturnValueOnce(createGitClientMock(clone));
+
+    const tempDir = await cloneRepo('https://github.com/Giphy/giphy-codex-skills.git');
+    createdDirs.push(tempDir);
+
+    expect(simpleGitMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: [
+          'filter.lfs.required=false',
+          'filter.lfs.smudge=',
+          'filter.lfs.clean=',
+          'filter.lfs.process=',
+        ],
+        unsafe: { allowUnsafeFilter: true },
+      })
+    );
+  });
+
   it('falls back to gh repo clone for GitHub HTTPS auth failures', async () => {
     const primaryClone = vi
       .fn()

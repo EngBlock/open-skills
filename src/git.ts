@@ -128,6 +128,12 @@ function createGitClient(extraEnv?: NodeJS.ProcessEnv) {
       'filter.lfs.clean=',
       'filter.lfs.process=',
     ],
+    // simple-git v3.36+ rejects all `filter.*` configuration by default.
+    // These values are hard-coded above and only disable the LFS filter for
+    // this clone; no caller-controlled filter command is ever allowed.
+    unsafe: {
+      allowUnsafeFilter: true,
+    },
   });
 }
 
