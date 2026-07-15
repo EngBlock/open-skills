@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 
 const { execSync } = vi.hoisted(() => ({ execSync: vi.fn() }));
 
@@ -9,7 +9,7 @@ import { getGitHubToken, resetGhAuthWarning } from './skill-lock.ts';
 describe('getGitHubToken', () => {
   const originalGitHubToken = process.env.GITHUB_TOKEN;
   const originalGhToken = process.env.GH_TOKEN;
-  let stderrWrite: ReturnType<typeof vi.spyOn>;
+  let stderrWrite: MockInstance<typeof process.stderr.write>;
 
   beforeEach(() => {
     delete process.env.GITHUB_TOKEN;
