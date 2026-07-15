@@ -190,3 +190,51 @@ description: A valid skill
     expect(result!.name).toBe('valid-skill');
   });
 });
+
+describe('parseSkillMd with metadata', () => {
+  let testDir: string;
+
+  beforeEach(() => {
+    testDir = join(tmpdir(), `skills-metadata-test-${Date.now()}`);
+    mkdirSync(testDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  async function parseWithMetadata(metadata: string) {
+    const skillPath = join(testDir, 'SKILL.md');
+    writeFileSync(
+      skillPath,
+      `---
+name: metadata-skill
+description: A skill with metadata
+metadata: ${metadata}
+---
+
+# Metadata Skill
+`
+    );
+    return parseSkillMd(skillPath);
+  }
+
+  it('preserves mapping metadata', async () => {
+    const result = await parseWithMetadata(`
+  origin: workflow
+  runId: 42`);
+
+    expect(result?.metadata).toEqual({ origin: 'workflow', runId: 42 });
+  });
+
+  it.each([
+    ['scalar', 'private'],
+    ['array', '\n  - private\n  - generated'],
+    ['null', 'null'],
+  ])('omits %s metadata', async (_type, metadata) => {
+    const result = await parseWithMetadata(metadata);
+
+    expect(result).not.toBeNull();
+    expect(result?.metadata).toBeUndefined();
+  });
+});

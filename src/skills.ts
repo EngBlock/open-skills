@@ -43,6 +43,10 @@ function normalizeRelativePath(path: string): string {
   return path.split(sep).join('/').replace(/\/+/g, '/');
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /**
  * Check if internal skills should be installed.
  * Internal skills are hidden by default unless INSTALL_INTERNAL_SKILLS=1 is set.
@@ -82,7 +86,8 @@ export async function parseSkillMd(
     // Skip internal skills unless:
     // 1. INSTALL_INTERNAL_SKILLS=1 is set, OR
     // 2. includeInternal option is true (e.g., when user explicitly requests a skill)
-    const isInternal = data.metadata?.internal === true;
+    const metadata = isRecord(data.metadata) ? data.metadata : undefined;
+    const isInternal = metadata?.internal === true;
     if (isInternal && !shouldInstallInternalSkills() && !options?.includeInternal) {
       return null;
     }
@@ -92,7 +97,7 @@ export async function parseSkillMd(
       description: sanitizeMetadata(data.description),
       path: dirname(skillMdPath),
       rawContent: content,
-      metadata: data.metadata,
+      metadata,
     };
   } catch {
     return null;
