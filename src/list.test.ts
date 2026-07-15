@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, rmSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { tmpdir, homedir } from 'os';
+import { tmpdir } from 'os';
 import { runCli } from './test-utils.ts';
 import { parseListOptions } from './list.ts';
 
@@ -18,6 +18,21 @@ describe('list command', () => {
       rmSync(testDir, { recursive: true, force: true });
     }
   });
+
+  function createTestSkill(root: string, name: string, description: string): string {
+    const skillDir = join(root, '.agents', 'skills', name);
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, 'SKILL.md'),
+      `---
+name: ${name}
+description: ${description}
+---
+# ${name}
+`
+    );
+    return skillDir;
+  }
 
   describe('parseListOptions', () => {
     it('should parse empty args', () => {
@@ -96,18 +111,7 @@ describe('list command', () => {
     });
 
     it('should output valid JSON with --json flag', () => {
-      const skillDir = join(testDir, '.agents', 'skills', 'json-skill');
-      mkdirSync(skillDir, { recursive: true });
-      writeFileSync(
-        join(skillDir, 'SKILL.md'),
-        `---
-name: json-skill
-description: A skill for JSON testing
----
-
-# JSON Skill
-`
-      );
+      createTestSkill(testDir, 'json-skill', 'A skill for JSON testing');
 
       const result = runCli(['list', '--json'], testDir);
       expect(result.exitCode).toBe(0);
@@ -123,19 +127,8 @@ description: A skill for JSON testing
     });
 
     it('should output multiple skills as JSON array', () => {
-      const skill1Dir = join(testDir, '.agents', 'skills', 'skill-alpha');
-      const skill2Dir = join(testDir, '.agents', 'skills', 'skill-beta');
-      mkdirSync(skill1Dir, { recursive: true });
-      mkdirSync(skill2Dir, { recursive: true });
-
-      writeFileSync(
-        join(skill1Dir, 'SKILL.md'),
-        `---\nname: skill-alpha\ndescription: Alpha\n---\n# Alpha\n`
-      );
-      writeFileSync(
-        join(skill2Dir, 'SKILL.md'),
-        `---\nname: skill-beta\ndescription: Beta\n---\n# Beta\n`
-      );
+      createTestSkill(testDir, 'skill-alpha', 'Alpha');
+      createTestSkill(testDir, 'skill-beta', 'Beta');
 
       const result = runCli(['list', '--json'], testDir);
       expect(result.exitCode).toBe(0);
@@ -154,21 +147,7 @@ description: A skill for JSON testing
     });
 
     it('should list project skills', () => {
-      // Create a skill in the canonical location
-      const skillDir = join(testDir, '.agents', 'skills', 'test-skill');
-      mkdirSync(skillDir, { recursive: true });
-      writeFileSync(
-        join(skillDir, 'SKILL.md'),
-        `---
-name: test-skill
-description: A test skill for listing
----
-
-# Test Skill
-
-This is a test skill.
-`
-      );
+      createTestSkill(testDir, 'test-skill', 'A test skill for listing');
 
       const result = runCli(['list'], testDir);
       expect(result.stdout).toContain('test-skill');
@@ -179,31 +158,8 @@ This is a test skill.
     });
 
     it('should list multiple skills', () => {
-      // Create multiple skills
-      const skill1Dir = join(testDir, '.agents', 'skills', 'skill-one');
-      const skill2Dir = join(testDir, '.agents', 'skills', 'skill-two');
-      mkdirSync(skill1Dir, { recursive: true });
-      mkdirSync(skill2Dir, { recursive: true });
-
-      writeFileSync(
-        join(skill1Dir, 'SKILL.md'),
-        `---
-name: skill-one
-description: First skill
----
-# Skill One
-`
-      );
-
-      writeFileSync(
-        join(skill2Dir, 'SKILL.md'),
-        `---
-name: skill-two
-description: Second skill
----
-# Skill Two
-`
-      );
+      createTestSkill(testDir, 'skill-one', 'First skill');
+      createTestSkill(testDir, 'skill-two', 'Second skill');
 
       const result = runCli(['list'], testDir);
       expect(result.stdout).toContain('skill-one');
@@ -213,22 +169,15 @@ description: Second skill
     });
 
     it('should respect -g flag for global only', () => {
-      // Create a project skill (should not be shown with -g)
-      const skillDir = join(testDir, '.agents', 'skills', 'project-skill');
-      mkdirSync(skillDir, { recursive: true });
-      writeFileSync(
-        join(skillDir, 'SKILL.md'),
-        `---
-name: project-skill
-description: A project skill
----
-# Project Skill
-`
-      );
+      createTestSkill(testDir, 'project-skill', 'A project skill');
 
-      const result = runCli(['list', '-g'], testDir);
+      const testHome = join(testDir, 'home');
+      createTestSkill(testHome, 'global-skill', 'A global skill');
+
+      const result = runCli(['list', '-g'], testDir, { HOME: testHome });
       // Should not show project skill when -g is specified
       expect(result.stdout).not.toContain('project-skill');
+      expect(result.stdout).toContain('global-skill');
       expect(result.stdout).toContain('Global Skills');
     });
 
@@ -240,18 +189,7 @@ description: A project skill
     });
 
     it('should filter by valid agent', () => {
-      // Create a skill
-      const skillDir = join(testDir, '.agents', 'skills', 'test-skill');
-      mkdirSync(skillDir, { recursive: true });
-      writeFileSync(
-        join(skillDir, 'SKILL.md'),
-        `---
-name: test-skill
-description: A test skill
----
-# Test Skill
-`
-      );
+      createTestSkill(testDir, 'test-skill', 'A test skill');
 
       const result = runCli(['list', '-a', 'claude-code'], testDir);
       expect(result.stdout).toContain('test-skill');
@@ -259,18 +197,7 @@ description: A test skill
     });
 
     it('should ignore directories without SKILL.md', () => {
-      // Create a valid skill
-      const validDir = join(testDir, '.agents', 'skills', 'valid-skill');
-      mkdirSync(validDir, { recursive: true });
-      writeFileSync(
-        join(validDir, 'SKILL.md'),
-        `---
-name: valid-skill
-description: Valid skill
----
-# Valid
-`
-      );
+      createTestSkill(testDir, 'valid-skill', 'Valid skill');
 
       // Create an invalid directory (no SKILL.md)
       const invalidDir = join(testDir, '.agents', 'skills', 'invalid-skill');
@@ -284,18 +211,7 @@ description: Valid skill
     });
 
     it('should handle SKILL.md with missing frontmatter', () => {
-      // Create a valid skill
-      const validDir = join(testDir, '.agents', 'skills', 'valid-skill');
-      mkdirSync(validDir, { recursive: true });
-      writeFileSync(
-        join(validDir, 'SKILL.md'),
-        `---
-name: valid-skill
-description: Valid skill
----
-# Valid
-`
-      );
+      createTestSkill(testDir, 'valid-skill', 'Valid skill');
 
       // Create a skill with invalid SKILL.md (no frontmatter)
       const invalidDir = join(testDir, '.agents', 'skills', 'invalid-skill');
@@ -309,17 +225,7 @@ description: Valid skill
     });
 
     it('should show skill path', () => {
-      const skillDir = join(testDir, '.agents', 'skills', 'test-skill');
-      mkdirSync(skillDir, { recursive: true });
-      writeFileSync(
-        join(skillDir, 'SKILL.md'),
-        `---
-name: test-skill
-description: A test skill
----
-# Test Skill
-`
-      );
+      createTestSkill(testDir, 'test-skill', 'A test skill');
 
       const result = runCli(['list'], testDir);
       // Path is shown inline with skill name (handles both Unix / and Windows \)

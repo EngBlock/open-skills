@@ -23,14 +23,18 @@ describe('remove command', { timeout: 30000 }, () => {
     }
   });
 
-  function createTestSkill(name: string, description?: string) {
-    const skillDir = join(skillsDir, name);
+  function createTestSkill(
+    name: string,
+    description = `A test skill called ${name}`,
+    targetSkillsDir = skillsDir
+  ): string {
+    const skillDir = join(targetSkillsDir, name);
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(
       join(skillDir, 'SKILL.md'),
       `---
 name: ${name}
-description: ${description || `A test skill called ${name}`}
+description: ${description}
 ---
 
 # ${name}
@@ -38,6 +42,7 @@ description: ${description || `A test skill called ${name}`}
 This is a test skill.
 `
     );
+    return skillDir;
   }
 
   function createAgentSkillsDir(agentName: string) {
@@ -200,14 +205,21 @@ This is a test skill.
   });
 
   describe('global flag', () => {
-    beforeEach(() => {
-      createTestSkill('global-skill');
-    });
+    it('should remove a skill from the isolated global home', () => {
+      const testHome = join(testDir, 'home');
+      const globalSkillDir = createTestSkill(
+        'global-skill',
+        'A global skill',
+        join(testHome, '.agents', 'skills')
+      );
 
-    it('should accept --global flag without error', () => {
-      const result = runCli(['remove', 'global-skill', '--global', '-y'], testDir);
-      // Command should run without error (skill may not be found in global scope from test dir)
+      const result = runCli(['remove', 'global-skill', '--global', '-y'], testDir, {
+        HOME: testHome,
+      });
+
       expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('Successfully removed');
+      expect(existsSync(globalSkillDir)).toBe(false);
     });
   });
 
