@@ -36,6 +36,7 @@ export type AgentType =
   | 'jazz'
   | 'junie'
   | 'kilo'
+  | 'kimchi'
   | 'kimi-code-cli'
   | 'kiro-cli'
   | 'kode'

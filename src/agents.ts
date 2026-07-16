@@ -52,6 +52,13 @@ export function isZCodeInstalled(
   return pathExists(join(homeDir, '.zcode')) || pathExists('/Applications/ZCode.app');
 }
 
+export function isKimchiInstalled(
+  homeDir = home,
+  pathExists: (path: string) => boolean = existsSync
+) {
+  return pathExists(join(homeDir, '.config', 'kimchi'));
+}
+
 export const agents: Record<AgentType, AgentConfig> = {
   'aider-desk': {
     name: 'aider-desk',
@@ -393,6 +400,15 @@ export const agents: Record<AgentType, AgentConfig> = {
     globalSkillsDir: join(home, '.kilocode/skills'),
     detectInstalled: async () => {
       return existsSync(join(home, '.kilocode'));
+    },
+  },
+  kimchi: {
+    name: 'kimchi',
+    displayName: 'Kimchi',
+    skillsDir: '.kimchi/skills',
+    globalSkillsDir: join(home, '.config', 'kimchi', 'harness', 'skills'),
+    detectInstalled: async () => {
+      return isKimchiInstalled();
     },
   },
   'kimi-code-cli': {
