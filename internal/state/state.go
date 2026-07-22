@@ -534,10 +534,13 @@ func cloneRawMap(source map[string]json.RawMessage) map[string]json.RawMessage {
 	return result
 }
 
-func (document *Document) Entry(name string) *LockEntry {
+// EntryWithName resolves an installed name to the exact lock-file key. Lock
+// keys retain the original name while on-disk paths use SanitizeName, so a
+// remove operation needs both identities to update the correct entry.
+func (document *Document) EntryWithName(name string) (string, *LockEntry) {
 	if entry, ok := document.Skills[name]; ok {
 		copy := entry
-		return &copy
+		return name, &copy
 	}
 	sanitized := sanitizeName(name)
 	lockedNames := make([]string, 0, len(document.Skills))
@@ -548,10 +551,57 @@ func (document *Document) Entry(name string) *LockEntry {
 	for _, lockedName := range lockedNames {
 		if sanitizeName(lockedName) == sanitized {
 			copy := document.Skills[lockedName]
-			return &copy
+			return lockedName, &copy
 		}
 	}
-	return nil
+	return "", nil
+}
+
+func (document *Document) Entry(name string) *LockEntry {
+	_, entry := document.EntryWithName(name)
+	return entry
+}
+
+// RetainInstallationPlacements updates native project placement metadata after
+// a partial removal. Older lock entries have no placement metadata, so their
+// unknown shape is retained unchanged rather than inventing ownership claims.
+func (document *Document) RetainInstallationPlacements(name string, agents, subagents []string) bool {
+	key, entry := document.EntryWithName(name)
+	if entry == nil || document.Version != 1 || len(entry.Agents) == 0 {
+		return false
+	}
+	fields := cloneRawMap(entry.raw)
+	agents = normalizeAgentIDs(agents)
+	if len(agents) == 0 {
+		delete(fields, "agents")
+	} else if encoded, err := json.Marshal(agents); err == nil {
+		fields["agents"] = encoded
+	} else {
+		return false
+	}
+	if len(subagents) == 0 {
+		delete(fields, "subagents")
+	} else if encoded, err := json.Marshal(subagents); err == nil {
+		fields["subagents"] = encoded
+	} else {
+		return false
+	}
+	entry.Agents = agents
+	entry.Subagents = append([]string(nil), subagents...)
+	entry.raw = fields
+	document.Skills[key] = *entry
+	return true
+}
+
+// RemoveInstallation deletes the exact resolved lock entry after its final
+// owned placement has been removed.
+func (document *Document) RemoveInstallation(name string) bool {
+	key, entry := document.EntryWithName(name)
+	if entry == nil {
+		return false
+	}
+	delete(document.Skills, key)
+	return true
 }
 
 func orderedAgentConfigs(options InspectOptions) []agentConfig {

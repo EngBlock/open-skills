@@ -60,6 +60,8 @@ func Run(ctx context.Context, invocation Invocation) int {
 		return runInit(invocation, invocation.Args[1:])
 	case "list", "ls":
 		return runList(invocation, invocation.Args[1:])
+	case "remove", "rm", "r":
+		return runRemove(invocation, invocation.Args[1:])
 	case "experimental_install":
 		return runInstallFromLock(invocation)
 	case "experimental_sync":
