@@ -361,3 +361,26 @@ func sortAgentIDs(ids []string) {
 	}
 	sort.Slice(ids, func(i, j int) bool { return order[ids[i]] < order[ids[j]] })
 }
+
+func normalizeAgentIDs(ids []string) []string {
+	selected := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		selected[id] = true
+	}
+	result := make([]string, 0, len(selected))
+	for _, agent := range agentConfigs {
+		if selected[agent.ID] {
+			result = append(result, agent.ID)
+			delete(selected, agent.ID)
+		}
+	}
+	if len(selected) > 0 {
+		unknown := make([]string, 0, len(selected))
+		for id := range selected {
+			unknown = append(unknown, id)
+		}
+		sort.Strings(unknown)
+		result = append(result, unknown...)
+	}
+	return result
+}

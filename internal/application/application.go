@@ -60,7 +60,16 @@ func Run(ctx context.Context, invocation Invocation) int {
 		return runInit(invocation, invocation.Args[1:])
 	case "list", "ls":
 		return runList(invocation, invocation.Args[1:])
-	case "add", "a", "install", "i":
+	case "experimental_install":
+		return runInstallFromLock(invocation)
+	case "experimental_sync":
+		return runSync(invocation, invocation.Args[1:])
+	case "install", "i":
+		if len(invocation.Args) == 1 {
+			return runInstallFromLock(invocation)
+		}
+		return runAddLocal(invocation, invocation.Args[1:])
+	case "add", "a":
 		return runAddLocal(invocation, invocation.Args[1:])
 	default:
 		_, _ = fmt.Fprintf(invocation.Stdout, "Unknown command: %s\nRun open-skills --help for usage.\n", command)

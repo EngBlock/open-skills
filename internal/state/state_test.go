@@ -82,6 +82,31 @@ func TestRecordInstallationWritesDeterministicTimestampFreeProjectState(t *testi
 	}
 }
 
+func TestProjectStateReadsAndWritesRecordedPlacements(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "skills-lock.json")
+	document, err := Read(path, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := document.RecordInstallation("placed", InstallationRecord{
+		Source: "local-source", SourceType: "local", InstalledContentHash: "hash", OwnedFiles: []string{"SKILL.md"},
+		Agents: []string{"claude-code", "eve"}, Subagents: []string{"research"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := document.Write(path); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := Read(path, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := restored.Entry("placed")
+	if entry == nil || entry.ComputedHash != "hash" || !reflect.DeepEqual(entry.Agents, []string{"claude-code", "eve"}) || !reflect.DeepEqual(entry.Subagents, []string{"research"}) {
+		t.Fatalf("restored placement = %#v", entry)
+	}
+}
+
 func TestSkillFrontmatterRejectsNonStringNames(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "SKILL.md")
 	if err := os.WriteFile(path, []byte("---\nname: 123\ndescription: invalid name\n---\n"), 0o600); err != nil {

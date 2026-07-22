@@ -393,6 +393,7 @@ func installLocalSkill(skill localSkill, source string, scope state.Scope, base,
 			return err
 		}
 	}
+	installedAgents := []string{}
 	for _, agent := range agents {
 		if agent == "eve" {
 			for _, subagent := range eveTargets(subagents) {
@@ -404,6 +405,7 @@ func installLocalSkill(skill localSkill, source string, scope state.Scope, base,
 					return err
 				}
 			}
+			installedAgents = append(installedAgents, agent)
 			continue
 		}
 		destination, universal, ok := state.AgentSkillsPath(agent, scope, project, home, os.Getenv("XDG_CONFIG_HOME"))
@@ -419,9 +421,11 @@ func installLocalSkill(skill localSkill, source string, scope state.Scope, base,
 					return err
 				}
 			}
+			installedAgents = append(installedAgents, agent)
 			continue
 		}
 		if pathsOverlap(skill.Path, destination) {
+			installedAgents = append(installedAgents, agent)
 			continue
 		}
 		if !copyMode && scope == state.Project && agent != "claude-code" && !state.ProjectAgentRootExists(agent, project) {
@@ -436,6 +440,7 @@ func installLocalSkill(skill localSkill, source string, scope state.Scope, base,
 				return err
 			}
 		}
+		installedAgents = append(installedAgents, agent)
 	}
 	hash, owned, err := contentIdentity(skill.Path)
 	if err != nil {
@@ -456,7 +461,7 @@ func installLocalSkill(skill localSkill, source string, scope state.Scope, base,
 	}
 	if err := document.RecordInstallation(skill.Name, state.InstallationRecord{
 		Source: source, SourceURL: source, SourceType: "local", InstalledContentHash: hash, OwnedFiles: owned,
-		Subagents: recordedEveTargets(agents, subagents),
+		Agents: installedAgents, Subagents: recordedEveTargets(installedAgents, subagents),
 	}); err != nil {
 		return err
 	}
@@ -632,6 +637,9 @@ func contentIdentity(directory string) (string, []string, error) {
 			return err
 		}
 		if entry.IsDir() {
+			if entry.Name() == ".git" || entry.Name() == "node_modules" {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if !entry.Type().IsRegular() {

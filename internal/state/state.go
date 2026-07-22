@@ -52,11 +52,14 @@ func (failure *InspectionError) Unwrap() error {
 }
 
 type LockEntry struct {
-	Source     string
-	SourceURL  string
-	SourceType string
-	PluginName string
-	raw        map[string]json.RawMessage
+	Source       string
+	SourceURL    string
+	SourceType   string
+	ComputedHash string
+	PluginName   string
+	Agents       []string
+	Subagents    []string
+	raw          map[string]json.RawMessage
 }
 
 // InstallationRecord is the stable information recorded for a locally
@@ -69,6 +72,8 @@ type InstallationRecord struct {
 	SourceType           string
 	InstalledContentHash string
 	OwnedFiles           []string
+	// Agents records the selected adapter placements in stable registry order.
+	Agents []string
 	// Subagents records Eve placements; an empty value represents the root agent.
 	Subagents []string
 }
@@ -250,7 +255,7 @@ func decodeLockEntry(fields map[string]json.RawMessage, expectedVersion int) (Lo
 		return LockEntry{}, err
 	}
 	if expectedVersion == 1 {
-		if _, err := requiredString(fields, "computedHash"); err != nil {
+		if entry.ComputedHash, err = requiredString(fields, "computedHash"); err != nil {
 			return LockEntry{}, err
 		}
 	} else {
@@ -280,10 +285,24 @@ func decodeLockEntry(fields map[string]json.RawMessage, expectedVersion int) (Lo
 		}
 	}
 	if expectedVersion == 1 {
-		if value, exists := fields["subagents"]; exists {
-			var subagents []string
-			if err := json.Unmarshal(value, &subagents); err != nil {
-				return LockEntry{}, errors.New("subagents must be an array of strings")
+		for field, destination := range map[string]*[]string{
+			"agents":    &entry.Agents,
+			"subagents": &entry.Subagents,
+		} {
+			value, exists := fields[field]
+			if !exists {
+				continue
+			}
+			if err := json.Unmarshal(value, destination); err != nil {
+				return LockEntry{}, fmt.Errorf("%s must be an array of strings", field)
+			}
+			for _, name := range *destination {
+				if name == "" && field == "subagents" {
+					continue
+				}
+				if strings.TrimSpace(name) == "" {
+					return LockEntry{}, fmt.Errorf("%s must not contain empty names", field)
+				}
 			}
 		}
 	}
@@ -374,6 +393,7 @@ func (document *Document) RecordInstallation(name string, record InstallationRec
 	if document.raw == nil {
 		document.raw = make(map[string]json.RawMessage)
 	}
+	record.Agents = normalizeAgentIDs(record.Agents)
 	entry := document.Skills[name]
 	fields := cloneRawMap(entry.raw)
 	if fields == nil {
@@ -423,18 +443,24 @@ func (document *Document) RecordInstallation(name string, record InstallationRec
 	}
 	fields["ownedFiles"] = owned
 	if document.Version == 1 {
-		if len(record.Subagents) == 0 {
-			delete(fields, "subagents")
-		} else {
-			subagents, err := json.Marshal(record.Subagents)
+		for field, values := range map[string][]string{
+			"agents":    record.Agents,
+			"subagents": record.Subagents,
+		} {
+			if len(values) == 0 {
+				delete(fields, field)
+				continue
+			}
+			encoded, err := json.Marshal(values)
 			if err != nil {
 				return err
 			}
-			fields["subagents"] = subagents
+			fields[field] = encoded
 		}
 	}
 	document.Skills[name] = LockEntry{
-		Source: record.Source, SourceURL: record.SourceURL, SourceType: record.SourceType, raw: fields,
+		Source: record.Source, SourceURL: record.SourceURL, SourceType: record.SourceType,
+		ComputedHash: record.InstalledContentHash, Agents: record.Agents, Subagents: record.Subagents, raw: fields,
 	}
 	return nil
 }
