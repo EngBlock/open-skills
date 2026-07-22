@@ -6,8 +6,6 @@ import { runCli, runCliOutput, stripLogo, hasLogo } from './test-utils.ts';
 
 const FAIL_ON_FETCH =
   '--import=data:text/javascript,globalThis.fetch%3D()%3D%3E%7Bprocess.stdout.write(%22UNEXPECTED_FETCH%5Cn%22)%3Bthrow%20new%20Error(%22fetch%20disabled%22)%7D';
-const RECORD_EMPTY_SEARCH_FETCHES =
-  '--import=data:text/javascript,globalThis.fetch%3D(u)%3D%3E%7Bprocess.stdout.write(%22FETCH%20%22%2Bu%2B%22%5Cn%22)%3Breturn%20Promise.resolve(%7Bok%3Atrue%2Cjson%3Aasync()%3D%3E(%7Bskills%3A%5B%5D%7D)%7D)%7D';
 
 function expectSuccessfulWithoutFetch(result: ReturnType<typeof runCli>): void {
   expect(result.exitCode).toBe(0);
@@ -42,6 +40,14 @@ describe('skills CLI', () => {
       expect(output).toContain('-y, --yes');
       expect(output).toContain('--all');
       expect(output).not.toContain('--metadata');
+      expect(output).toContain(
+        'find, search, f, s  Show migration guidance for decentralized discovery'
+      );
+      expect(output).not.toContain('Find Options:');
+      expect(output).not.toContain('Search for skills');
+      expect(output).not.toContain('interactive search');
+      expect(output).not.toContain('search by keyword');
+      expect(output).not.toContain('skills.sh');
     });
 
     it('should show same output for -h alias', () => {
@@ -75,7 +81,8 @@ describe('skills CLI', () => {
       expect(output).toContain('npx skills use');
       expect(output).toContain('npx skills update');
       expect(output).toContain('npx skills init');
-      expect(output).toContain('skills.sh');
+      expect(output).not.toContain('Search for skills');
+      expect(output).not.toContain('skills.sh');
     });
   });
 
@@ -92,6 +99,7 @@ describe('skills CLI', () => {
         const result = runCli(['init', 'demo'], cwd, { NODE_OPTIONS: FAIL_ON_FETCH });
 
         expectSuccessfulWithoutFetch(result);
+        expect(result.stdout).not.toContain('skills.sh');
         expect(readFileSync(join(cwd, 'demo', 'SKILL.md'), 'utf-8')).toContain('name: demo');
       });
     });
@@ -155,17 +163,34 @@ describe('skills CLI', () => {
     });
   });
 
-  describe('remote commands', () => {
-    it('sends only the requested search fetch for find', () => {
-      const result = runCli(['find', 'react'], undefined, {
-        NODE_OPTIONS: RECORD_EMPTY_SEARCH_FETCHES,
-        SKILLS_API_URL: 'https://search.example.test',
-      });
-      const fetches = result.stdout.split('\n').filter((line) => line.startsWith('FETCH '));
+  describe('legacy find commands', () => {
+    const migrationGuidance = `Hosted skill search is no longer available.\nDiscover skills by searching GitHub and the web for SKILL.md files, then install one with:\n  npx skills add <owner>/<repo>@<skill>`;
 
-      expect(result.exitCode).toBe(0);
-      expect(fetches).toEqual(['FETCH https://search.example.test/api/search?q=react&limit=10']);
-    });
+    it.each(['find', 'search', 'f', 's'])(
+      '%s returns stable offline migration guidance',
+      (command) => {
+        const result = runCli([command, 'react', '--owner', 'example'], undefined, {
+          NODE_OPTIONS: FAIL_ON_FETCH,
+        });
+
+        expect(result.exitCode).toBe(1);
+        expect(result.stdout.trim()).toBe(migrationGuidance);
+        expect(result.stdout).not.toContain('UNEXPECTED_FETCH');
+        expect(result.stderr).toBe('');
+      }
+    );
+
+    it.each(['find', 'search', 'f', 's'])(
+      '%s handles legacy help flags consistently',
+      (command) => {
+        const result = runCli([command, '--help'], undefined, { NODE_OPTIONS: FAIL_ON_FETCH });
+
+        expect(result.exitCode).toBe(1);
+        expect(result.stdout.trim()).toBe(migrationGuidance);
+        expect(result.stdout).not.toContain('UNEXPECTED_FETCH');
+        expect(result.stderr).toBe('');
+      }
+    );
   });
 
   describe('removed options', () => {
@@ -213,7 +238,6 @@ describe('skills CLI', () => {
       ['check --help routes to top-level help', 'check'],
       ['list --help routes to top-level help', 'list'],
       ['init --help routes to top-level help', 'init'],
-      ['find --help routes to top-level help', 'find'],
       ['experimental_install --help routes to top-level help', 'experimental_install'],
       ['experimental_sync --help routes to top-level help', 'experimental_sync'],
     ];
@@ -237,6 +261,7 @@ describe('skills CLI', () => {
       expect(result.exitCode).toBe(0);
       // remove has its own help screen distinct from the top-level usage banner
       expect(result.stdout).toContain('skills remove');
+      expect(result.stdout).not.toContain('skills.sh');
     });
 
     it('update --help does not run the update flow', () => {

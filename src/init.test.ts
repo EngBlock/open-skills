@@ -34,8 +34,6 @@ describe('init command', () => {
         GitHub:  Push to a repo, then npx skills add <owner>/<repo>
         URL:     Host the file, then npx skills add https://example.com/my-test-skill/SKILL.md
 
-      Browse existing skills for inspiration at https://skills.sh/
-
       "
     `);
 

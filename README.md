@@ -109,7 +109,7 @@ When installing interactively, you can choose:
 | ---------------------------- | --------------------------------------------- |
 | `npx skills use <source>`    | Use one skill without installing              |
 | `npx skills list`            | List installed skills (alias: `ls`)           |
-| `npx skills find [query]`    | Search for skills interactively or by keyword |
+| `npx skills find [query]`    | Show decentralized-discovery migration guidance |
 | `npx skills remove [skills]` | Remove installed skills from agents           |
 | `npx skills update [skills]` | Update installed skills to latest versions    |
 | `npx skills init [name]`     | Create a new SKILL.md template                |
@@ -131,17 +131,12 @@ npx skills ls -a claude-code -a cursor
 
 ### `skills find`
 
-Search for skills interactively or by keyword.
+Hosted skill search has been removed. The legacy `find`, `search`, `f`, and `s` commands print offline migration guidance and exit with status 1, including when given an old query or `--owner` option.
+
+Discover skills by searching GitHub and the web for relevant `SKILL.md` files and inspecting their contents. Install a discovered skill directly from its source:
 
 ```bash
-# Interactive search (fzf-style)
-npx skills find
-
-# Search by keyword
-npx skills find typescript
-
-# Search across every repository owned by an organization or user
-npx skills find react --owner vercel
+npx skills add <owner>/<repo>@<skill>
 ```
 
 ### `skills update`
@@ -233,7 +228,7 @@ Skills let agents perform specialized tasks like:
 - Creating PRs following your team's conventions
 - Integrating with external tools (Linear, Notion, etc.)
 
-Discover skills at **[skills.sh](https://skills.sh)**
+Discover skills by searching GitHub and the web for relevant `SKILL.md` files and inspecting their contents before installation.
 
 ## Supported Agents
 
@@ -503,7 +498,6 @@ INSTALL_INTERNAL_SKILLS=1 npx skills add vercel-labs/agent-skills --list
 ## Related Links
 
 - [Agent Skills Specification](https://agentskills.io)
-- [Skills Directory](https://skills.sh)
 - [Amp Skills Documentation](https://ampcode.com/manual#agent-skills)
 - [Antigravity Skills Documentation](https://antigravity.google/docs/skills)
 - [Factory AI / Droid Skills Documentation](https://docs.factory.ai/cli/configuration/skills)

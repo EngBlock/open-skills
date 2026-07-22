@@ -4,7 +4,7 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { basename, join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { runAdd, parseAddOptions } from './add.ts';
-import { runFind } from './find.ts';
+import { showFindMigrationGuidance } from './find.ts';
 import { runInstallFromLock } from './install.ts';
 import { runList } from './list.ts';
 import { removeCommand, parseRemoveOptions } from './remove.ts';
@@ -26,6 +26,7 @@ function getVersion(): string {
 }
 
 const VERSION = getVersion();
+const LEGACY_FIND_COMMANDS = new Set(['find', 'search', 'f', 's']);
 
 const RESET = '\x1b[0m';
 const BOLD = '\x1b[1m';
@@ -76,9 +77,6 @@ function showBanner(): void {
   console.log(
     `  ${DIM}$${RESET} ${TEXT}npx skills list${RESET}                 ${DIM}List installed skills${RESET}`
   );
-  console.log(
-    `  ${DIM}$${RESET} ${TEXT}npx skills find ${DIM}[query]${RESET}         ${DIM}Search for skills${RESET}`
-  );
   console.log();
   console.log(
     `  ${DIM}$${RESET} ${TEXT}npx skills update${RESET}               ${DIM}Update installed skills${RESET}`
@@ -96,8 +94,6 @@ function showBanner(): void {
   console.log();
   console.log(`${DIM}try:${RESET} npx skills add vercel-labs/agent-skills`);
   console.log();
-  console.log(`Discover more skills at ${TEXT}https://skills.sh/${RESET}`);
-  console.log();
 }
 
 function showHelp(): void {
@@ -112,10 +108,7 @@ ${BOLD}Manage Skills:${RESET}
                        Generate a prompt for using one skill without installing it
   remove [skills]      Remove installed skills
   list, ls             List installed skills
-  find [query]         Search for skills interactively
-
-${BOLD}Find Options:${RESET}
-  --owner <owner>        Search only repositories from a GitHub owner
+  find, search, f, s  Show migration guidance for decentralized discovery
 
 ${BOLD}Updates:${RESET}
   update [skills...]   Update skills to latest versions (alias: upgrade)
@@ -182,9 +175,6 @@ ${BOLD}Examples:${RESET}
   ${DIM}$${RESET} skills ls -g                         ${DIM}# list global skills${RESET}
   ${DIM}$${RESET} skills ls -a claude-code             ${DIM}# filter by agent${RESET}
   ${DIM}$${RESET} skills ls --json                      ${DIM}# JSON output${RESET}
-  ${DIM}$${RESET} skills find                          ${DIM}# interactive search${RESET}
-  ${DIM}$${RESET} skills find typescript               ${DIM}# search by keyword${RESET}
-  ${DIM}$${RESET} skills find react --owner vercel     ${DIM}# search within an owner${RESET}
   ${DIM}$${RESET} skills update
   ${DIM}$${RESET} skills update my-skill             ${DIM}# update a single skill${RESET}
   ${DIM}$${RESET} skills update -g                    ${DIM}# update global skills only${RESET}
@@ -192,8 +182,6 @@ ${BOLD}Examples:${RESET}
   ${DIM}$${RESET} skills init my-skill
   ${DIM}$${RESET} skills experimental_sync              ${DIM}# sync from node_modules${RESET}
   ${DIM}$${RESET} skills experimental_sync -y           ${DIM}# sync without prompts${RESET}
-
-Discover more skills at ${TEXT}https://skills.sh/${RESET}
 `);
 }
 
@@ -223,8 +211,6 @@ ${BOLD}Examples:${RESET}
   ${DIM}$${RESET} skills rm --agent claude-code my-skill   ${DIM}# remove from specific agent${RESET}
   ${DIM}$${RESET} skills remove --all                      ${DIM}# remove all skills${RESET}
   ${DIM}$${RESET} skills remove --skill '*' -a cursor      ${DIM}# remove all skills from cursor${RESET}
-
-Discover more skills at ${TEXT}https://skills.sh/${RESET}
 `);
 }
 
@@ -287,8 +273,6 @@ Describe when this skill should be used.
     `  ${DIM}URL:${RESET}     Host the file, then ${TEXT}npx skills add https://example.com/${displayPath}${RESET}`
   );
   console.log();
-  console.log(`Browse existing skills for inspiration at ${TEXT}https://skills.sh/${RESET}`);
-  console.log();
 }
 
 // ============================================
@@ -306,8 +290,13 @@ async function main(): Promise<void> {
     return;
   }
 
-  const command = args[0];
+  const command = args[0]!;
   const restArgs = args.slice(1);
+
+  if (LEGACY_FIND_COMMANDS.has(command)) {
+    showFindMigrationGuidance();
+    return;
+  }
 
   // Subcommand --help / -h must short-circuit before dispatch so that running
   // e.g. `skills update --help` prints help instead of executing the update
@@ -329,14 +318,6 @@ async function main(): Promise<void> {
   }
 
   switch (command) {
-    case 'find':
-    case 'search':
-    case 'f':
-    case 's':
-      if (!inAgent) showLogo();
-      console.log();
-      await runFind(restArgs);
-      break;
     case 'init':
       if (!inAgent) showLogo();
       console.log();
