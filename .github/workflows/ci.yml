@@ -37,7 +37,7 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Prettier
+      - name: oxfmt
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == '24'
         run: pnpm format:check
 

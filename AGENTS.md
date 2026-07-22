@@ -141,7 +141,7 @@ pnpm run -C scripts sync-agents.ts
 
 ## Code Style
 
-This project uses Prettier for code formatting. **Always run `pnpm format` before committing changes** to ensure consistent formatting.
+This project uses oxfmt for code formatting. **Always run `pnpm format` before committing changes** to ensure consistent formatting.
 
 ```bash
 # Format all files

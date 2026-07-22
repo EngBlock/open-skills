@@ -23,17 +23,17 @@
     "dev": "node src/cli.ts",
     "exec:test": "node scripts/execute-tests.ts",
     "prepublishOnly": "npm run build",
-    "format": "prettier --write \"src/**/*.ts\" \"scripts/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"scripts/**/*.ts\"",
+    "format": "oxfmt --write src scripts tests",
+    "format:check": "oxfmt --check src scripts tests",
     "prepare": "husky",
     "test": "vitest",
     "type-check": "tsc --noEmit",
     "publish:snapshot": "npm version prerelease --preid=snapshot --no-git-tag-version && npm publish --tag snapshot"
   },
   "lint-staged": {
-    "src/**/*.ts": "prettier --write",
-    "scripts/**/*.ts": "prettier --write",
-    "tests/**/*.ts": "prettier --write"
+    "src/**/*.ts": "oxfmt --write",
+    "scripts/**/*.ts": "oxfmt --write",
+    "tests/**/*.ts": "oxfmt --write"
   },
   "keywords": [
     "cli",
@@ -134,8 +134,8 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "obuild": "^0.4.22",
+    "oxfmt": "^0.60.0",
     "picocolors": "^1.1.1",
-    "prettier": "^3.8.1",
     "simple-git": "^3.36.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17",

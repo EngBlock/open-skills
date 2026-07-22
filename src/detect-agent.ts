@@ -3,7 +3,8 @@ import { access } from 'node:fs/promises';
 import type { AgentType } from './types.ts';
 
 export type AgentResult =
-  { isAgent: true; agent: { name: string } } | { isAgent: false; agent: undefined };
+  | { isAgent: true; agent: { name: string } }
+  | { isAgent: false; agent: undefined };
 
 const DEVIN_LOCAL_PATH = '/opt/.devin';
 
