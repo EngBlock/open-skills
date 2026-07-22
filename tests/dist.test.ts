@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const rootDir = join(import.meta.dirname, '..');
@@ -17,5 +18,15 @@ describe('dist build', () => {
     });
 
     expect(result).toContain('skills');
+
+    const dependencyArtifacts = [
+      'package.json',
+      'pnpm-lock.yaml',
+      'dist/cli.mjs',
+      'dist/THIRD-PARTY-LICENSES.md',
+      'ThirdPartyNoticeText.txt',
+    ].map((path) => readFileSync(join(rootDir, path), 'utf-8'));
+
+    expect(dependencyArtifacts.join('\n')).not.toContain('@vercel/detect-agent');
   });
 });

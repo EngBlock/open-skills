@@ -1,14 +1,16 @@
-import { determineAgent, type AgentResult } from '@vercel/detect-agent';
+import { constants } from 'node:fs';
+import { access } from 'node:fs/promises';
 import { setDetectedAgent } from './telemetry.ts';
 import type { AgentType } from './types.ts';
 
+export type AgentResult =
+  { isAgent: true; agent: { name: string } } | { isAgent: false; agent: undefined };
+
+const DEVIN_LOCAL_PATH = '/opt/.devin';
+
 let cachedResult: AgentResult | null = null;
 
-/**
- * @vercel/detect-agent treats any CURSOR_TRACE_ID as a Cursor agent, but that
- * variable is also present in Cursor's integrated terminal for regular user
- * sessions. Require stronger execution signals before enabling agent mode.
- */
+/** Cursor trace IDs are also present in ordinary integrated terminals. */
 function hasStrongCursorAgentSignal(): boolean {
   return (
     Boolean(process.env.CURSOR_AGENT?.trim()) ||
@@ -17,7 +19,7 @@ function hasStrongCursorAgentSignal(): boolean {
 }
 
 function refineAgentResult(result: AgentResult): AgentResult {
-  if (!result.isAgent || !result.agent) {
+  if (!result.isAgent) {
     return result;
   }
 
@@ -26,16 +28,65 @@ function refineAgentResult(result: AgentResult): AgentResult {
       return { isAgent: false, agent: undefined };
     }
 
-    if (result.agent.name === 'cursor') {
-      return { isAgent: true, agent: { name: 'cursor-cli' } };
-    }
+    return { isAgent: true, agent: { name: 'cursor-cli' } };
   }
 
   return result;
 }
 
+async function determineAgent(): Promise<AgentResult> {
+  const explicitAgent = process.env.AI_AGENT?.trim();
+  if (explicitAgent) {
+    const name = explicitAgent === 'github-copilot-cli' ? 'github-copilot' : explicitAgent;
+    return { isAgent: true, agent: { name } };
+  }
+
+  if (process.env.CURSOR_TRACE_ID) {
+    return { isAgent: true, agent: { name: 'cursor' } };
+  }
+  if (process.env.CURSOR_AGENT || process.env.CURSOR_EXTENSION_HOST_ROLE === 'agent-exec') {
+    return { isAgent: true, agent: { name: 'cursor-cli' } };
+  }
+  if (process.env.GEMINI_CLI) {
+    return { isAgent: true, agent: { name: 'gemini' } };
+  }
+  if (process.env.CODEX_SANDBOX || process.env.CODEX_CI || process.env.CODEX_THREAD_ID) {
+    return { isAgent: true, agent: { name: 'codex' } };
+  }
+  if (process.env.ANTIGRAVITY_AGENT) {
+    return { isAgent: true, agent: { name: 'antigravity' } };
+  }
+  if (process.env.AUGMENT_AGENT) {
+    return { isAgent: true, agent: { name: 'augment-cli' } };
+  }
+  if (process.env.OPENCODE_CLIENT) {
+    return { isAgent: true, agent: { name: 'opencode' } };
+  }
+  if (process.env.CLAUDECODE || process.env.CLAUDE_CODE) {
+    const name = process.env.CLAUDE_CODE_IS_COWORK ? 'cowork' : 'claude';
+    return { isAgent: true, agent: { name } };
+  }
+  if (process.env.REPL_ID) {
+    return { isAgent: true, agent: { name: 'replit' } };
+  }
+  if (
+    process.env.COPILOT_MODEL ||
+    process.env.COPILOT_ALLOW_ALL ||
+    process.env.COPILOT_GITHUB_TOKEN
+  ) {
+    return { isAgent: true, agent: { name: 'github-copilot' } };
+  }
+
+  try {
+    await access(DEVIN_LOCAL_PATH, constants.F_OK);
+    return { isAgent: true, agent: { name: 'devin' } };
+  } catch {
+    return { isAgent: false, agent: undefined };
+  }
+}
+
 /**
- * Map from @vercel/detect-agent names to skills-cli AgentType identifiers.
+ * Map from detected execution-agent names to skills-cli AgentType identifiers.
  * Only includes agents that exist in both systems.
  */
 const agentNameToType: Record<string, AgentType> = {

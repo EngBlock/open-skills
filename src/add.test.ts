@@ -101,6 +101,40 @@ Instructions here.
     expect(result.exitCode).toBe(0);
   });
 
+  it.each([
+    ['claude', '.claude'],
+    ['codex', '.agents'],
+  ])(
+    'installs non-interactively for detected %s and universal targets',
+    (detectedAgent, agentDirectory) => {
+      const sourceDir = join(testDir, 'source');
+      const skillDir = join(sourceDir, 'detected-agent-skill');
+      mkdirSync(skillDir, { recursive: true });
+      writeFileSync(
+        join(skillDir, 'SKILL.md'),
+        `---
+name: detected-agent-skill
+description: Detected agent installation test
+---
+
+# Detected Agent Skill
+`
+      );
+
+      const projectDir = join(testDir, 'project');
+      mkdirSync(projectDir, { recursive: true });
+
+      const result = runCli(['add', sourceDir], projectDir, { AI_AGENT: detectedAgent });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('Agent detected — installing non-interactively');
+      expect(existsSync(join(projectDir, agentDirectory, 'skills', 'detected-agent-skill'))).toBe(
+        true
+      );
+      expect(existsSync(join(projectDir, '.agents', 'skills', 'detected-agent-skill'))).toBe(true);
+    }
+  );
+
   it('deduplicates copied install paths for universal agents sharing the same directory', () => {
     const sourceDir = join(testDir, 'source');
     const skillDir = join(sourceDir, 'skills', 'shared-skill');
