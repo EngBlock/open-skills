@@ -75,7 +75,6 @@ export function createTestHomeEnvironment(home: string): Record<string, string> 
     HERMES_HOME: join(home, '.hermes'),
     AUTOHAND_HOME: join(home, '.autohand'),
     FLATPAK_XDG_CONFIG_HOME: join(home, '.var', 'app'),
-    DISABLE_TELEMETRY: '1',
   };
 }
 

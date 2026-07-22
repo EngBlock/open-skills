@@ -51,12 +51,6 @@ vi.mock('picocolors', () => {
   return { default: obj };
 });
 
-vi.mock('../src/telemetry.ts', () => ({
-  track: vi.fn(),
-  setVersion: vi.fn(),
-  fetchAuditData: vi.fn().mockResolvedValue(null),
-}));
-
 vi.mock('../src/detect-agent.ts', () => ({
   detectAgent: vi.fn().mockResolvedValue({ isAgent: false, agent: { name: 'none' } }),
   getAgentType: vi.fn(),
@@ -68,16 +62,6 @@ vi.mock('../src/detect-agent.ts', () => ({
 // `displayName` makes getAgentBaseDir() do join(baseDir, undefined) and throws
 // "The \"path\" argument must be of type string. Received undefined". We pass
 // `agent: ['codex']` to runAdd so the detectInstalledAgents() branch is skipped anyway.
-
-// Keep parseSource/getOwnerRepo real, but stub the only network call (isRepoPrivate)
-// so the test runs offline.
-vi.mock('../src/source-parser.ts', async (importActual) => {
-  const actual = await importActual<typeof import('../src/source-parser.ts')>();
-  return {
-    ...actual,
-    isRepoPrivate: vi.fn().mockResolvedValue(false),
-  };
-});
 
 // Simulate a GitHub clone without touching the network: cloneRepo returns a local
 // fixture directory. cleanupTempDir is a no-op so we control teardown ourselves.
@@ -96,6 +80,7 @@ describe('root-level disk install (issue #1603)', () => {
   let project: string; // install target cwd
   let origCwd: string;
   let spy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     base = await mkdtemp(join(tmpdir(), 'root-disk-'));
@@ -118,6 +103,8 @@ describe('root-level disk install (issue #1603)', () => {
 
     // Drive the GitHub-clone code path (tempDir === skill.path) without network.
     vi.mocked(cloneRepo).mockResolvedValue(fixture);
+    fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({})));
+    vi.stubGlobal('fetch', fetchSpy);
 
     spy = vi.spyOn(installer, 'installSkillForAgent');
     vi.spyOn(process, 'exit').mockImplementation((() => {
@@ -129,9 +116,10 @@ describe('root-level disk install (issue #1603)', () => {
     process.chdir(origCwd);
     await rm(base, { recursive: true, force: true });
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
-  it('installs the full directory (scripts/ + references/) for a root-level SKILL.md repo', async () => {
+  it('installs a root-level skill without hosted requests', async () => {
     // A github-style source goes through cloneRepo + discoverSkills(tempDir),
     // where skill.path === tempDir. This is exactly the branch that dropped the
     // supporting files before the fix (see issue #1603).
@@ -144,6 +132,7 @@ describe('root-level disk install (issue #1603)', () => {
 
     // The disk-based install path must be used (not the blob single-file path).
     expect(spy).toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
 
     const installed = join(project, '.agents', 'skills', 'myrootskill');
     await expect(readFile(join(installed, 'SKILL.md'), 'utf-8')).resolves.toContain('myrootskill');

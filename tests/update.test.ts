@@ -73,7 +73,6 @@ describe('Update Cleanup Unit Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.exitCode = undefined;
-    process.env.DISABLE_TELEMETRY = '1';
     // Default mock for isTTY
     Object.defineProperty(process.stdin, 'isTTY', {
       value: true,

@@ -15,7 +15,6 @@ import {
 import { searchMultiselect } from './prompts/search-multiselect.ts';
 import { addSkillToLocalLock, computeSkillFolderHash, readLocalLock } from './local-lock.ts';
 import type { Skill, AgentType } from './types.ts';
-import { track } from './telemetry.ts';
 import { detectAgent, getAgentType } from './detect-agent.ts';
 
 const isCancelled = (value: unknown): value is symbol => typeof value === 'symbol';
@@ -436,14 +435,6 @@ export async function runSync(args: string[], options: SyncOptions = {}): Promis
       p.log.message(`  ${pc.red('✗')} ${r.skill} → ${r.agent}: ${pc.dim(r.error)}`);
     }
   }
-
-  // Track telemetry
-  track({
-    event: 'experimental_sync',
-    skillCount: String(toInstall.length),
-    successCount: String(successfulSkillNames.size),
-    agents: targetAgents.join(','),
-  });
 
   console.log();
   p.outro(

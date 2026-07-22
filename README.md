@@ -494,19 +494,11 @@ Ensure you have write access to the target directory.
 | Variable                  | Description                                                                |
 | ------------------------- | -------------------------------------------------------------------------- |
 | `INSTALL_INTERNAL_SKILLS` | Set to `1` or `true` to show and install skills marked as `internal: true` |
-| `DISABLE_TELEMETRY`       | Set to disable anonymous usage telemetry                                   |
-| `DO_NOT_TRACK`            | Alternative way to disable telemetry                                       |
 
 ```bash
 # Install internal skills
 INSTALL_INTERNAL_SKILLS=1 npx skills add vercel-labs/agent-skills --list
 ```
-
-## Telemetry
-
-This CLI collects anonymous usage data to help improve the tool. No personal information is collected.
-
-Telemetry is automatically disabled in CI environments.
 
 ## Related Links
 

@@ -1,6 +1,5 @@
 import { constants } from 'node:fs';
 import { access } from 'node:fs/promises';
-import { setDetectedAgent } from './telemetry.ts';
 import type { AgentType } from './types.ts';
 
 export type AgentResult =
@@ -106,14 +105,11 @@ const agentNameToType: Record<string, AgentType> = {
 
 /**
  * Detect if the CLI is being run inside an AI agent environment.
- * Results are cached after the first call. Also updates telemetry with the agent name.
+ * Results are cached after the first call.
  */
 export async function detectAgent(): Promise<AgentResult> {
   if (cachedResult) return cachedResult;
   cachedResult = refineAgentResult(await determineAgent());
-  if (cachedResult.isAgent) {
-    setDetectedAgent(cachedResult.agent.name);
-  }
   return cachedResult;
 }
 

@@ -3,7 +3,6 @@ import pc from 'picocolors';
 import { readdir, rm, lstat } from 'fs/promises';
 import { join } from 'path';
 import { agents, detectInstalledAgents, getEveSubagents } from './agents.ts';
-import { track } from './telemetry.ts';
 import { detectAgent } from './detect-agent.ts';
 import { removeSkillFromLock, getSkillFromLock, readSkillLock } from './skill-lock.ts';
 import { readLocalLock, removeSkillFromLocalLock } from './local-lock.ts';
@@ -313,30 +312,6 @@ export async function removeCommand(skillNames: string[], options: RemoveOptions
 
   const successful = results.filter((r) => r.success);
   const failed = results.filter((r) => !r.success);
-
-  // Track removal (grouped by source)
-  if (successful.length > 0) {
-    const bySource = new Map<string, { skills: string[]; sourceType?: string }>();
-
-    for (const r of successful) {
-      const source = r.source || 'local';
-      const existing = bySource.get(source) || { skills: [] };
-      existing.skills.push(r.skill);
-      existing.sourceType = r.sourceType;
-      bySource.set(source, existing);
-    }
-
-    for (const [source, data] of bySource) {
-      track({
-        event: 'remove',
-        source,
-        skills: data.skills.join(','),
-        agents: targetAgents.join(','),
-        ...(isGlobal && { global: '1' }),
-        sourceType: data.sourceType,
-      });
-    }
-  }
 
   if (successful.length > 0) {
     p.log.success(pc.green(`Successfully removed ${successful.length} skill(s)`));
