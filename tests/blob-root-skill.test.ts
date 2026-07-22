@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { resetRepoTreeAuthState, tryBlobInstall } from '../src/blob.ts';
+import { tryBlobInstall } from '../src/blob.ts';
+import { resetRepoTreeAuthState } from '../src/github-tree.ts';
 
 const ROOT_SKILL_MD = `---
 name: eve

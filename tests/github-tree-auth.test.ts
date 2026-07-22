@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { fetchRepoTree, resetRepoTreeAuthState } from '../src/blob.ts';
+import { fetchRepoTree, resetRepoTreeAuthState } from '../src/github-tree.ts';
 
 const SAMPLE_TREE = {
   sha: 'deadbeef',

@@ -88,11 +88,10 @@ import type { Skill, AgentType } from './types.ts';
 import {
   tryBlobInstall,
   BLOB_ALLOWED_REPOS,
-  getSkillFolderHashFromTree,
-  fetchRepoTree,
   type BlobSkill,
   type BlobInstallResult,
 } from './blob.ts';
+import { fetchRepoTree, getSkillFolderHashFromTree } from './github-tree.ts';
 import packageJson from '../package.json' with { type: 'json' };
 export function initTelemetry(version: string): void {
   setVersion(version);

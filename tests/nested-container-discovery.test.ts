@@ -15,7 +15,8 @@ import { mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { discoverSkills } from '../src/skills.ts';
-import { findSkillMdPaths, type RepoTree, type TreeEntry } from '../src/blob.ts';
+import { findSkillMdPaths } from '../src/blob.ts';
+import type { RepoTree, TreeEntry } from '../src/github-tree.ts';
 
 function writeSkill(dir: string, name: string): void {
   mkdirSync(dir, { recursive: true });
