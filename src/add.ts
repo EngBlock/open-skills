@@ -6,12 +6,13 @@ import { sep, join, dirname } from 'path';
 import { parseSource, getOwnerRepo } from './source-parser.ts';
 import { stripTerminalEscapes } from './sanitize.ts';
 import { searchMultiselect } from './prompts/search-multiselect.ts';
+import { CLI_NAME, CLI_RUN_COMMAND, PROJECT_REPOSITORY } from './constants.ts';
 
 // Helper to check if a value is a cancel symbol (works with both clack and our custom prompts)
 const isCancelled = (value: unknown): value is symbol => typeof value === 'symbol';
 const EVE_AGENT_LABEL = 'eve agent';
-const FIND_SKILLS_SOURCE = 'NathanBeddoeWebDev/open-skills';
-const FIND_SKILLS_INSTALL_COMMAND = `npx skills add ${FIND_SKILLS_SOURCE}@find-skills`;
+const FIND_SKILLS_SOURCE = PROJECT_REPOSITORY;
+const FIND_SKILLS_INSTALL_COMMAND = `${CLI_RUN_COMMAND} add ${FIND_SKILLS_SOURCE}@find-skills`;
 
 export function getLockSource(parsedUrl: string, normalizedSource: string | null): string | null {
   // Preserve SSH URLs in lock files instead of normalizing to owner/repo shorthand.
@@ -894,10 +895,14 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
     );
     console.log();
     console.log(pc.dim('  Usage:'));
-    console.log(`    ${pc.cyan('npx skills add')} ${pc.yellow('<source>')} ${pc.dim('[options]')}`);
+    console.log(
+      `    ${pc.cyan(`${CLI_RUN_COMMAND} add`)} ${pc.yellow('<source>')} ${pc.dim('[options]')}`
+    );
     console.log();
     console.log(pc.dim('  Example:'));
-    console.log(`    ${pc.cyan('npx skills add')} ${pc.yellow('vercel-labs/agent-skills')}`);
+    console.log(
+      `    ${pc.cyan(`${CLI_RUN_COMMAND} add`)} ${pc.yellow(`${FIND_SKILLS_SOURCE}@find-skills`)}`
+    );
     console.log();
     process.exit(1);
   }
@@ -924,7 +929,7 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
 
   console.log();
   if (!agentResult.isAgent) {
-    p.intro(pc.bgCyan(pc.black(' skills ')));
+    p.intro(pc.bgCyan(pc.black(` ${CLI_NAME} `)));
   }
 
   if (agentResult.isAgent) {

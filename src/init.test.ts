@@ -31,8 +31,8 @@ describe('init command', () => {
         2. Update the name and description in the frontmatter
 
       Publishing:
-        GitHub:  Push to a repo, then npx skills add <owner>/<repo>
-        URL:     Host the file, then npx skills add https://example.com/my-test-skill/SKILL.md
+        GitHub:  Push to a repo, then npx open-skills add <owner>/<repo>
+        URL:     Host the file, then npx open-skills add https://example.com/my-test-skill/SKILL.md
 
       "
     `);
@@ -79,9 +79,9 @@ describe('init command', () => {
     expect(output).toContain('Created:\n  SKILL.md'); // directly in cwd, not in a subfolder
     expect(output).toContain('Publishing:');
     expect(output).toContain('GitHub:');
-    expect(output).toContain('npx skills add <owner>/<repo>');
+    expect(output).toContain('npx open-skills add <owner>/<repo>');
     expect(output).toContain('URL:');
-    expect(output).toContain('npx skills add https://example.com/SKILL.md');
+    expect(output).toContain('npx open-skills add https://example.com/SKILL.md');
     expect(existsSync(join(testDir, 'SKILL.md'))).toBe(true);
   });
 
@@ -89,9 +89,9 @@ describe('init command', () => {
     const output = stripLogo(runCliOutput(['init', 'my-skill'], testDir));
 
     expect(output).toContain('Publishing:');
-    expect(output).toContain('GitHub:  Push to a repo, then npx skills add <owner>/<repo>');
+    expect(output).toContain('GitHub:  Push to a repo, then npx open-skills add <owner>/<repo>');
     expect(output).toContain(
-      'URL:     Host the file, then npx skills add https://example.com/my-skill/SKILL.md'
+      'URL:     Host the file, then npx open-skills add https://example.com/my-skill/SKILL.md'
     );
   });
 

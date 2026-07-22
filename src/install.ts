@@ -5,6 +5,7 @@ import { runAdd } from './add.ts';
 import { runSync, parseSyncOptions } from './sync.ts';
 import { getUniversalAgents } from './agents.ts';
 import { buildLocalUpdateSource } from './update-source.ts';
+import { CLI_RUN_COMMAND } from './constants.ts';
 
 /**
  * Install all skills from the local skills-lock.json.
@@ -23,7 +24,7 @@ export async function runInstallFromLock(args: string[]): Promise<void> {
   if (skillEntries.length === 0) {
     p.log.warn('No project skills found in skills-lock.json');
     p.log.info(
-      `Add project-level skills with ${pc.cyan('npx skills add <package>')} (without ${pc.cyan('-g')})`
+      `Add project-level skills with ${pc.cyan(`${CLI_RUN_COMMAND} add <package>`)} (without ${pc.cyan('-g')})`
     );
     return;
   }

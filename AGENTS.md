@@ -1,25 +1,25 @@
 # AGENTS.md
 
-This file provides guidance to AI coding agents working on the `skills` CLI codebase.
+This file provides guidance to AI coding agents working on the `open-skills` CLI codebase.
 
 ## Project Overview
 
-`skills` is the CLI for the open agent skills ecosystem.
+`open-skills` is the CLI for the open agent skills ecosystem.
 
 ## Commands
 
-| Command                       | Description                                         |
-| ----------------------------- | --------------------------------------------------- |
-| `skills`                      | Show banner with available commands                 |
-| `skills add <pkg>`            | Install skills from git repos, URLs, or local paths |
-| `skills use <pkg>@<skill>`    | Use one skill without installing                    |
-| `skills experimental_install` | Restore skills from skills-lock.json                |
-| `skills experimental_sync`    | Sync skills from node_modules into agent dirs       |
-| `skills list`                 | List installed skills (alias: `ls`)                 |
-| `skills update [skills...]`   | Update skills to latest versions                    |
-| `skills init [name]`          | Create a new SKILL.md template                      |
+| Command                            | Description                                         |
+| ---------------------------------- | --------------------------------------------------- |
+| `open-skills`                      | Show banner with available commands                 |
+| `open-skills add <pkg>`            | Install skills from git repos, URLs, or local paths |
+| `open-skills use <pkg>@<skill>`    | Use one skill without installing                    |
+| `open-skills experimental_install` | Restore skills from skills-lock.json                |
+| `open-skills experimental_sync`    | Sync skills from node_modules into agent dirs       |
+| `open-skills list`                 | List installed skills (alias: `ls`)                 |
+| `open-skills update [skills...]`   | Update skills to latest versions                    |
+| `open-skills init [name]`          | Create a new SKILL.md template                      |
 
-Aliases: `skills a` works for `add`. `skills i`, `skills install` (no args) restore from `skills-lock.json`. `skills ls` works for `list`. `skills experimental_install` restores from `skills-lock.json`. `skills experimental_sync` crawls `node_modules` for skills.
+The installed `skills` and `add-skill` executables are compatibility aliases. `open-skills a` works for `add`. `open-skills i`, `open-skills install` (no args) restore from `skills-lock.json`. `open-skills ls` works for `list`. `open-skills experimental_install` restores from `skills-lock.json`. `open-skills experimental_sync` crawls `node_modules` for skills.
 
 ## Architecture
 
@@ -78,14 +78,14 @@ tests/
 
 ## Update Checking System
 
-### How `skills check` and `skills update` Work
+### How `open-skills check` and `open-skills update` Work
 
 1. Read `~/.agents/.skill-lock.json` for installed skills
 2. Filter to GitHub-backed skills that have both `skillFolderHash` and `skillPath`
 3. Group skills by source and fetch each repository tree once through `src/github-tree.ts`. Optional auth is sourced lazily from `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token` after an anonymous request is rate-limited or identifies a private-repository retry.
 4. Tree retrieval uses an explicit recorded ref when present; otherwise it tries `HEAD`, `main`, then `master`.
 5. Resolve each skill folder's tree SHA and compare it with the lock file's `skillFolderHash`; a mismatch means an update is available.
-6. `skills update` reinstalls changed skills by invoking the current CLI entrypoint directly (`node <repo>/bin/cli.mjs add <source-tree-url> -g -y`) to avoid nested npm exec/npx behavior.
+6. `open-skills update` reinstalls changed skills by invoking the current CLI entrypoint directly (`node <repo>/bin/cli.mjs add <source-tree-url> -g -y`) to avoid nested npm exec/npx behavior.
 
 ### Lock File Compatibility
 
@@ -95,12 +95,12 @@ If reading an older lock file version, it's wiped. Users must reinstall skills t
 
 ## Key Integration Points
 
-| Feature                    | Implementation                                                  |
-| -------------------------- | --------------------------------------------------------------- |
-| `skills add`               | `src/add.ts` - full implementation                              |
-| `skills experimental_sync` | `src/sync.ts` - crawl node_modules                              |
-| `skills check`             | `src/cli.ts` + GitHub tree/hash helpers in `src/github-tree.ts` |
-| `skills update`            | `src/update.ts` hash compare + reinstall via `skills add`       |
+| Feature                            | Implementation                                                  |
+| ---------------------------------- | --------------------------------------------------------------- |
+| `open-skills add`                  | `src/add.ts` - full implementation                              |
+| `open-skills experimental_sync`    | `src/sync.ts` - crawl node_modules                              |
+| `open-skills check`                | `src/cli.ts` + GitHub tree/hash helpers in `src/github-tree.ts` |
+| `open-skills update`               | `src/update.ts` hash compare + reinstall via `open-skills add`  |
 
 ## Development
 
@@ -112,7 +112,7 @@ pnpm install
 pnpm build
 
 # Test locally
-pnpm dev add vercel-labs/agent-skills --list
+pnpm dev add NathanBeddoeWebDev/open-skills --list
 pnpm dev experimental_sync
 pnpm dev check
 pnpm dev update

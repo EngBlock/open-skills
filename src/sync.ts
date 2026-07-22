@@ -14,6 +14,7 @@ import {
 } from './agents.ts';
 import { searchMultiselect } from './prompts/search-multiselect.ts';
 import { addSkillToLocalLock, computeSkillFolderHash, readLocalLock } from './local-lock.ts';
+import { CLI_NAME } from './constants.ts';
 import type { Skill, AgentType } from './types.ts';
 import { detectAgent, getAgentType } from './detect-agent.ts';
 
@@ -151,7 +152,7 @@ export async function runSync(args: string[], options: SyncOptions = {}): Promis
 
   console.log();
   if (!agentResult.isAgent) {
-    p.intro(pc.bgCyan(pc.black(' skills experimental_sync ')));
+    p.intro(pc.bgCyan(pc.black(` ${CLI_NAME} experimental_sync `)));
   }
 
   if (agentResult.isAgent) {

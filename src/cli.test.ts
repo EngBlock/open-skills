@@ -25,7 +25,10 @@ describe('skills CLI', () => {
   describe('--help', () => {
     it('should display help message', () => {
       const output = runCliOutput(['--help']);
-      expect(output).toContain('Usage: skills <command> [options]');
+      expect(output).toContain('Usage: open-skills <command> [options]');
+      expect(output).toContain('npx open-skills add NathanBeddoeWebDev/open-skills');
+      expect(output).not.toContain('npx skills');
+      expect(output).not.toContain('vercel-labs');
       expect(output).toContain('Manage Skills:');
       expect(output).toContain('init [name]');
       expect(output).toContain('add <package>');
@@ -77,10 +80,12 @@ describe('skills CLI', () => {
       const result = runCli([]);
       const output = stripLogo(result.stdout);
       expect(output).toContain('The open agent skills ecosystem');
-      expect(output).toContain('npx skills add');
-      expect(output).toContain('npx skills use');
-      expect(output).toContain('npx skills update');
-      expect(output).toContain('npx skills init');
+      expect(output).toContain('npx open-skills add');
+      expect(output).toContain('npx open-skills use');
+      expect(output).toContain('npx open-skills update');
+      expect(output).toContain('npx open-skills init');
+      expect(output).toContain('NathanBeddoeWebDev/open-skills');
+      expect(output).not.toContain('npx skills');
       expect(output).not.toContain('Search for skills');
       expect(output).not.toContain('skills.sh');
     });
@@ -164,7 +169,7 @@ describe('skills CLI', () => {
   });
 
   describe('legacy find commands', () => {
-    const migrationGuidance = `Hosted skill search is no longer available.\nDiscover skills by searching GitHub and the web for SKILL.md files, then install one with:\n  npx skills add <owner>/<repo>@<skill>`;
+    const migrationGuidance = `Hosted skill search is no longer available.\nDiscover skills by searching GitHub and the web for SKILL.md files, then install one with:\n  npx open-skills add <owner>/<repo>@<skill>`;
 
     it.each(['find', 'search', 'f', 's'])(
       '%s returns stable offline migration guidance',
@@ -207,7 +212,7 @@ describe('skills CLI', () => {
       const output = runCliOutput(['unknown-command']);
       expect(output).toMatchInlineSnapshot(`
         "Unknown command: unknown-command
-        Run skills --help for usage.
+        Run open-skills --help for usage.
         "
       `);
     });
@@ -246,13 +251,13 @@ describe('skills CLI', () => {
       it(label, () => {
         const result = runCli([command, '--help']);
         expect(result.exitCode).toBe(0);
-        expect(result.stdout).toContain('Usage: skills <command> [options]');
+        expect(result.stdout).toContain('Usage: open-skills <command> [options]');
       });
 
       it(`${label} (-h alias)`, () => {
         const result = runCli([command, '-h']);
         expect(result.exitCode).toBe(0);
-        expect(result.stdout).toContain('Usage: skills <command> [options]');
+        expect(result.stdout).toContain('Usage: open-skills <command> [options]');
       });
     }
 
@@ -260,7 +265,7 @@ describe('skills CLI', () => {
       const result = runCli(['remove', '--help']);
       expect(result.exitCode).toBe(0);
       // remove has its own help screen distinct from the top-level usage banner
-      expect(result.stdout).toContain('skills remove');
+      expect(result.stdout).toContain('open-skills remove');
       expect(result.stdout).not.toContain('skills.sh');
     });
 

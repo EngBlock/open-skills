@@ -267,6 +267,7 @@ describe('git clone fallbacks', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(GitCloneError);
       expect((error as Error).message).toMatch(/SAML SSO/);
+      expect((error as Error).message).toContain('open-skills tried');
       expect((error as Error).message).toMatch(/git@github\.com:Giphy\/giphy-codex-skills\.git/);
     }
   });

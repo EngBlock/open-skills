@@ -5,6 +5,7 @@ import { tmpdir } from 'os';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { isGitHubHost } from './github-host.ts';
+import { CLI_NAME, CLI_RUN_COMMAND } from './constants.ts';
 
 const DEFAULT_CLONE_TIMEOUT_MS = 300_000; // 5 minutes
 const ALLOWED_GIT_PROTOCOLS = 'https:http:ssh:git:file';
@@ -208,9 +209,9 @@ function buildGitHubAuthError(url: string, repo: GitHubRepoInfo | null, message:
   if (repo && isGitHubSsoAuthError(message)) {
     return (
       `GitHub blocked HTTPS access to ${url} because the organization enforces SAML SSO.\n` +
-      `  skills tried your existing git credentials and available fallbacks, but none succeeded.\n` +
+      `  ${CLI_NAME} tried your existing git credentials and available fallbacks, but none succeeded.\n` +
       `  - Re-authorize your GitHub credentials/app for that org's SSO policy\n` +
-      `  - Or rerun with SSH: npx skills add ${repo.sshUrl}\n` +
+      `  - Or rerun with SSH: ${CLI_RUN_COMMAND} add ${repo.sshUrl}\n` +
       `  - Verify access with: gh auth status -h ${host} or ssh -T git@${host}`
     );
   }
@@ -219,7 +220,7 @@ function buildGitHubAuthError(url: string, repo: GitHubRepoInfo | null, message:
     return (
       `Authentication failed for ${url}.\n` +
       `  - For private repos, ensure you have access\n` +
-      `  - Retry with SSH: npx skills add ${repo.sshUrl}\n` +
+      `  - Retry with SSH: ${CLI_RUN_COMMAND} add ${repo.sshUrl}\n` +
       `  - Check access with: gh auth status -h ${host} or ssh -T git@${host}`
     );
   }
@@ -255,7 +256,7 @@ export async function cloneRepo(url: string, ref?: string): Promise<string> {
       throw new GitCloneError(
         `Clone timed out after ${seconds}s. Common causes:\n` +
           `  - Large repository: raise the timeout with SKILLS_CLONE_TIMEOUT_MS=600000 (10m)\n` +
-          `  - Slow network: retry, or clone manually and pass the local path to 'skills add'\n` +
+          `  - Slow network: retry, or clone manually and pass the local path to '${CLI_NAME} add'\n` +
           `  - Private repo without credentials: ensure auth is configured\n` +
           `      - For SSH: ssh-add -l (to check loaded keys)\n` +
           `      - For HTTPS: gh auth status (if using GitHub CLI)`,

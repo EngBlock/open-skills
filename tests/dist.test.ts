@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripTerminalEscapes } from '../src/sanitize.ts';
 
 const rootDir = join(import.meta.dirname, '..');
 
@@ -17,7 +18,7 @@ describe('dist build', () => {
       encoding: 'utf-8',
     });
 
-    expect(result).toContain('skills');
+    expect(stripTerminalEscapes(result)).toContain('Usage: open-skills <command> [options]');
 
     const dependencyArtifacts = [
       'package.json',
@@ -27,6 +28,8 @@ describe('dist build', () => {
       'ThirdPartyNoticeText.txt',
     ].map((path) => readFileSync(join(rootDir, path), 'utf-8'));
 
-    expect(dependencyArtifacts.join('\n')).not.toContain('@vercel/detect-agent');
+    const artifacts = dependencyArtifacts.join('\n');
+    expect(artifacts).toContain('Open Skills CLI ThirdPartyNotices');
+    expect(artifacts).not.toContain('@vercel/detect-agent');
   });
 });

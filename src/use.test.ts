@@ -95,11 +95,11 @@ describe('use command', () => {
       const multiple = parseUseOptions(['source', '--agent', 'claude-code', 'codex']);
 
       expect(wildcard.errors).toContain(
-        "skills use --agent does not support '*'; specify exactly one agent."
+        "open-skills use --agent does not support '*'; specify exactly one agent."
       );
       expect(missing.errors).toContain('--agent requires an agent name');
       expect(invalid.errors.join('\n')).toContain('Invalid agents: not-an-agent');
-      expect(multiple.errors).toContain('skills use --agent accepts exactly one agent.');
+      expect(multiple.errors).toContain('open-skills use --agent accepts exactly one agent.');
     });
   });
 

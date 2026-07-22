@@ -12,6 +12,7 @@ import { runSync, parseSyncOptions } from './sync.ts';
 import { isRunningInAgent } from './detect-agent.ts';
 import { runUpdate } from './update.ts';
 import { runUse, parseUseOptions } from './use.ts';
+import { CLI_NAME, CLI_RUN_COMMAND, PROJECT_REPOSITORY } from './constants.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -66,44 +67,44 @@ function showBanner(): void {
   console.log(`${DIM}The open agent skills ecosystem${RESET}`);
   console.log();
   console.log(
-    `  ${DIM}$${RESET} ${TEXT}npx skills add ${DIM}<package>${RESET}        ${DIM}Add a new skill${RESET}`
+    `  ${DIM}$${RESET} ${TEXT}${CLI_RUN_COMMAND} add ${DIM}<package>${RESET}        ${DIM}Add a new skill${RESET}`
   );
   console.log(
-    `  ${DIM}$${RESET} ${TEXT}npx skills use ${DIM}<package>@<skill>${RESET} ${DIM}Use a skill without installing${RESET}`
+    `  ${DIM}$${RESET} ${TEXT}${CLI_RUN_COMMAND} use ${DIM}<package>@<skill>${RESET} ${DIM}Use a skill without installing${RESET}`
   );
   console.log(
-    `  ${DIM}$${RESET} ${TEXT}npx skills remove${RESET}               ${DIM}Remove installed skills${RESET}`
+    `  ${DIM}$${RESET} ${TEXT}${CLI_RUN_COMMAND} remove${RESET}               ${DIM}Remove installed skills${RESET}`
   );
   console.log(
-    `  ${DIM}$${RESET} ${TEXT}npx skills list${RESET}                 ${DIM}List installed skills${RESET}`
+    `  ${DIM}$${RESET} ${TEXT}${CLI_RUN_COMMAND} list${RESET}                 ${DIM}List installed skills${RESET}`
   );
   console.log();
   console.log(
-    `  ${DIM}$${RESET} ${TEXT}npx skills update${RESET}               ${DIM}Update installed skills${RESET}`
+    `  ${DIM}$${RESET} ${TEXT}${CLI_RUN_COMMAND} update${RESET}               ${DIM}Update installed skills${RESET}`
   );
   console.log();
   console.log(
-    `  ${DIM}$${RESET} ${TEXT}npx skills experimental_install${RESET} ${DIM}Restore from skills-lock.json${RESET}`
+    `  ${DIM}$${RESET} ${TEXT}${CLI_RUN_COMMAND} experimental_install${RESET} ${DIM}Restore from skills-lock.json${RESET}`
   );
   console.log(
-    `  ${DIM}$${RESET} ${TEXT}npx skills init ${DIM}[name]${RESET}          ${DIM}Create a new skill${RESET}`
+    `  ${DIM}$${RESET} ${TEXT}${CLI_RUN_COMMAND} init ${DIM}[name]${RESET}          ${DIM}Create a new skill${RESET}`
   );
   console.log(
-    `  ${DIM}$${RESET} ${TEXT}npx skills experimental_sync${RESET}    ${DIM}Sync skills from node_modules${RESET}`
+    `  ${DIM}$${RESET} ${TEXT}${CLI_RUN_COMMAND} experimental_sync${RESET}    ${DIM}Sync skills from node_modules${RESET}`
   );
   console.log();
-  console.log(`${DIM}try:${RESET} npx skills add vercel-labs/agent-skills`);
+  console.log(`${DIM}try:${RESET} ${CLI_RUN_COMMAND} add ${PROJECT_REPOSITORY}@find-skills`);
   console.log();
 }
 
 function showHelp(): void {
   console.log(`
-${BOLD}Usage:${RESET} skills <command> [options]
+${BOLD}Usage:${RESET} ${CLI_NAME} <command> [options]
 
 ${BOLD}Manage Skills:${RESET}
   add <package>        Add a skill package (alias: a)
-                       e.g. vercel-labs/agent-skills
-                            https://github.com/vercel-labs/agent-skills
+                       e.g. ${PROJECT_REPOSITORY}
+                            https://github.com/${PROJECT_REPOSITORY}
   use <package>@<skill>
                        Generate a prompt for using one skill without installing it
   remove [skills]      Remove installed skills
@@ -162,32 +163,32 @@ ${BOLD}Options:${RESET}
   --version, -v     Show version number
 
 ${BOLD}Examples:${RESET}
-  ${DIM}$${RESET} skills add vercel-labs/agent-skills
-  ${DIM}$${RESET} skills use vercel-labs/agent-skills@vercel-optimize | claude
-  ${DIM}$${RESET} skills use vercel-labs/agent-skills --skill vercel-optimize --agent claude-code
-  ${DIM}$${RESET} skills add vercel-labs/agent-skills -g
-  ${DIM}$${RESET} skills add vercel-labs/agent-skills --agent claude-code cursor
-  ${DIM}$${RESET} skills add vercel-labs/agent-skills --skill pr-review commit
-  ${DIM}$${RESET} skills remove                        ${DIM}# interactive remove${RESET}
-  ${DIM}$${RESET} skills remove web-design             ${DIM}# remove by name${RESET}
-  ${DIM}$${RESET} skills rm --global frontend-design
-  ${DIM}$${RESET} skills list                          ${DIM}# list project skills${RESET}
-  ${DIM}$${RESET} skills ls -g                         ${DIM}# list global skills${RESET}
-  ${DIM}$${RESET} skills ls -a claude-code             ${DIM}# filter by agent${RESET}
-  ${DIM}$${RESET} skills ls --json                      ${DIM}# JSON output${RESET}
-  ${DIM}$${RESET} skills update
-  ${DIM}$${RESET} skills update my-skill             ${DIM}# update a single skill${RESET}
-  ${DIM}$${RESET} skills update -g                    ${DIM}# update global skills only${RESET}
-  ${DIM}$${RESET} skills experimental_install            ${DIM}# restore from skills-lock.json${RESET}
-  ${DIM}$${RESET} skills init my-skill
-  ${DIM}$${RESET} skills experimental_sync              ${DIM}# sync from node_modules${RESET}
-  ${DIM}$${RESET} skills experimental_sync -y           ${DIM}# sync without prompts${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} add ${PROJECT_REPOSITORY}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} use ${PROJECT_REPOSITORY}@find-skills | claude
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} use ${PROJECT_REPOSITORY} --skill find-skills --agent claude-code
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} add ${PROJECT_REPOSITORY} -g
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} add ${PROJECT_REPOSITORY} --agent claude-code cursor
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} add ${PROJECT_REPOSITORY} --skill find-skills
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} remove                        ${DIM}# interactive remove${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} remove web-design             ${DIM}# remove by name${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} rm --global frontend-design
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} list                          ${DIM}# list project skills${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} ls -g                         ${DIM}# list global skills${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} ls -a claude-code             ${DIM}# filter by agent${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} ls --json                      ${DIM}# JSON output${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} update
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} update my-skill             ${DIM}# update a single skill${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} update -g                    ${DIM}# update global skills only${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} experimental_install            ${DIM}# restore from skills-lock.json${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} init my-skill
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} experimental_sync              ${DIM}# sync from node_modules${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} experimental_sync -y           ${DIM}# sync without prompts${RESET}
 `);
 }
 
 function showRemoveHelp(): void {
   console.log(`
-${BOLD}Usage:${RESET} skills remove [skills...] [options]
+${BOLD}Usage:${RESET} ${CLI_NAME} remove [skills...] [options]
 
 ${BOLD}Description:${RESET}
   Remove installed skills from agents. If no skill names are provided,
@@ -204,13 +205,13 @@ ${BOLD}Options:${RESET}
   --all              Shorthand for --skill '*' --agent '*' -y
 
 ${BOLD}Examples:${RESET}
-  ${DIM}$${RESET} skills remove                           ${DIM}# interactive selection${RESET}
-  ${DIM}$${RESET} skills remove my-skill                   ${DIM}# remove specific skill${RESET}
-  ${DIM}$${RESET} skills remove skill1 skill2 -y           ${DIM}# remove multiple skills${RESET}
-  ${DIM}$${RESET} skills remove --global my-skill          ${DIM}# remove from global scope${RESET}
-  ${DIM}$${RESET} skills rm --agent claude-code my-skill   ${DIM}# remove from specific agent${RESET}
-  ${DIM}$${RESET} skills remove --all                      ${DIM}# remove all skills${RESET}
-  ${DIM}$${RESET} skills remove --skill '*' -a cursor      ${DIM}# remove all skills from cursor${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} remove                           ${DIM}# interactive selection${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} remove my-skill                   ${DIM}# remove specific skill${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} remove skill1 skill2 -y           ${DIM}# remove multiple skills${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} remove --global my-skill          ${DIM}# remove from global scope${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} rm --agent claude-code my-skill   ${DIM}# remove from specific agent${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} remove --all                      ${DIM}# remove all skills${RESET}
+  ${DIM}$${RESET} ${CLI_RUN_COMMAND} remove --skill '*' -a cursor      ${DIM}# remove all skills from cursor${RESET}
 `);
 }
 
@@ -267,10 +268,10 @@ Describe when this skill should be used.
   console.log();
   console.log(`${DIM}Publishing:${RESET}`);
   console.log(
-    `  ${DIM}GitHub:${RESET}  Push to a repo, then ${TEXT}npx skills add <owner>/<repo>${RESET}`
+    `  ${DIM}GitHub:${RESET}  Push to a repo, then ${TEXT}${CLI_RUN_COMMAND} add <owner>/<repo>${RESET}`
   );
   console.log(
-    `  ${DIM}URL:${RESET}     Host the file, then ${TEXT}npx skills add https://example.com/${displayPath}${RESET}`
+    `  ${DIM}URL:${RESET}     Host the file, then ${TEXT}${CLI_RUN_COMMAND} add https://example.com/${displayPath}${RESET}`
   );
   console.log();
 }
@@ -384,7 +385,7 @@ async function main(): Promise<void> {
 
     default:
       console.log(`Unknown command: ${command}`);
-      console.log(`Run ${BOLD}skills --help${RESET} for usage.`);
+      console.log(`Run ${BOLD}${CLI_NAME} --help${RESET} for usage.`);
       process.exitCode = 1;
   }
 }

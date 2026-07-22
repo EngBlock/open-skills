@@ -1,9 +1,10 @@
 {
-  "name": "skills",
-  "version": "1.5.20",
+  "name": "open-skills",
+  "version": "0.1.0",
   "description": "The open agent skills ecosystem",
   "type": "module",
   "bin": {
+    "open-skills": "./bin/cli.mjs",
     "skills": "./bin/cli.mjs",
     "add-skill": "./bin/cli.mjs"
   },
@@ -34,6 +35,7 @@
   "keywords": [
     "cli",
     "agent-skills",
+    "open-skills",
     "skills",
     "ai-agents",
     "aider-desk",
@@ -114,13 +116,13 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vercel-labs/skills.git"
+    "url": "git+https://github.com/NathanBeddoeWebDev/open-skills.git"
   },
-  "homepage": "https://github.com/vercel-labs/skills#readme",
+  "homepage": "https://github.com/NathanBeddoeWebDev/open-skills#readme",
   "bugs": {
-    "url": "https://github.com/vercel-labs/skills/issues"
+    "url": "https://github.com/NathanBeddoeWebDev/open-skills/issues"
   },
-  "author": "",
+  "author": "Nathan Beddoe",
   "license": "MIT",
   "devDependencies": {
     "@clack/prompts": "^1.2.0",

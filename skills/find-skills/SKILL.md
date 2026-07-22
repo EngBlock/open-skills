@@ -75,7 +75,7 @@ Present a short list, best match first. For each recommendation include:
 - an install command using the explicit source, for example:
 
 ```bash
-npx skills add <owner>/<repository>@<skill-name>
+npx open-skills add <owner>/<repository>@<skill-name>
 ```
 
 If the skill is selected by a repository subpath instead, use that exact GitHub tree URL. Never invent a package name or imply that popularity provides a security review.
@@ -87,5 +87,5 @@ Ask the user before installing a recommendation. If they approve, install only t
 Say what you searched and why the candidates were rejected or remained unverifiable. Offer to help with the task directly. If the task recurs, suggest creating a local skill with:
 
 ```bash
-npx skills init <skill-name>
+npx open-skills init <skill-name>
 ```

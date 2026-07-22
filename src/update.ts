@@ -14,6 +14,7 @@ import {
   shouldUseFullDepthForUpdate,
 } from './update-source.ts';
 import { cloneRepo, cleanupTempDir } from './git.ts';
+import { CLI_RUN_COMMAND } from './constants.ts';
 import { discoverSkills } from './skills.ts';
 import { fetchRepoTree, getSkillFolderHashFromTree } from './github-tree.ts';
 import { removeCommand } from './remove.ts';
@@ -217,7 +218,7 @@ export function printSkippedSkills(skipped: SkippedSkill[]): void {
       const names = skills.map((s) => sanitizeMetadata(s.name)).join(', ');
       console.log(`  ${TEXT}•${RESET} ${names} ${DIM}(${reason})${RESET}`);
     }
-    console.log(`    ${DIM}To update: ${TEXT}npx skills add ${source} -g -y${RESET}`);
+    console.log(`    ${DIM}To update: ${TEXT}${CLI_RUN_COMMAND} add ${source} -g -y${RESET}`);
   }
 }
 
@@ -292,7 +293,9 @@ export async function updateGlobalSkills(
   if (skillNames.length === 0) {
     if (!options.skills) {
       console.log(`${DIM}No global skills tracked in lock file.${RESET}`);
-      console.log(`${DIM}Install skills with${RESET} ${TEXT}npx skills add <package> -g${RESET}`);
+      console.log(
+        `${DIM}Install skills with${RESET} ${TEXT}${CLI_RUN_COMMAND} add <package> -g${RESET}`
+      );
     }
     return { successCount, failCount, checkedCount: 0 };
   }
@@ -504,7 +507,7 @@ export async function updateProjectSkills(
     if (!options.skills) {
       console.log(`${DIM}No project skills to update.${RESET}`);
       console.log(
-        `${DIM}Install project skills with${RESET} ${TEXT}npx skills add <package>${RESET}`
+        `${DIM}Install project skills with${RESET} ${TEXT}${CLI_RUN_COMMAND} add <package>${RESET}`
       );
     }
     return { successCount, failCount, foundCount: 0 };
@@ -678,7 +681,7 @@ export function printLegacyProjectSkills(
     const reinstall = buildLocalUpdateSource(skill.entry);
     console.log(`  ${TEXT}•${RESET} ${sanitizeMetadata(skill.name)}`);
     if (reinstall) {
-      console.log(`    ${DIM}To refresh: ${TEXT}npx skills add ${reinstall} -y${RESET}`);
+      console.log(`    ${DIM}To refresh: ${TEXT}${CLI_RUN_COMMAND} add ${reinstall} -y${RESET}`);
     } else {
       console.log(
         `    ${DIM}To refresh: reinstall using the original full Git URL; this lock entry only has an ambiguous shorthand.${RESET}`

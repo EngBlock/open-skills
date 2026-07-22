@@ -62,6 +62,7 @@ This is a test skill.
     );
 
     const result = runCli(['add', testDir, '--list'], testDir);
+    expect(result.stdout).toContain('open-skills');
     expect(result.stdout).toContain('test-skill');
     expect(result.stdout).toContain('A test skill for testing');
     expect(result.exitCode).toBe(0);
