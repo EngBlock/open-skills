@@ -127,28 +127,6 @@ describe('use command', () => {
   });
 
   describe('materializeUseSkill', () => {
-    it('writes blob-shaped files to a skills-use temp directory', async () => {
-      const skill: UseSkill = {
-        kind: 'blob',
-        name: 'Blob Skill',
-        directoryName: 'Blob Skill',
-        rawContent: '# Blob Skill',
-        files: [
-          { path: 'SKILL.md', contents: '# Blob Skill' },
-          { path: 'scripts/run.sh', contents: 'echo hi' },
-        ],
-      };
-
-      const materialized = await materializeUseSkill(skill);
-      cleanupDirs.push(materialized.tempRoot);
-
-      expect(materialized.skillDir).toContain('skills-use-');
-      expect(readFileSync(join(materialized.skillDir, 'scripts', 'run.sh'), 'utf-8')).toBe(
-        'echo hi'
-      );
-      expect(materialized.hasSupportingFiles).toBe(true);
-    });
-
     it('writes well-known-shaped files to a skills-use temp directory', async () => {
       const skill: UseSkill = {
         kind: 'well-known',

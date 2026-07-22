@@ -14,7 +14,7 @@ import {
   realpath,
 } from 'fs/promises';
 import { existsSync } from 'fs';
-import { join, basename, normalize, resolve, sep, relative, dirname, extname } from 'path';
+import { join, basename, normalize, resolve, sep, relative, dirname } from 'path';
 import { homedir, platform } from 'os';
 import type { Skill, AgentType, RemoteSkill } from './types.ts';
 import type { WellKnownSkill } from './providers/wellknown.ts';
@@ -513,20 +513,8 @@ async function copyDirectory(src: string, dest: string, agentType?: AgentType): 
   );
 }
 
-function isEvePackagedSkill(files: Array<{ path: string; contents?: string }>): boolean {
-  return files.some((file) => basename(file.path).toLowerCase() === 'skill.md');
-}
-
 function toEveFlatSkillFileName(installName: string): string {
   return `${sanitizeName(installName)}.md`;
-}
-
-function getEveFlatSkillMarkdown(files: Array<{ path: string; contents: string }>): string {
-  const skillFile = files.find((file) => basename(file.path).toLowerCase() === 'skill.md');
-  if (skillFile) return stripIgnoredEveFrontmatter(skillFile.contents);
-
-  const markdownFile = files.find((file) => extname(file.path).toLowerCase() === '.md');
-  return markdownFile ? stripIgnoredEveFrontmatter(markdownFile.contents) : '';
 }
 
 export async function isSkillInstalled(
@@ -870,172 +858,6 @@ export async function installWellKnownSkillForAgent(
       await cleanAndCreateDirectory(agentDir);
       await writeSkillFiles(agentDir);
 
-      return {
-        success: true,
-        path: agentDir,
-        canonicalPath: canonicalDir,
-        mode: 'symlink',
-        symlinkFailed: true,
-      };
-    }
-
-    return {
-      success: true,
-      path: agentDir,
-      canonicalPath: canonicalDir,
-      mode: 'symlink',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      path: agentDir,
-      mode: installMode,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-}
-
-/**
- * Install a blob-downloaded skill (fetched from skills.sh download API).
- * Similar to installWellKnownSkillForAgent but takes the snapshot file format
- * (array of { path, contents }) instead of a Map.
- */
-export async function installBlobSkillForAgent(
-  skill: { installName: string; files: Array<{ path: string; contents: string }> },
-  agentType: AgentType,
-  options: { global?: boolean; cwd?: string; mode?: InstallMode; eveSubagent?: string } = {}
-): Promise<InstallResult> {
-  const agent = agents[agentType];
-  const isGlobal = options.global ?? false;
-  const cwd = options.cwd || process.cwd();
-  const installMode = options.mode ?? 'symlink';
-  const eveSubagent = options.eveSubagent;
-
-  if (isGlobal && agent.globalSkillsDir === undefined) {
-    return {
-      success: false,
-      path: '',
-      mode: installMode,
-      error: `${agent.displayName} does not support global skill installation`,
-    };
-  }
-
-  const skillName = sanitizeName(skill.installName);
-  const agentBase = getAgentBaseDir(agentType, isGlobal, cwd, eveSubagent);
-
-  if (agentType === 'eve' && !isEvePackagedSkill(skill.files)) {
-    const flatSkillPath = join(agentBase, toEveFlatSkillFileName(skill.installName));
-    if (!isPathSafe(agentBase, flatSkillPath)) {
-      return {
-        success: false,
-        path: flatSkillPath,
-        mode: installMode,
-        error: 'Invalid skill name: potential path traversal detected',
-      };
-    }
-
-    try {
-      await mkdir(agentBase, { recursive: true });
-      await rm(flatSkillPath, { recursive: true, force: true });
-      await writeFile(flatSkillPath, getEveFlatSkillMarkdown(skill.files), 'utf-8');
-      return { success: true, path: flatSkillPath, mode: 'copy' };
-    } catch (error) {
-      return {
-        success: false,
-        path: flatSkillPath,
-        mode: installMode,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
-  }
-
-  const canonicalBase =
-    agentType === 'eve' && installMode === 'symlink'
-      ? getAgentBaseDir(agentType, isGlobal, cwd, eveSubagent)
-      : getCanonicalSkillsDir(isGlobal, cwd);
-  const canonicalDir = join(canonicalBase, skillName);
-  const agentDir = join(agentBase, skillName);
-
-  if (!isPathSafe(canonicalBase, canonicalDir)) {
-    return {
-      success: false,
-      path: agentDir,
-      mode: installMode,
-      error: 'Invalid skill name: potential path traversal detected',
-    };
-  }
-
-  if (!isPathSafe(agentBase, agentDir)) {
-    return {
-      success: false,
-      path: agentDir,
-      mode: installMode,
-      error: 'Invalid skill name: potential path traversal detected',
-    };
-  }
-
-  async function writeSkillFiles(targetDir: string): Promise<void> {
-    for (const file of skill.files) {
-      const fullPath = join(targetDir, file.path);
-      if (!isPathSafe(targetDir, fullPath)) continue;
-
-      const parentDir = dirname(fullPath);
-      if (parentDir !== targetDir) {
-        await mkdir(parentDir, { recursive: true });
-      }
-
-      await writeFile(
-        fullPath,
-        agentType === 'eve' && basename(file.path).toLowerCase() === 'skill.md'
-          ? stripIgnoredEveFrontmatter(file.contents)
-          : file.contents,
-        'utf-8'
-      );
-    }
-  }
-
-  try {
-    if (installMode === 'copy') {
-      await cleanAndCreateDirectory(agentDir);
-      await writeSkillFiles(agentDir);
-      return { success: true, path: agentDir, mode: 'copy' };
-    }
-
-    // Symlink mode
-    await cleanAndCreateDirectory(canonicalDir);
-    await writeSkillFiles(canonicalDir);
-
-    if (isGlobal && isUniversalAgent(agentType)) {
-      return {
-        success: true,
-        path: canonicalDir,
-        canonicalPath: canonicalDir,
-        mode: 'symlink',
-      };
-    }
-
-    // For project-level installs, skip creating symlinks for non-universal agents
-    // whose config directory doesn't already exist in the project. Claude Code is
-    // exempted since it can be explicitly selected as the install target even when
-    // .claude/ doesn't exist yet (see installSkillForAgent for the same exemption).
-    if (!isGlobal && !isUniversalAgent(agentType)) {
-      const agentRootDir = join(cwd, agents[agentType].skillsDir.split('/')[0]!);
-      if (!existsSync(agentRootDir) && agentType !== 'claude-code') {
-        return {
-          success: true,
-          path: canonicalDir,
-          canonicalPath: canonicalDir,
-          mode: 'symlink',
-          skipped: true,
-        };
-      }
-    }
-
-    const symlinkCreated = await createSymlink(canonicalDir, agentDir);
-
-    if (!symlinkCreated) {
-      await cleanAndCreateDirectory(agentDir);
-      await writeSkillFiles(agentDir);
       return {
         success: true,
         path: agentDir,
