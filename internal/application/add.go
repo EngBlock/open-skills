@@ -32,11 +32,11 @@ type localSkill struct {
 	Path string
 }
 
-// runAddLocal owns the complete offline local-source workflow: discovery,
-// selection, canonical installation topology, and compatible lock mutation.
-// Keeping those decisions here gives the command a small seam while state owns
-// schema validation and persistence.
-func runAddLocal(invocation Invocation, arguments []string) int {
+// runAdd owns source acquisition, discovery, selection, canonical installation
+// topology, and compatible lock mutation. Git sources are materialized in an
+// isolated temporary checkout, then use the exact same discovery and install
+// path as local directories.
+func runAdd(invocation Invocation, arguments []string) int {
 	invocation.Stdin = bufio.NewReader(invocation.Stdin)
 	source, options, err := parseAddOptions(arguments)
 	if err != nil {
@@ -48,15 +48,50 @@ func runAddLocal(invocation Invocation, arguments []string) int {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Invalid local path: %v\n", err)
 		return 1
 	}
-	info, err := os.Stat(absoluteSource)
-	if err != nil || !info.IsDir() {
+	provenance := installationProvenance{Identity: source, URL: source, Type: "local"}
+	var workspace gitWorkspace
+	isGit := false
+	if info, statErr := os.Stat(absoluteSource); statErr == nil && info.IsDir() {
+		// Existing directories always retain local-source behavior, even when a
+		// directory happens to resemble an owner/repository shorthand.
+	} else if isClearlyLocalPath(source) {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Local path does not exist or is not a directory: %s\n", source)
 		return 1
+	} else {
+		git, parseErr := parseGitSource(source)
+		if parseErr != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, parseErr)
+			return 1
+		}
+		workspace, err = materializeGitSource(git)
+		if err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Acquire Git source: %v\n", err)
+			return 1
+		}
+		defer func() {
+			if removeErr := workspace.remove(); removeErr != nil {
+				_, _ = fmt.Fprintf(invocation.Stderr, "Remove Git workspace: %v\n", removeErr)
+			}
+		}()
+		absoluteSource = workspace.Root
+		if git.Subpath != "" {
+			absoluteSource = filepath.Join(absoluteSource, filepath.FromSlash(git.Subpath))
+			info, statErr := os.Stat(absoluteSource)
+			if statErr != nil || !info.IsDir() {
+				_, _ = fmt.Fprintf(invocation.Stderr, "Git source subpath does not exist or is not a directory: %s\n", git.Subpath)
+				return 1
+			}
+		}
+		if git.SkillFilter != "" {
+			options.Skills = append(options.Skills, git.SkillFilter)
+		}
+		provenance = installationProvenance{Identity: git.Identity, URL: git.URL, Type: git.Type, Ref: workspace.Commit, Workspace: &workspace}
+		isGit = true
 	}
 
 	skills, err := discoverLocalSkills(absoluteSource, options.FullDepth)
 	if err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Discover local skills: %v\n", err)
+		_, _ = fmt.Fprintf(invocation.Stderr, "Discover skills: %v\n", err)
 		return 1
 	}
 	if len(skills) == 0 {
@@ -74,6 +109,14 @@ func runAddLocal(invocation Invocation, arguments []string) int {
 	if err != nil {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
+	}
+	if isGit {
+		for _, skill := range selected {
+			if err := rejectLFSPointers(skill.Path); err != nil {
+				_, _ = fmt.Fprintf(invocation.Stderr, "Install %s: %v\n", skill.Name, err)
+				return 1
+			}
+		}
 	}
 	project, err := os.Getwd()
 	if err != nil {
@@ -97,13 +140,22 @@ func runAddLocal(invocation Invocation, arguments []string) int {
 		return 1
 	}
 	for _, skill := range selected {
-		if err := installLocalSkill(skill, absoluteSource, scope, base, project, home, agents, options.Copy, options.Subagents); err != nil {
+		if err := installLocalSkill(skill, provenance, scope, base, project, home, agents, options.Copy, options.Subagents); err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Install %s: %v\n", skill.Name, err)
 			return 1
 		}
 		_, _ = fmt.Fprintf(invocation.Stdout, "Installed %s\n", skill.Name)
 	}
 	return 0
+}
+
+// runAddLocal is retained for callers that exercised the original native seam.
+func runAddLocal(invocation Invocation, arguments []string) int {
+	return runAdd(invocation, arguments)
+}
+
+func isClearlyLocalPath(source string) bool {
+	return source == "." || source == ".." || strings.HasPrefix(source, "./") || strings.HasPrefix(source, "../") || filepath.IsAbs(source)
 }
 
 func parseAddOptions(arguments []string) (string, addOptions, error) {
@@ -381,7 +433,15 @@ func skillNames(skills []localSkill) string {
 	return strings.Join(names, ", ")
 }
 
-func installLocalSkill(skill localSkill, source string, scope state.Scope, base, project, home string, agents []string, copyMode bool, subagents []string) error {
+type installationProvenance struct {
+	Identity  string
+	URL       string
+	Type      string
+	Ref       string
+	Workspace *gitWorkspace
+}
+
+func installLocalSkill(skill localSkill, provenance installationProvenance, scope state.Scope, base, project, home string, agents []string, copyMode bool, subagents []string) error {
 	canonical := filepath.Join(base, ".agents", "skills", state.SanitizeName(skill.Name))
 	allEve := len(agents) > 0
 	for _, agent := range agents {
@@ -459,8 +519,28 @@ func installLocalSkill(skill localSkill, source string, scope state.Scope, base,
 	if err != nil {
 		return err
 	}
+	folderHash := hash
+	skillPath := ""
+	if provenance.Workspace != nil {
+		var err error
+		if provenance.Type == "github" {
+			folderHash, err = gitTreeHash(*provenance.Workspace, skill.Path)
+			if err != nil {
+				return err
+			}
+		}
+		relative, err := filepath.Rel(provenance.Workspace.Root, filepath.Join(skill.Path, "SKILL.md"))
+		if err != nil {
+			return fmt.Errorf("determine Git skill path: %w", err)
+		}
+		if relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("Git skill path escapes workspace: %s", skill.Path)
+		}
+		skillPath = filepath.ToSlash(relative)
+	}
 	if err := document.RecordInstallation(skill.Name, state.InstallationRecord{
-		Source: source, SourceURL: source, SourceType: "local", InstalledContentHash: hash, OwnedFiles: owned,
+		Source: provenance.Identity, SourceURL: provenance.URL, SourceType: provenance.Type,
+		Ref: provenance.Ref, SkillPath: skillPath, InstalledContentHash: hash, SkillFolderHash: folderHash, OwnedFiles: owned,
 		Agents: installedAgents, Subagents: recordedEveTargets(installedAgents, subagents),
 	}); err != nil {
 		return err

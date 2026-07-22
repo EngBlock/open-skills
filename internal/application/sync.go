@@ -339,7 +339,7 @@ func localSkillNamed(source, name string) (localSkill, bool) {
 }
 
 func installRecordedSkill(skill localSkill, source, sourceType, project string, agents, subagents []string) error {
-	if err := installLocalSkill(skill, source, state.Project, project, project, "", agents, false, subagents); err != nil {
+	if err := installLocalSkill(skill, installationProvenance{Identity: source, URL: source, Type: sourceType}, state.Project, project, project, "", agents, false, subagents); err != nil {
 		return err
 	}
 	hash, owned, err := contentIdentity(skill.Path)

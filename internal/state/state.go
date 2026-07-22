@@ -55,6 +55,8 @@ type LockEntry struct {
 	Source       string
 	SourceURL    string
 	SourceType   string
+	Ref          string
+	SkillPath    string
 	ComputedHash string
 	PluginName   string
 	Agents       []string
@@ -70,7 +72,10 @@ type InstallationRecord struct {
 	Source               string
 	SourceURL            string
 	SourceType           string
+	Ref                  string
+	SkillPath            string
 	InstalledContentHash string
+	SkillFolderHash      string
 	OwnedFiles           []string
 	// Agents records the selected adapter placements in stable registry order.
 	Agents []string
@@ -280,6 +285,10 @@ func decodeLockEntry(fields map[string]json.RawMessage, expectedVersion int) (Lo
 		switch name {
 		case "sourceUrl":
 			entry.SourceURL = decoded
+		case "ref":
+			entry.Ref = decoded
+		case "skillPath":
+			entry.SkillPath = decoded
 		case "pluginName":
 			entry.PluginName = decoded
 		}
@@ -351,7 +360,7 @@ func (document *Document) Marshal() ([]byte, error) {
 			}
 			fields[field] = encoded
 		}
-		for field, value := range map[string]string{"sourceUrl": entry.SourceURL, "pluginName": entry.PluginName} {
+		for field, value := range map[string]string{"sourceUrl": entry.SourceURL, "ref": entry.Ref, "skillPath": entry.SkillPath, "pluginName": entry.PluginName} {
 			if value == "" {
 				continue
 			}
@@ -418,20 +427,41 @@ func (document *Document) RecordInstallation(name string, record InstallationRec
 		if err := setString("computedHash", record.InstalledContentHash); err != nil {
 			return err
 		}
+		if record.SourceType != "git" && record.SourceType != "gitlab" {
+			delete(fields, "sourceUrl")
+		} else if record.SourceURL != "" {
+			if err := setString("sourceUrl", record.SourceURL); err != nil {
+				return err
+			}
+		}
 	} else {
 		if err := setString("sourceUrl", record.SourceURL); err != nil {
 			return err
 		}
-		if err := setString("skillFolderHash", record.InstalledContentHash); err != nil {
+		folderHash := record.SkillFolderHash
+		if folderHash == "" {
+			folderHash = record.InstalledContentHash
+		}
+		if err := setString("skillFolderHash", folderHash); err != nil {
 			return err
 		}
 		now := time.Now().UTC().Format(time.RFC3339Nano)
-		for _, field := range []string{"installedAt", "updatedAt"} {
-			if _, exists := fields[field]; !exists {
-				if err := setString(field, now); err != nil {
-					return err
-				}
+		if _, exists := fields["installedAt"]; !exists {
+			if err := setString("installedAt", now); err != nil {
+				return err
 			}
+		}
+		if err := setString("updatedAt", now); err != nil {
+			return err
+		}
+	}
+	for field, value := range map[string]string{"ref": record.Ref, "skillPath": record.SkillPath} {
+		if value == "" {
+			delete(fields, field)
+			continue
+		}
+		if err := setString(field, value); err != nil {
+			return err
 		}
 	}
 	if err := setString("installedContentHash", record.InstalledContentHash); err != nil {
@@ -460,7 +490,8 @@ func (document *Document) RecordInstallation(name string, record InstallationRec
 	}
 	document.Skills[name] = LockEntry{
 		Source: record.Source, SourceURL: record.SourceURL, SourceType: record.SourceType,
-		ComputedHash: record.InstalledContentHash, Agents: record.Agents, Subagents: record.Subagents, raw: fields,
+		Ref: record.Ref, SkillPath: record.SkillPath, ComputedHash: record.InstalledContentHash,
+		Agents: record.Agents, Subagents: record.Subagents, raw: fields,
 	}
 	return nil
 }

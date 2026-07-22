@@ -58,7 +58,7 @@ func TestInstallLocalSkillSkipsOverlappingAgentDestination(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(source, "SKILL.md"), []byte("---\nname: topology-skill\ndescription: test\n---\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := installLocalSkill(localSkill{Name: "topology-skill", Path: source}, filepath.Join(project, "skills"), state.Project, project, project, project, []string{"openclaw"}, true, nil); err != nil {
+	if err := installLocalSkill(localSkill{Name: "topology-skill", Path: source}, installationProvenance{Identity: filepath.Join(project, "skills"), URL: filepath.Join(project, "skills"), Type: "local"}, state.Project, project, project, project, []string{"openclaw"}, true, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(source, "SKILL.md")); err != nil {
