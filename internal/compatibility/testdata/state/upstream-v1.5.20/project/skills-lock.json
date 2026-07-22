@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "upstream-project": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vercel-labs/skills",
+      "computedHash": "upstream-project-hash"
+    }
+  }
+}

@@ -58,6 +58,8 @@ func Run(ctx context.Context, invocation Invocation) int {
 		}
 		_, _ = fmt.Fprintln(invocation.Stdout)
 		return runInit(invocation, invocation.Args[1:])
+	case "list", "ls":
+		return runList(invocation, invocation.Args[1:])
 	default:
 		_, _ = fmt.Fprintf(invocation.Stdout, "Unknown command: %s\nRun open-skills --help for usage.\n", command)
 		return 1

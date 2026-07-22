@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "project-zeta": {
+      "source": "EngBlock/project-skills",
+      "sourceType": "github",
+      "computedHash": "project-zeta-hash"
+    },
+    "project-alpha": {
+      "source": "EngBlock/project-skills",
+      "sourceUrl": "https://github.com/EngBlock/project-skills",
+      "sourceType": "github",
+      "skillPath": "skills/project-alpha/SKILL.md",
+      "computedHash": "project-alpha-hash"
+    }
+  }
+}

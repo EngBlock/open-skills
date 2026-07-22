@@ -40,6 +40,8 @@ package-lock.json
 .codebuddy/
 .agent/
 .agents/
+!internal/compatibility/testdata/state/**/.agents/
+!internal/compatibility/testdata/state/**/.agents/**
 .claude/
 .cursor/
 .gemini/
