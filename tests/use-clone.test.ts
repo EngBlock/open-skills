@@ -34,9 +34,7 @@ describe('clone-backed use', () => {
 
   afterEach(async () => {
     for (const [output] of vi.mocked(process.stdout.write).mock.calls) {
-      const supportDir = String(output)
-        .split('Supporting files for this skill were downloaded to:\n')[1]
-        ?.split('\n')[0];
+      const supportDir = extractSupportDir(String(output));
       if (supportDir) await rm(join(supportDir, '..'), { recursive: true, force: true });
     }
     vi.restoreAllMocks();
@@ -62,9 +60,7 @@ describe('clone-backed use', () => {
     );
 
     const prompt = vi.mocked(process.stdout.write).mock.calls[0]?.[0] as string;
-    const supportDir = prompt
-      .split('Supporting files for this skill were downloaded to:\n')[1]
-      ?.split('\n')[0];
+    const supportDir = extractSupportDir(prompt);
     expect(supportDir).toBeTruthy();
     await expect(
       import('node:fs/promises').then(({ readFile }) =>
@@ -130,6 +126,10 @@ describe('clone-backed use', () => {
 
 function writtenPrompt(): string {
   return vi.mocked(process.stdout.write).mock.calls.at(-1)?.[0] as string;
+}
+
+function extractSupportDir(prompt: string): string | undefined {
+  return prompt.split('Supporting files for this skill were downloaded to:\n')[1]?.split('\n')[0];
 }
 
 function jsonResponse(value: unknown): Response {
