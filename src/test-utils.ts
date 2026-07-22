@@ -7,9 +7,9 @@ import { stripTerminalEscapes } from './sanitize.ts';
 // const PROJECT_ROOT = join(import.meta.dirname, '..');
 const CLI_PATH = join(import.meta.dirname, 'cli.ts');
 
-// Keep synchronized with the environment checks in @vercel/detect-agent@1.2.3
-// and the additional Cursor checks in detect-agent.ts. Filesystem-based detection
-// such as /opt/.devin is intentionally outside this environment-isolation helper.
+// Keep synchronized with the environment checks in detect-agent.ts.
+// Filesystem-based detection such as /opt/.devin is intentionally outside this
+// environment-isolation helper.
 const AGENT_DETECTION_ENV_VARS = new Set(
   [
     'AI_AGENT',
