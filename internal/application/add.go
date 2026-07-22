@@ -32,6 +32,55 @@ type localSkill struct {
 	Path string
 }
 
+func materializeWellKnownSkills(fetched []wellKnownFetchedSkill) (string, map[string]string, error) {
+	if len(fetched) == 0 {
+		return "", nil, fmt.Errorf("no skills to materialize")
+	}
+	root, err := os.MkdirTemp("", "open-skills-well-known-")
+	if err != nil {
+		return "", nil, err
+	}
+	fail := func(cause error) (string, map[string]string, error) {
+		_ = os.RemoveAll(root)
+		return "", nil, cause
+	}
+	sourceURLs := make(map[string]string, len(fetched))
+	for _, skill := range fetched {
+		if !validWellKnownSkillName(skill.Name) || len(skill.Files) == 0 || skill.SourceURL == "" {
+			return fail(fmt.Errorf("invalid fetched well-known skill"))
+		}
+		directory := filepath.Join(root, skill.Name)
+		for name, contents := range skill.Files {
+			if !validWellKnownFilePath(name) {
+				return fail(fmt.Errorf("unsafe fetched file path %q", name))
+			}
+			if strings.EqualFold(name, "SKILL.md") {
+				name = "SKILL.md"
+			}
+			target := filepath.Join(directory, filepath.FromSlash(name))
+			relative, err := filepath.Rel(directory, target)
+			if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+				return fail(fmt.Errorf("fetched file path escapes skill directory: %q", name))
+			}
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return fail(err)
+			}
+			if err := os.WriteFile(target, contents, 0o644); err != nil {
+				return fail(err)
+			}
+		}
+		name, ok := readSkill(directory)
+		if !ok {
+			return fail(fmt.Errorf("well-known skill %q has no valid SKILL.md", skill.Name))
+		}
+		if _, duplicate := sourceURLs[name]; duplicate {
+			return fail(fmt.Errorf("duplicate well-known skill name %q", name))
+		}
+		sourceURLs[name] = skill.SourceURL
+	}
+	return root, sourceURLs, nil
+}
+
 // runAdd owns source acquisition, discovery, selection, canonical installation
 // topology, and compatible lock mutation. Git sources are materialized in an
 // isolated temporary checkout, then use the exact same discovery and install
@@ -51,12 +100,30 @@ func runAdd(invocation Invocation, arguments []string) int {
 	provenance := installationProvenance{Identity: source, URL: source, Type: "local"}
 	var workspace gitWorkspace
 	isGit := false
+	wellKnownURLs := map[string]string{}
 	if info, statErr := os.Stat(absoluteSource); statErr == nil && info.IsDir() {
 		// Existing directories always retain local-source behavior, even when a
 		// directory happens to resemble an owner/repository shorthand.
 	} else if isClearlyLocalPath(source) {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Local path does not exist or is not a directory: %s\n", source)
 		return 1
+	} else if wellKnown, matches, parseErr := parseWellKnownSource(source); matches {
+		if parseErr != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, parseErr)
+			return 1
+		}
+		fetched, fetchErr := fetchWellKnownSkills(wellKnown)
+		if fetchErr != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Discover well-known skills: %v\n", fetchErr)
+			return 1
+		}
+		absoluteSource, wellKnownURLs, err = materializeWellKnownSkills(fetched)
+		if err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Materialize well-known skills: %v\n", err)
+			return 1
+		}
+		defer os.RemoveAll(absoluteSource)
+		provenance = installationProvenance{Identity: wellKnown.identity, Type: "well-known"}
 	} else {
 		git, parseErr := parseGitSource(source)
 		if parseErr != nil {
@@ -140,7 +207,11 @@ func runAdd(invocation Invocation, arguments []string) int {
 		return 1
 	}
 	for _, skill := range selected {
-		if err := installLocalSkill(skill, provenance, scope, base, project, home, agents, options.Copy, options.Subagents); err != nil {
+		skillProvenance := provenance
+		if sourceURL, ok := wellKnownURLs[skill.Name]; ok {
+			skillProvenance.URL = sourceURL
+		}
+		if err := installLocalSkill(skill, skillProvenance, scope, base, project, home, agents, options.Copy, options.Subagents); err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Install %s: %v\n", skill.Name, err)
 			return 1
 		}

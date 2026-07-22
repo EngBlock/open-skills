@@ -427,7 +427,7 @@ func (document *Document) RecordInstallation(name string, record InstallationRec
 		if err := setString("computedHash", record.InstalledContentHash); err != nil {
 			return err
 		}
-		if record.SourceType != "git" && record.SourceType != "gitlab" {
+		if record.SourceType != "git" && record.SourceType != "gitlab" && record.SourceType != "well-known" {
 			delete(fields, "sourceUrl")
 		} else if record.SourceURL != "" {
 			if err := setString("sourceUrl", record.SourceURL); err != nil {

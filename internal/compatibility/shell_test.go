@@ -293,11 +293,11 @@ func TestNativeShellInitUsesCurrentDirectoryAndPreservesExistingSkill(t *testing
 	assertOfflineShellObservation(t, preserved)
 }
 
-// D02 keeps offline shell commands inert. Git source acquisition is deliberately
-// implemented by the add command (issue #18), so os/exec and net/url are
-// permitted dependencies; process observations above ensure shell routes never
-// invoke them.
-func TestD02OfflineShellHasNoNetworkDependencies(t *testing.T) {
+// D02 keeps offline shell commands inert. Source acquisition is deliberately
+// implemented by add (issues #18 and #19), so the native executable may import
+// HTTP transport for user-supplied well-known providers. Process observations
+// above ensure offline shell routes never invoke it.
+func TestD02OfflineShellHasNoLowLevelDependencies(t *testing.T) {
 	command := exec.Command("go", "list", "-json", "./internal/application")
 	command.Dir = testModuleRoot(t)
 	output, err := command.Output()
@@ -317,8 +317,8 @@ func TestD02OfflineShellHasNoNetworkDependencies(t *testing.T) {
 		}
 	}
 	for _, dependency := range append(metadata.Imports, metadata.Deps...) {
-		if dependency == "net" || dependency == "net/http" || dependency == "net/rpc" {
-			t.Errorf("offline shell depends on network transport capability %q", dependency)
+		if dependency == "net/rpc" {
+			t.Errorf("offline shell depends on unsupported RPC capability %q", dependency)
 		}
 	}
 }
