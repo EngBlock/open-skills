@@ -88,6 +88,16 @@ jobs:
       - name: Tests
         run: go test ./...
 
+      - name: D02 network-disabled shell tests
+        run: |
+          GO_BIN="$(command -v go)"
+          sudo unshare --net -- sh -c '
+            ip link set lo up
+            export PATH="$(dirname "$1"):/usr/sbin:/usr/bin:/bin"
+            export GOCACHE=/tmp/open-skills-go-cache
+            exec "$1" test ./internal/compatibility -run "TestNativeShell|TestD02OfflineShellHasNoNetworkOrSubprocessDependencies" -count=1
+          ' sh "$GO_BIN"
+
       - name: Build standalone executable
         env:
           CGO_ENABLED: '0'

@@ -93,11 +93,24 @@ func (h Harness) Run(ctx context.Context, target Target, scenario Scenario) (Obs
 	if err := mergeEnvironment(environment, scenario.Env, expand); err != nil {
 		return Observation{}, fmt.Errorf("scenario environment: %w", err)
 	}
+	if scenario.Offline {
+		// Standard HTTP clients are forced through the recorder. Direct child
+		// tools are replaced below with recording stubs, while every other
+		// executable remains unavailable through the empty PATH.
+		environment["HTTP_PROXY"] = server.URL
+		environment["HTTPS_PROXY"] = server.URL
+		environment["ALL_PROXY"] = server.URL
+		environment["NO_PROXY"] = ""
+	}
 
+	fixtures := append([]CommandFixture{}, scenario.Commands...)
+	if scenario.Offline {
+		fixtures = appendOfflineCommandFixtures(fixtures)
+	}
 	spawnLog := filepath.Join(control, "spawned.jsonl")
 	environment["PATH"] = ""
-	if len(scenario.Commands) > 0 {
-		fixtureBin, behaviors, err := installCommandFixtures(ctx, control, scenario.Commands)
+	if len(fixtures) > 0 {
+		fixtureBin, behaviors, err := installCommandFixtures(ctx, control, fixtures)
 		if err != nil {
 			return Observation{}, err
 		}
@@ -167,7 +180,23 @@ func (h Harness) Run(ctx context.Context, target Target, scenario Scenario) (Obs
 	if err != nil {
 		return Observation{}, err
 	}
+	if scenario.Offline && (len(observation.HTTPRequests) > 0 || len(observation.SpawnedCommands) > 0) {
+		return observation, fmt.Errorf("offline scenario captured a network attempt: %d HTTP request(s), %d child command(s)", len(observation.HTTPRequests), len(observation.SpawnedCommands))
+	}
 	return observation, nil
+}
+
+func appendOfflineCommandFixtures(fixtures []CommandFixture) []CommandFixture {
+	configured := make(map[string]struct{}, len(fixtures))
+	for _, fixture := range fixtures {
+		configured[fixture.Name] = struct{}{}
+	}
+	for _, name := range []string{"curl", "wget", "git", "gh", "node", "npm", "npx", "powershell", "pwsh"} {
+		if _, ok := configured[name]; !ok {
+			fixtures = append(fixtures, CommandFixture{Name: name, ExitCode: 125})
+		}
+	}
+	return fixtures
 }
 
 func isolatedEnvironment(paths SandboxPaths) map[string]string {

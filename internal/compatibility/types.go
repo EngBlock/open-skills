@@ -61,6 +61,11 @@ type CommandFixture struct {
 }
 
 type Scenario struct {
+	// Offline makes captured HTTP requests and child commands a harness failure.
+	// The sandbox routes standard proxy traffic to its recorder and exposes only
+	// recording stubs for common network-capable commands. The shell suite pairs
+	// this process check with a dependency boundary and network-disabled CI.
+	Offline      bool
 	Args         []string
 	Stdin        []byte
 	Env          map[string]string

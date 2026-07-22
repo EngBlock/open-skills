@@ -172,6 +172,35 @@ func TestHarnessUsesMinimalEnvironmentAndFixtureOnlyPath(t *testing.T) {
 	}
 }
 
+func TestD02HarnessOfflineScenariosFailOnCapturedNetworkAttempts(t *testing.T) {
+	t.Run("HTTP", func(t *testing.T) {
+		observation, err := (Harness{}).Run(context.Background(), fixtureTarget(), Scenario{
+			Args:    []string{"network-http"},
+			Env:     map[string]string{"NETWORK_URL": "{{http:url}}/unexpected"},
+			Offline: true,
+		})
+		if err == nil || !strings.Contains(err.Error(), "offline scenario captured a network attempt") {
+			t.Fatalf("HTTP attempt did not fail closed: observation=%#v err=%v", observation, err)
+		}
+		if len(observation.HTTPRequests) != 1 {
+			t.Fatalf("HTTP attempt was not recorded: %#v", observation.HTTPRequests)
+		}
+	})
+
+	t.Run("child command", func(t *testing.T) {
+		observation, err := (Harness{}).Run(context.Background(), fixtureTarget(), Scenario{
+			Args:    []string{"network-command"},
+			Offline: true,
+		})
+		if err == nil || !strings.Contains(err.Error(), "offline scenario captured a network attempt") {
+			t.Fatalf("child attempt did not fail closed: observation=%#v err=%v", observation, err)
+		}
+		if len(observation.SpawnedCommands) != 1 || observation.SpawnedCommands[0].Name != "curl" {
+			t.Fatalf("child attempt was not recorded: %#v", observation.SpawnedCommands)
+		}
+	})
+}
+
 func TestHarnessRejectsMalformedEnvironmentNames(t *testing.T) {
 	for _, test := range []struct {
 		name     string
@@ -633,7 +662,7 @@ func TestHTTPFixtureRoutesIncludeQueryAndBoundBodies(t *testing.T) {
 	}
 }
 
-func TestBuildNativeProducesOnlyOpenSkillsAndRunsWithoutNode(t *testing.T) {
+func TestD01BuildNativeProducesOnlyOpenSkillsAndRunsWithoutNode(t *testing.T) {
 	repositoryRoot := testModuleRoot(t)
 	preexisting := t.TempDir()
 	sentinel := filepath.Join(preexisting, "sentinel")
@@ -667,8 +696,8 @@ func TestBuildNativeProducesOnlyOpenSkillsAndRunsWithoutNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("native bootstrap failed without Node in PATH: %v: %s", err, output)
 	}
-	if len(output) != 0 {
-		t.Fatalf("native bootstrap must remain quiet, got %q", output)
+	if !strings.Contains(string(output), "The open agent skills ecosystem") || !strings.Contains(string(output), "open-skills add") {
+		t.Fatalf("native command shell did not start without Node, got %q", output)
 	}
 }
 
@@ -694,6 +723,12 @@ func TestFixtureProcess(t *testing.T) {
 		runFixtureProbe()
 	case "environment":
 		fmt.Printf("token=%s\nproxy=%s\npath=%s\n", os.Getenv("GITHUB_TOKEN"), os.Getenv("HTTPS_PROXY"), os.Getenv("PATH"))
+		os.Exit(0)
+	case "network-http":
+		_, _ = http.Get(os.Getenv("NETWORK_URL"))
+		os.Exit(0)
+	case "network-command":
+		_ = exec.Command("curl", "https://example.invalid").Run()
 		os.Exit(0)
 	case "custom-lock":
 		lock := filepath.Join(os.Getenv("XDG_STATE_HOME"), "skills", ".skill-lock.json")
