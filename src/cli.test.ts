@@ -26,7 +26,7 @@ describe('skills CLI', () => {
     it('should display help message', () => {
       const output = runCliOutput(['--help']);
       expect(output).toContain('Usage: open-skills <command> [options]');
-      expect(output).toContain('npx open-skills add NathanBeddoeWebDev/open-skills');
+      expect(output).toContain('npx @engblock/open-skills add NathanBeddoeWebDev/open-skills');
       expect(output).not.toContain('npx skills');
       expect(output).not.toContain('vercel-labs');
       expect(output).toContain('Manage Skills:');
@@ -80,10 +80,10 @@ describe('skills CLI', () => {
       const result = runCli([]);
       const output = stripLogo(result.stdout);
       expect(output).toContain('The open agent skills ecosystem');
-      expect(output).toContain('npx open-skills add');
-      expect(output).toContain('npx open-skills use');
-      expect(output).toContain('npx open-skills update');
-      expect(output).toContain('npx open-skills init');
+      expect(output).toContain('npx @engblock/open-skills add');
+      expect(output).toContain('npx @engblock/open-skills use');
+      expect(output).toContain('npx @engblock/open-skills update');
+      expect(output).toContain('npx @engblock/open-skills init');
       expect(output).toContain('NathanBeddoeWebDev/open-skills');
       expect(output).not.toContain('npx skills');
       expect(output).not.toContain('Search for skills');
@@ -169,7 +169,7 @@ describe('skills CLI', () => {
   });
 
   describe('legacy find commands', () => {
-    const migrationGuidance = `Hosted skill search is no longer available.\nDiscover skills by searching GitHub and the web for SKILL.md files, then install one with:\n  npx open-skills add <owner>/<repo>@<skill>`;
+    const migrationGuidance = `Hosted skill search is no longer available.\nDiscover skills by searching GitHub and the web for SKILL.md files, then install one with:\n  npx @engblock/open-skills add <owner>/<repo>@<skill>`;
 
     it.each(['find', 'search', 'f', 's'])(
       '%s returns stable offline migration guidance',

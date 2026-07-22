@@ -7,10 +7,13 @@ import { stripTerminalEscapes } from '../src/sanitize.ts';
 const rootDir = join(import.meta.dirname, '..');
 const packageJson = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf-8'));
 
-describe('open-skills package identity', () => {
+describe('@engblock/open-skills package identity', () => {
   it('publishes the independent package metadata', () => {
     expect(packageJson).toMatchObject({
-      name: 'open-skills',
+      name: '@engblock/open-skills',
+      publishConfig: {
+        access: 'public',
+      },
       version: '0.1.0',
       author: 'Nathan Beddoe',
       repository: {
@@ -33,7 +36,7 @@ describe('open-skills package identity', () => {
     const files = packed.files.map((file: { path: string }) => file.path);
     const notices = readFileSync(join(rootDir, 'ThirdPartyNoticeText.txt'), 'utf-8');
 
-    expect(packed.name).toBe('open-skills');
+    expect(packed.name).toBe('@engblock/open-skills');
     expect(packed.version).toBe('0.1.0');
     expect(files).toEqual(
       expect.arrayContaining([
@@ -49,9 +52,9 @@ describe('open-skills package identity', () => {
 
   it('provides compatible open-skills, skills, and add-skill executables', () => {
     expect(packageJson.bin).toEqual({
-      'open-skills': './bin/cli.mjs',
-      skills: './bin/cli.mjs',
-      'add-skill': './bin/cli.mjs',
+      'open-skills': 'bin/cli.mjs',
+      skills: 'bin/cli.mjs',
+      'add-skill': 'bin/cli.mjs',
     });
 
     for (const executable of ['open-skills', 'skills', 'add-skill']) {

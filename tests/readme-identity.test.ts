@@ -11,9 +11,11 @@ describe('README identity', () => {
       '[![CI](https://github.com/NathanBeddoeWebDev/open-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/NathanBeddoeWebDev/open-skills/actions/workflows/ci.yml)'
     );
     expect(readme).toContain(
-      '[![npm version](https://img.shields.io/npm/v/open-skills.svg)](https://www.npmjs.com/package/open-skills)'
+      '[![npm version](https://img.shields.io/npm/v/@engblock/open-skills.svg)](https://www.npmjs.com/package/@engblock/open-skills)'
     );
-    expect(readme).toContain('npx open-skills add NathanBeddoeWebDev/open-skills@find-skills');
+    expect(readme).toContain(
+      'npx @engblock/open-skills add NathanBeddoeWebDev/open-skills@find-skills'
+    );
     expect(readme).not.toContain('npx skills');
   });
 

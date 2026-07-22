@@ -1,12 +1,15 @@
 {
-  "name": "open-skills",
+  "name": "@engblock/open-skills",
   "version": "0.1.0",
   "description": "The open agent skills ecosystem",
   "type": "module",
   "bin": {
-    "open-skills": "./bin/cli.mjs",
-    "skills": "./bin/cli.mjs",
-    "add-skill": "./bin/cli.mjs"
+    "open-skills": "bin/cli.mjs",
+    "skills": "bin/cli.mjs",
+    "add-skill": "bin/cli.mjs"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "dist",

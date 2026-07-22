@@ -28,8 +28,10 @@ describe('bundled find-skills guidance', () => {
   });
 
   it('uses the independent CLI in installation guidance', () => {
-    expect(findSkillsMarkdown).toContain('npx open-skills add <owner>/<repository>@<skill-name>');
-    expect(findSkillsMarkdown).toContain('npx open-skills init <skill-name>');
+    expect(findSkillsMarkdown).toContain(
+      'npx @engblock/open-skills add <owner>/<repository>@<skill-name>'
+    );
+    expect(findSkillsMarkdown).toContain('npx @engblock/open-skills init <skill-name>');
     expect(findSkillsMarkdown).not.toContain('npx skills');
   });
 });
