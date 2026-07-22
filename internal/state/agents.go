@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 type agentConfig struct {
@@ -107,6 +108,50 @@ func AgentIDs() []string {
 	return ids
 }
 
+// IsAgentID reports whether id is part of the retained npm 0.1.2 adapter set.
+func IsAgentID(id string) bool {
+	for _, agent := range agentConfigs {
+		if agent.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+// AgentSupportedInScope makes availability an explicit preflight decision,
+// preventing global installs from mutating canonical content before rejecting
+// project-only adapters such as Eve.
+func AgentSupportedInScope(id string, scope Scope) bool {
+	for _, agent := range agentConfigs {
+		if agent.ID == id {
+			return scope != Global || !agent.NoGlobal
+		}
+	}
+	return false
+}
+
+func UniversalAgentIDs(scope Scope) []string {
+	ids := []string{}
+	for _, agent := range agentConfigs {
+		if agent.ProjectDir == ".agents/skills" && (scope != Global || !agent.NoGlobal) {
+			ids = append(ids, agent.ID)
+		}
+	}
+	return ids
+}
+
+// DetectedAgentIDs returns the retained adapters available in an isolated
+// project/home environment, in stable registry order.
+func DetectedAgentIDs(options InspectOptions) []string {
+	ids := []string{}
+	for _, agent := range agentConfigs {
+		if (options.Scope != Global || !agent.NoGlobal) && agentDetected(agent, options) {
+			ids = append(ids, agent.ID)
+		}
+	}
+	return ids
+}
+
 func AgentDisplayName(id string) string {
 	for _, agent := range agentConfigs {
 		if agent.ID == id {
@@ -132,6 +177,28 @@ func AgentSkillsPath(id string, scope Scope, project, home, xdgConfigHome string
 		return path, canonical, true
 	}
 	return "", false, false
+}
+
+// EveSkillsPath resolves root (empty subagent) and named Eve subagent placement.
+func EveSkillsPath(project, subagent string) string {
+	if subagent == "" {
+		return filepath.Join(project, "agent", "skills")
+	}
+	return filepath.Join(project, "agent", "subagents", sanitizeName(subagent), "skills")
+}
+
+// ProjectAgentRootExists mirrors the npm behavior that avoids materializing
+// unused project adapter directories (except Claude Code, handled by add).
+func ProjectAgentRootExists(id, project string) bool {
+	for _, agent := range agentConfigs {
+		if agent.ID != id {
+			continue
+		}
+		first := strings.Split(filepath.ToSlash(agent.ProjectDir), "/")[0]
+		info, err := os.Stat(filepath.Join(project, first))
+		return err == nil && info.IsDir()
+	}
+	return false
 }
 
 func selectedAgentConfigs(filter []string) []agentConfig {
@@ -213,6 +280,22 @@ func agentDetected(agent agentConfig, options InspectOptions) bool {
 				return true
 			}
 		}
+	case "astrbot":
+		if info, err := os.Stat(filepath.Join(options.Project, "data", "skills")); err == nil && info.IsDir() {
+			return true
+		}
+	case "codebuddy":
+		if info, err := os.Stat(filepath.Join(options.Project, ".codebuddy")); err == nil && info.IsDir() {
+			return true
+		}
+	case "continue":
+		if info, err := os.Stat(filepath.Join(options.Project, ".continue")); err == nil && info.IsDir() {
+			return true
+		}
+	case "jazz":
+		if info, err := os.Stat(filepath.Join(options.Project, ".jazz")); err == nil && info.IsDir() {
+			return true
+		}
 	case "kimi-code-cli":
 		for _, directory := range []string{".kimi-code", ".kimi"} {
 			if info, err := os.Stat(filepath.Join(options.Home, directory)); err == nil && info.IsDir() {
@@ -224,6 +307,10 @@ func agentDetected(agent agentConfig, options InspectOptions) bool {
 			if _, err := os.Stat(path); err == nil {
 				return true
 			}
+		}
+	case "zcode":
+		if info, err := os.Stat("/Applications/ZCode.app"); err == nil && info.IsDir() {
+			return true
 		}
 	case "zed":
 		configHome := options.XDGConfigHome

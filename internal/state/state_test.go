@@ -171,3 +171,27 @@ func TestSupportedStateRoundTripPreservesSafeUnknownFields(t *testing.T) {
 		t.Fatalf("round-trip output lacks final newline: %q", roundTrip)
 	}
 }
+
+func TestRecordInstallationClearsStaleEveSubagents(t *testing.T) {
+	document, err := Read(filepath.Join(t.TempDir(), "skills-lock.json"), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := document.RecordInstallation("eve-skill", InstallationRecord{
+		Source: "source", SourceType: "local", InstalledContentHash: "first", OwnedFiles: []string{"SKILL.md"}, Subagents: []string{"", "research"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := document.RecordInstallation("eve-skill", InstallationRecord{
+		Source: "source", SourceType: "local", InstalledContentHash: "second", OwnedFiles: []string{"SKILL.md"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := document.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(data, []byte("subagents")) {
+		t.Fatalf("stale Eve placement survived replacement: %s", data)
+	}
+}

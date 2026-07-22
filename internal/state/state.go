@@ -69,6 +69,8 @@ type InstallationRecord struct {
 	SourceType           string
 	InstalledContentHash string
 	OwnedFiles           []string
+	// Subagents records Eve placements; an empty value represents the root agent.
+	Subagents []string
 }
 
 type Document struct {
@@ -420,6 +422,17 @@ func (document *Document) RecordInstallation(name string, record InstallationRec
 		return err
 	}
 	fields["ownedFiles"] = owned
+	if document.Version == 1 {
+		if len(record.Subagents) == 0 {
+			delete(fields, "subagents")
+		} else {
+			subagents, err := json.Marshal(record.Subagents)
+			if err != nil {
+				return err
+			}
+			fields["subagents"] = subagents
+		}
+	}
 	document.Skills[name] = LockEntry{
 		Source: record.Source, SourceURL: record.SourceURL, SourceType: record.SourceType, raw: fields,
 	}

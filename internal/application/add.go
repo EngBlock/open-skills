@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/EngBlock/open-skills/internal/state"
@@ -23,6 +24,7 @@ type addOptions struct {
 	All       bool
 	FullDepth bool
 	Copy      bool
+	Subagents []string
 }
 
 type localSkill struct {
@@ -35,6 +37,7 @@ type localSkill struct {
 // Keeping those decisions here gives the command a small seam while state owns
 // schema validation and persistence.
 func runAddLocal(invocation Invocation, arguments []string) int {
+	invocation.Stdin = bufio.NewReader(invocation.Stdin)
 	source, options, err := parseAddOptions(arguments)
 	if err != nil {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
@@ -88,13 +91,13 @@ func runAddLocal(invocation Invocation, arguments []string) int {
 		scope = state.Global
 		base = home
 	}
-	agents, err := selectInstallAgents(options)
+	agents, err := selectInstallAgents(invocation, options, scope, project, home)
 	if err != nil {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
 	}
 	for _, skill := range selected {
-		if err := installLocalSkill(skill, absoluteSource, scope, base, project, home, agents, options.Copy); err != nil {
+		if err := installLocalSkill(skill, absoluteSource, scope, base, project, home, agents, options.Copy, options.Subagents); err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Install %s: %v\n", skill.Name, err)
 			return 1
 		}
@@ -122,6 +125,13 @@ func parseAddOptions(arguments []string) (string, addOptions, error) {
 			options.FullDepth = true
 		case "--copy":
 			options.Copy = true
+		case "--subagent":
+			values, next := optionValues(arguments, index)
+			if len(values) == 0 {
+				return "", options, fmt.Errorf("%s requires at least one subagent", argument)
+			}
+			options.Subagents = append(options.Subagents, values...)
+			index = next
 		case "-a", "--agent":
 			values, next := optionValues(arguments, index)
 			if len(values) == 0 {
@@ -277,7 +287,7 @@ func selectLocalSkills(invocation Invocation, skills []localSkill, options addOp
 		return skills, nil
 	}
 	_, _ = fmt.Fprintf(invocation.Stdout, "Select skills to install (%s, or * for all): ", skillNames(skills))
-	line, err := bufio.NewReader(invocation.Stdin).ReadString('\n')
+	line, err := readInputLine(invocation.Stdin)
 	if err != nil && err != io.EOF {
 		return nil, err
 	}
@@ -288,22 +298,63 @@ func selectLocalSkills(invocation Invocation, skills []localSkill, options addOp
 	return selectLocalSkills(invocation, skills, addOptions{Skills: strings.FieldsFunc(line, func(r rune) bool { return r == ',' || r == ' ' })})
 }
 
-func selectInstallAgents(options addOptions) ([]string, error) {
-	if len(options.Agents) == 0 {
-		return nil, nil // Canonical topology alone serves universal consumers.
+func readInputLine(input io.Reader) (string, error) {
+	if reader, ok := input.(*bufio.Reader); ok {
+		return reader.ReadString('\n')
 	}
-	valid := make(map[string]bool)
-	for _, agent := range state.AgentIDs() {
-		valid[agent] = true
+	return bufio.NewReader(input).ReadString('\n')
+}
+
+func selectInstallAgents(invocation Invocation, options addOptions, scope state.Scope, project, home string) ([]string, error) {
+	if scope == state.Global && len(options.Subagents) > 0 {
+		return nil, fmt.Errorf("Eve subagents do not support global installation")
 	}
-	if len(options.Agents) == 1 && options.Agents[0] == "*" {
-		return state.AgentIDs(), nil
+	requested := append([]string(nil), options.Agents...)
+	if len(options.Subagents) > 0 && !contains(requested, "eve") && !contains(requested, "*") {
+		requested = append(requested, "eve")
 	}
-	seen := make(map[string]bool)
-	selected := []string{}
-	for _, agent := range options.Agents {
-		if !valid[agent] {
+	if len(requested) == 0 {
+		requested = state.DetectedAgentIDs(state.InspectOptions{
+			Scope: scope, Project: project, Home: home, XDGConfigHome: os.Getenv("XDG_CONFIG_HOME"),
+		})
+		detectedEve := contains(requested, "eve")
+		if len(requested) == 0 && options.Yes {
+			requested = state.AgentIDs()
+		}
+		// An Eve project is a dedicated topology: npm selects Eve alone rather
+		// than adding the shared universal directory alongside it.
+		if detectedEve {
+			requested = []string{"eve"}
+		} else if len(requested) > 0 {
+			// npm automatically includes all universal consumers when it detects agents.
+			requested = append(requested, state.UniversalAgentIDs(scope)...)
+		} else {
+			_, _ = fmt.Fprint(invocation.Stdout, "Select agents to install (or * for all): ")
+			line, err := readInputLine(invocation.Stdin)
+			if err != nil && err != io.EOF {
+				return nil, err
+			}
+			requested = strings.FieldsFunc(strings.TrimSpace(line), func(r rune) bool { return r == ',' || r == ' ' })
+			if len(requested) == 0 {
+				return nil, fmt.Errorf("installation cancelled; select agents with --agent or use --yes")
+			}
+		}
+	}
+	if contains(requested, "*") {
+		requested = state.AgentIDs()
+	}
+
+	selected := make([]string, 0, len(requested))
+	seen := make(map[string]bool, len(requested))
+	for _, agent := range requested {
+		if !state.IsAgentID(agent) {
 			return nil, fmt.Errorf("Invalid agents: %s", agent)
+		}
+		if !state.AgentSupportedInScope(agent, scope) {
+			if contains(options.Agents, "*") || (len(options.Agents) == 0 && options.Yes) {
+				continue
+			}
+			return nil, fmt.Errorf("agent %q does not support %s installation", agent, scope)
 		}
 		if !seen[agent] {
 			seen[agent] = true
@@ -311,6 +362,15 @@ func selectInstallAgents(options addOptions) ([]string, error) {
 		}
 	}
 	return selected, nil
+}
+
+func contains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func skillNames(skills []localSkill) string {
@@ -321,34 +381,63 @@ func skillNames(skills []localSkill) string {
 	return strings.Join(names, ", ")
 }
 
-func installLocalSkill(skill localSkill, source string, scope state.Scope, base, project, home string, agents []string, copyMode bool) error {
+func installLocalSkill(skill localSkill, source string, scope state.Scope, base, project, home string, agents []string, copyMode bool, subagents []string) error {
 	canonical := filepath.Join(base, ".agents", "skills", state.SanitizeName(skill.Name))
-	if !sameLocalPath(skill.Path, canonical) {
+	allEve := len(agents) > 0
+	for _, agent := range agents {
+		allEve = allEve && agent == "eve"
+	}
+	needsCanonical := (!copyMode && !allEve) || len(agents) == 0 || contains(agents, "universal")
+	if needsCanonical && !pathsOverlap(skill.Path, canonical) {
 		if err := replaceDirectoryFromSource(skill.Path, canonical); err != nil {
 			return err
 		}
 	}
 	for _, agent := range agents {
+		if agent == "eve" {
+			for _, subagent := range eveTargets(subagents) {
+				destination := filepath.Join(state.EveSkillsPath(project, subagent), state.SanitizeName(skill.Name))
+				if pathsOverlap(skill.Path, destination) {
+					continue
+				}
+				if err := replaceEveDirectoryFromSource(skill.Path, destination); err != nil {
+					return err
+				}
+			}
+			continue
+		}
 		destination, universal, ok := state.AgentSkillsPath(agent, scope, project, home, os.Getenv("XDG_CONFIG_HOME"))
 		if !ok {
 			return fmt.Errorf("agent %q does not support this scope", agent)
 		}
+		destination = filepath.Join(destination, state.SanitizeName(skill.Name))
 		if universal {
+			// Universal adapters share canonical content in both project and global scope.
+			destination = canonical
+			if !pathsOverlap(skill.Path, destination) {
+				if err := replaceDirectoryFromSource(skill.Path, destination); err != nil {
+					return err
+				}
+			}
 			continue
 		}
-		destination = filepath.Join(destination, state.SanitizeName(skill.Name))
-		if sameLocalPath(canonical, destination) {
+		if pathsOverlap(skill.Path, destination) {
+			continue
+		}
+		if !copyMode && scope == state.Project && agent != "claude-code" && !state.ProjectAgentRootExists(agent, project) {
 			continue
 		}
 		if copyMode {
-			if err := replaceDirectoryFromSource(canonical, destination); err != nil {
+			if err := replaceDirectoryFromSource(skill.Path, destination); err != nil {
 				return err
 			}
-		} else if err := replaceWithSymlink(canonical, destination); err != nil {
-			return err
+		} else if !sameLocalPath(canonical, destination) {
+			if err := replaceWithSymlink(canonical, destination); err != nil {
+				return err
+			}
 		}
 	}
-	hash, owned, err := contentIdentity(canonical)
+	hash, owned, err := contentIdentity(skill.Path)
 	if err != nil {
 		return err
 	}
@@ -367,10 +456,114 @@ func installLocalSkill(skill localSkill, source string, scope state.Scope, base,
 	}
 	if err := document.RecordInstallation(skill.Name, state.InstallationRecord{
 		Source: source, SourceURL: source, SourceType: "local", InstalledContentHash: hash, OwnedFiles: owned,
+		Subagents: recordedEveTargets(agents, subagents),
 	}); err != nil {
 		return err
 	}
 	return document.Write(lockPath)
+}
+
+func eveTargets(subagents []string) []string {
+	if len(subagents) == 0 {
+		return []string{""}
+	}
+	result := make([]string, 0, len(subagents))
+	seen := make(map[string]bool, len(subagents))
+	for _, subagent := range subagents {
+		if subagent == "root" || subagent == "." {
+			subagent = ""
+		}
+		if !seen[subagent] {
+			seen[subagent] = true
+			result = append(result, subagent)
+		}
+	}
+	return result
+}
+
+func recordedEveTargets(agents, subagents []string) []string {
+	if !contains(agents, "eve") {
+		return nil
+	}
+	targets := eveTargets(subagents)
+	if len(targets) == 1 && targets[0] == "" {
+		return nil
+	}
+	return targets
+}
+
+func replaceEveDirectoryFromSource(source, destination string) error {
+	if err := replaceDirectoryFromSource(source, destination); err != nil {
+		return err
+	}
+	skillPath := filepath.Join(destination, "SKILL.md")
+	contents, err := os.ReadFile(skillPath)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(strings.ReplaceAll(string(contents), "\r\n", "\n"), "\n")
+	if len(lines) == 0 || lines[0] != "---" {
+		return nil
+	}
+	end := -1
+	for index := 1; index < len(lines); index++ {
+		if lines[index] == "---" {
+			end = index
+			break
+		}
+	}
+	if end < 0 {
+		return nil
+	}
+	allowed := []string{}
+	metadata := []string{}
+	for index := 1; index < end; index++ {
+		line := lines[index]
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		key, value, found := strings.Cut(trimmed, ":")
+		if !found {
+			continue
+		}
+		key, value = strings.TrimSpace(key), strings.TrimSpace(value)
+		switch key {
+		case "description", "license":
+			allowed = append(allowed, key+": "+value)
+		case "metadata":
+			for index++; index < end && (strings.HasPrefix(lines[index], " ") || strings.HasPrefix(lines[index], "\t")); index++ {
+				metadataKey, metadataValue, isField := strings.Cut(strings.TrimSpace(lines[index]), ":")
+				if isField && isEveMetadataString(strings.TrimSpace(metadataValue)) {
+					metadata = append(metadata, strings.TrimSpace(metadataKey)+": "+strings.TrimSpace(metadataValue))
+				}
+			}
+			index--
+		}
+	}
+	if len(metadata) > 0 {
+		allowed = append(allowed, "metadata:")
+		for _, entry := range metadata {
+			allowed = append(allowed, "  "+entry)
+		}
+	}
+	frontmatter := append([]string{"---"}, allowed...)
+	frontmatter = append(frontmatter, "---")
+	return os.WriteFile(skillPath, []byte(strings.Join(append(frontmatter, lines[end+1:]...), "\n")), 0o644)
+}
+
+func isEveMetadataString(value string) bool {
+	if value == "" || strings.HasPrefix(value, "[") || strings.HasPrefix(value, "{") {
+		return false
+	}
+	lower := strings.ToLower(value)
+	if lower == "true" || lower == "false" || lower == "null" || lower == "~" {
+		return false
+	}
+	if _, err := strconv.ParseFloat(strings.ReplaceAll(value, "_", ""), 64); err == nil {
+		return false
+	}
+	return true
 }
 
 func replaceDirectoryFromSource(source, destination string) error {
@@ -473,4 +666,19 @@ func sameLocalPath(left, right string) bool {
 	leftAbsolute, leftErr := filepath.Abs(left)
 	rightAbsolute, rightErr := filepath.Abs(right)
 	return leftErr == nil && rightErr == nil && filepath.Clean(leftAbsolute) == filepath.Clean(rightAbsolute)
+}
+
+func pathsOverlap(left, right string) bool {
+	leftAbsolute, leftErr := filepath.Abs(left)
+	rightAbsolute, rightErr := filepath.Abs(right)
+	if leftErr != nil || rightErr != nil {
+		return false
+	}
+	for _, pair := range [][2]string{{leftAbsolute, rightAbsolute}, {rightAbsolute, leftAbsolute}} {
+		relative, err := filepath.Rel(pair[0], pair[1])
+		if err == nil && (relative == "." || (relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)))) {
+			return true
+		}
+	}
+	return false
 }

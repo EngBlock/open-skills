@@ -114,7 +114,7 @@ func TestNativeAddInstallsLocalSkillGloballyAndRetainsGlobalSchema(t *testing.T)
 func TestNativeAddPromptsForMultipleLocalSkills(t *testing.T) {
 	observation, err := (Harness{}).Run(context.Background(), buildShellTarget(t), Scenario{
 		Args:  []string{"add", "{{temp}}/source"},
-		Stdin: []byte("beta\n"),
+		Stdin: []byte("beta\nuniversal\n"),
 		Files: []FileFixture{
 			{Root: TempRoot, Path: "source/alpha/SKILL.md", Data: []byte("---\nname: alpha\ndescription: Alpha local skill\n---\n")},
 			{Root: TempRoot, Path: "source/beta/SKILL.md", Data: []byte("---\nname: beta\ndescription: Beta local skill\n---\n")},
