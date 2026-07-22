@@ -68,18 +68,19 @@ vi.mock('../src/detect-agent.ts', () => ({
 vi.mock('../src/git.ts', () => ({
   cloneRepo: vi.fn(),
   cleanupTempDir: vi.fn().mockResolvedValue(undefined),
+  GitCloneError: class GitCloneError extends Error {},
 }));
 
 import { runAdd } from '../src/add.ts';
 import { cloneRepo } from '../src/git.ts';
 import * as installer from '../src/installer.ts';
 
-describe('root-level disk install (issue #1603)', () => {
+describe('GitHub disk installation', () => {
   let base: string;
   let fixture: string; // a fake cloned repo (SKILL.md at the repo root)
   let project: string; // install target cwd
   let origCwd: string;
-  let spy: ReturnType<typeof vi.spyOn>;
+  let installSkillSpy: ReturnType<typeof vi.spyOn>;
   let fetchSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
@@ -103,10 +104,10 @@ describe('root-level disk install (issue #1603)', () => {
 
     // Drive the GitHub-clone code path (tempDir === skill.path) without network.
     vi.mocked(cloneRepo).mockResolvedValue(fixture);
-    fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({})));
+    fetchSpy = vi.fn().mockResolvedValue(new Response('', { status: 404 }));
     vi.stubGlobal('fetch', fetchSpy);
 
-    spy = vi.spyOn(installer, 'installSkillForAgent');
+    installSkillSpy = vi.spyOn(installer, 'installSkillForAgent');
     vi.spyOn(process, 'exit').mockImplementation((() => {
       throw new Error('process.exit called');
     }) as never);
@@ -119,29 +120,94 @@ describe('root-level disk install (issue #1603)', () => {
     vi.unstubAllGlobals();
   });
 
-  it('installs a root-level skill without hosted requests', async () => {
-    // A github-style source goes through cloneRepo + discoverSkills(tempDir),
-    // where skill.path === tempDir. This is exactly the branch that dropped the
-    // supporting files before the fix (see issue #1603).
-    await runAdd(['someowner/somerepo'], {
+  it('clones a formerly snapshot-eligible source and records the project install', async () => {
+    await runAdd(['vercel-labs/agent-skills'], {
       yes: true,
       agent: ['codex'],
       global: false,
       mode: 'copy',
     });
 
-    // The disk-based install path must be used (not the blob single-file path).
-    expect(spy).toHaveBeenCalled();
+    expect(cloneRepo).toHaveBeenCalledWith(
+      'https://github.com/vercel-labs/agent-skills.git',
+      undefined
+    );
+    expect(installSkillSpy).toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
 
     const installed = join(project, '.agents', 'skills', 'myrootskill');
     await expect(readFile(join(installed, 'SKILL.md'), 'utf-8')).resolves.toContain('myrootskill');
-    // Regression for #1603: supporting files must NOT be dropped.
     await expect(readFile(join(installed, 'scripts', 'check-deps.mjs'), 'utf-8')).resolves.toBe(
       'console.log("x")\n'
     );
     await expect(readFile(join(installed, 'references', 'guide.md'), 'utf-8')).resolves.toBe(
       '# guide\n'
     );
+
+    const lock = JSON.parse(await readFile(join(project, 'skills-lock.json'), 'utf-8')) as {
+      version: number;
+      skills: Record<string, Record<string, unknown>>;
+    };
+    expect(lock).toEqual({
+      version: 1,
+      skills: {
+        myrootskill: {
+          source: 'vercel-labs/agent-skills',
+          sourceType: 'github',
+          skillPath: 'SKILL.md',
+          computedHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        },
+      },
+    });
+  });
+
+  it('retains the global GitHub lock schema for cloned skills', async () => {
+    const stateDir = join(base, 'state');
+    vi.stubEnv('XDG_STATE_HOME', stateDir);
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          sha: 'root-tree-sha',
+          tree: [{ path: 'SKILL.md', type: 'blob', sha: 'skill-blob-sha' }],
+        })
+      )
+    );
+    installSkillSpy.mockResolvedValue({
+      success: true,
+      path: join(base, 'global-skills', 'myrootskill'),
+      mode: 'copy',
+    });
+
+    await runAdd(['vercel-labs/agent-skills'], {
+      yes: true,
+      agent: ['codex'],
+      global: true,
+      copy: true,
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.github.com/repos/vercel-labs/agent-skills/git/trees/HEAD?recursive=1',
+      expect.any(Object)
+    );
+
+    const lock = JSON.parse(
+      await readFile(join(stateDir, 'skills', '.skill-lock.json'), 'utf-8')
+    ) as { version: number; skills: Record<string, Record<string, unknown>> };
+    expect(lock).toEqual({
+      version: 3,
+      skills: {
+        myrootskill: {
+          source: 'vercel-labs/agent-skills',
+          sourceType: 'github',
+          sourceUrl: 'https://github.com/vercel-labs/agent-skills.git',
+          skillPath: 'SKILL.md',
+          skillFolderHash: 'root-tree-sha',
+          installedAt: expect.any(String),
+          updatedAt: expect.any(String),
+        },
+      },
+      dismissed: {},
+    });
   });
 });

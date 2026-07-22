@@ -38,7 +38,6 @@ import { cloneRepo, cleanupTempDir, GitCloneError } from './git.ts';
 import { discoverSkills, getSkillDisplayName, filterSkills } from './skills.ts';
 import {
   installSkillForAgent,
-  installBlobSkillForAgent,
   isSkillInstalled,
   getCanonicalPath,
   installWellKnownSkillForAgent,
@@ -65,12 +64,6 @@ import {
 } from './skill-lock.ts';
 import { addSkillToLocalLock, computeSkillFolderHash } from './local-lock.ts';
 import type { Skill, AgentType } from './types.ts';
-import {
-  tryBlobInstall,
-  BLOB_ALLOWED_REPOS,
-  type BlobSkill,
-  type BlobInstallResult,
-} from './blob.ts';
 import { fetchRepoTree, getSkillFolderHashFromTree } from './github-tree.ts';
 /**
  * Shortens a path for display: replaces homedir with ~ and cwd with .
@@ -973,7 +966,6 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
     const includeInternal = !!(options.skill && options.skill.length > 0);
 
     let skills: Skill[];
-    let blobResult: BlobInstallResult | null = null;
 
     if (parsed.type === 'local') {
       // Use local path directly, no cloning needed
@@ -990,46 +982,7 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
         includeInternal,
         fullDepth: options.fullDepth,
       });
-    } else if (parsed.type === 'github' && !options.fullDepth) {
-      // Try the blob-based fast install for GitHub sources; skip for --full-depth.
-      // Eligible per repo (a BLOB_ALLOWED_REPOS entry = self-hosted download URL) or
-      // per owner (BLOB_ALLOWED_OWNERS = all their repos, skills.sh-hosted).
-      const BLOB_ALLOWED_OWNERS = ['vercel', 'vercel-labs', 'heygen-com'];
-      const ownerRepo = getOwnerRepo(parsed);
-      const owner = ownerRepo?.split('/')[0]?.toLowerCase();
-      const isSelfHostedRepo =
-        !!ownerRepo && Object.hasOwn(BLOB_ALLOWED_REPOS, ownerRepo.toLowerCase());
-      if (ownerRepo && owner && (isSelfHostedRepo || BLOB_ALLOWED_OWNERS.includes(owner))) {
-        spinner.start('Fetching skills…');
-        blobResult = await tryBlobInstall(ownerRepo, {
-          subpath: parsed.subpath,
-          skillFilter: parsed.skillFilter,
-          ref: parsed.ref,
-          getToken: getGitHubToken,
-          includeInternal,
-        });
-        if (!blobResult) {
-          spinner.stop(pc.dim('Falling back to clone…'));
-        }
-      }
-
-      if (blobResult) {
-        skills = blobResult.skills;
-        spinner.stop(`Found ${pc.green(skills.length)} skill${skills.length > 1 ? 's' : ''}`);
-      } else {
-        // Blob failed — fall back to git clone
-        spinner.start('Cloning repository…');
-        tempDir = await cloneRepo(parsed.url, parsed.ref);
-        spinner.stop('Repository cloned');
-
-        spinner.start('Discovering skills…');
-        skills = await discoverSkills(tempDir, parsed.subpath, {
-          includeInternal,
-          fullDepth: options.fullDepth,
-        });
-      }
     } else {
-      // GitLab, git URL, or --full-depth: always clone
       spinner.start('Cloning repository…');
       tempDir = await cloneRepo(parsed.url, parsed.ref);
       spinner.stop('Repository cloned');
@@ -1050,9 +1003,7 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
       process.exit(1);
     }
 
-    if (!blobResult) {
-      spinner.stop(`Found ${pc.green(skills.length)} skill${skills.length > 1 ? 's' : ''}`);
-    }
+    spinner.stop(`Found ${pc.green(skills.length)} skill${skills.length > 1 ? 's' : ''}`);
 
     if (options.list) {
       console.log();
@@ -1524,27 +1475,14 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
     for (const skill of selectedSkills) {
       for (const target of installTargets) {
         const { agent, subagent } = target;
-        let result;
-        if (blobResult && 'files' in skill) {
-          // Blob-based install: write files from snapshot
-          const blobSkill = skill as BlobSkill;
-          result = await installBlobSkillForAgent(
-            { installName: blobSkill.name, files: blobSkill.files },
-            agent,
-            { global: installGlobally, mode: installMode, eveSubagent: subagent }
-          );
-        } else {
-          // Disk-based install: copy from cloned/local directory.
-          // Root-level skills (SKILL.md at repo root, so skill.path === tempDir)
-          // also take this path and are copied recursively (see installer.ts
-          // copyDirectory, which excludes .git), so their scripts/, references/,
-          // assets/, etc. are installed too. See issue #1603.
-          result = await installSkillForAgent(skill, agent, {
-            global: installGlobally,
-            mode: installMode,
-            eveSubagent: subagent,
-          });
-        }
+        // Root-level skills (SKILL.md at repo root, so skill.path === tempDir)
+        // are copied recursively (see installer.ts copyDirectory, which excludes
+        // .git), so their scripts/, references/, assets/, etc. are installed too.
+        const result = await installSkillForAgent(skill, agent, {
+          global: installGlobally,
+          mode: installMode,
+          eveSubagent: subagent,
+        });
         results.push({
           skill: getSkillDisplayName(skill),
           agent: targetDisplayName(target),
@@ -1562,10 +1500,7 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
     // Build skillFiles map for lock entries: { skillName: relative path to SKILL.md from repo root }
     const skillFiles: Record<string, string> = {};
     for (const skill of selectedSkills) {
-      if (blobResult && 'repoPath' in skill) {
-        // Blob-based: repoPath is already the repo-relative path (e.g., "skills/react/SKILL.md")
-        skillFiles[skill.name] = (skill as BlobSkill).repoPath;
-      } else if (tempDir && skill.path === tempDir) {
+      if (tempDir && skill.path === tempDir) {
         // Skill is at root level of repo
         skillFiles[skill.name] = 'SKILL.md';
       } else if (tempDir && skill.path.startsWith(tempDir + sep)) {
@@ -1590,7 +1525,7 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
       // For GitHub clone installs, fetch the repo tree once and reuse it
       // for all skills — avoids N sequential API calls that take ~400ms each.
       let cachedTree: Awaited<ReturnType<typeof fetchRepoTree>> | undefined;
-      if (parsed.type === 'github' && !blobResult) {
+      if (parsed.type === 'github') {
         cachedTree = await fetchRepoTree(normalizedSource, parsed.ref, getGitHubToken);
       }
 
@@ -1601,10 +1536,7 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
             let skillFolderHash = '';
             const skillPathValue = skillFiles[skill.name];
 
-            if (blobResult && skillPathValue) {
-              const hash = getSkillFolderHashFromTree(blobResult.tree, skillPathValue);
-              if (hash) skillFolderHash = hash;
-            } else if (parsed.type === 'github' && skillPathValue && cachedTree) {
+            if (parsed.type === 'github' && skillPathValue && cachedTree) {
               const hash = getSkillFolderHashFromTree(cachedTree, skillPathValue);
               if (hash) skillFolderHash = hash;
             } else if (skillPathValue && tempDir) {
@@ -1644,11 +1576,7 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
         const skillDisplayName = getSkillDisplayName(skill);
         if (successfulSkillNames.has(skillDisplayName)) {
           try {
-            // For blob skills, use the snapshot hash; for disk skills, compute from files
-            const computedHash =
-              blobResult && 'snapshotHash' in skill
-                ? (skill as BlobSkill).snapshotHash
-                : await computeSkillFolderHash(skill.path);
+            const computedHash = await computeSkillFolderHash(skill.path);
             const skillPathValue = skillFiles[skill.name];
             await addSkillToLocalLock(
               skill.name,
