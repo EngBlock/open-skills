@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "package": {
+    "name": "@engblock/open-skills",
+    "version": "0.1.2",
+    "publishedAt": "2026-07-22T14:13:45.715Z",
+    "metadataUrl": "https://registry.npmjs.org/@engblock%2fopen-skills/0.1.2",
+    "publicationMetadataUrl": "https://registry.npmjs.org/@engblock%2fopen-skills"
+  },
+  "artifact": {
+    "url": "https://registry.npmjs.org/@engblock/open-skills/-/open-skills-0.1.2.tgz",
+    "integrity": "sha512-TTD/WemKLYiem5bM+vEtuxXORSZExvP4wdDxCELP1xpSqlSnEzMa2xe61JO7xBMFEbSrtBqEyys+cHVEDyCMFg==",
+    "sha1": "159fb3c760ea72b731674c6a93059a37040a0c1f",
+    "sha256": "2871993290bb28ae40d3a1c59f64b1e29564de4145a62bd3c9bdf7b85aef39c9",
+    "sha512": "4d30ff59e98a2d889e9b96ccfaf12dbb15ce452644c6f3f8c1d0f10842cfd71a52aa54a713331adb17bad493bbc4130511b4abb41a84cb2b3e7075440f208c16",
+    "size": 108613,
+    "fileCount": 17,
+    "unpackedSize": 463008,
+    "npmSignature": {
+      "keyId": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+      "signature": "MEQCIDtsQW1BXXCHsHAR8CJoOdMD3zt11KEKIxdBCJkxBm4vAiAgNtXTMf0R7YIaiRAKY8LDDA9vexF5cYYnQSKyDvxTcg=="
+    }
+  },
+  "source": {
+    "repository": "https://github.com/EngBlock/open-skills",
+    "tag": "v0.1.2",
+    "tagRefUrl": "https://api.github.com/repos/EngBlock/open-skills/git/refs/tags/v0.1.2",
+    "tagObject": "b3117c12d841b5fdfc3c2fead72c39d01e148ab2",
+    "tagObjectUrl": "https://api.github.com/repos/EngBlock/open-skills/git/tags/b3117c12d841b5fdfc3c2fead72c39d01e148ab2",
+    "commit": "a91eb79d035d7a33300d2cc60b18db3f81a94621",
+    "commitUrl": "https://api.github.com/repos/EngBlock/open-skills/git/commits/a91eb79d035d7a33300d2cc60b18db3f81a94621",
+    "tree": "f766eaf80048c8f5232eaa981bfd1fa45485fc70",
+    "tagSigned": false,
+    "protection": {
+      "rulesetId": 19578936,
+      "rulesetName": "Protect npm 0.1.2 compatibility baseline",
+      "rulesetUrl": "https://api.github.com/repos/EngBlock/open-skills/rulesets/19578936"
+    }
+  }
+}

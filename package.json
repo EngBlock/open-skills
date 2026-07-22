@@ -28,6 +28,7 @@
     "prepare": "husky",
     "test": "vitest",
     "type-check": "tsc --noEmit",
+    "verify:native-baseline": "node scripts/verify-native-baseline.ts",
     "publish:snapshot": "npm version prerelease --preid=snapshot --no-git-tag-version && npm publish --tag snapshot"
   },
   "lint-staged": {
