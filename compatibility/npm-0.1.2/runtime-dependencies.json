@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "dependencies": [
+    {
+      "name": "yaml",
+      "version": "2.9.0",
+      "source": "pnpm-lock.yaml at v0.1.2",
+      "artifact": {
+        "url": "https://registry.npmjs.org/yaml/-/yaml-2.9.0.tgz",
+        "integrity": "sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==",
+        "sha1": "78274afd93598a1dfdd6130df6a566defcbf9aa4",
+        "sha256": "008fa204cb1ba700e0272ba045abbf09a6ffe63456e8146ba97cac6c2ad1ef91",
+        "sha512": "d80be1357de66fccdde99cbb20d4ed4a9975175e475ba5a7aa3d2cad696428b729625fe03083098b2b86ab629e236605c543e376507edcb735d2c78c2ed2f870",
+        "size": 112086,
+        "fileCount": 233,
+        "unpackedSize": 685953
+      }
+    }
+  ]
+}

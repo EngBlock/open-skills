@@ -1,0 +1,24 @@
+# Native development
+
+The native preview is a standard-library-only Go module. Its supported seam is the built `open-skills` process; packages under `internal/` are implementation details and do not promise a public Go interface.
+
+Build and smoke-test the standalone executable without a Node runtime:
+
+```sh
+CGO_ENABLED=0 go build -trimpath -o build/open-skills ./cmd/open-skills
+env PATH= ./build/open-skills
+```
+
+Run native checks with:
+
+```sh
+gofmt -w cmd internal
+go vet ./...
+go test ./...
+```
+
+`internal/compatibility` contains the process-level differential harness. Each target gets a fresh home, project, temporary directory, local Git repositories, HTTP server, stdin, environment, and PATH command fixtures. The harness records raw process streams and status, filesystem and lock state, HTTP requests, and child-command invocations before applying only documented presentation normalization.
+
+The npm side must be prepared with `PrepareNPMOracle`. It reads `compatibility/npm-0.1.2/oracle.json` plus `runtime-dependencies.json`, verifies the exact CLI and pinned `yaml@2.9.0` tarball bytes, enforces their recorded file counts and unpacked sizes, and safely extracts `package/bin/cli.mjs` with its runtime dependency for an explicitly supplied Node executable. It never resolves a dist-tag or invokes npm/npx.
+
+Scenario processes inherit no credentials, proxies, agent markers, runtime injection variables, or host Git configuration. Their `PATH` is empty unless declared command fixtures are installed, in which case it contains only those fixtures. This fail-closed setup makes subprocess behavior explicit while local repository fixtures are initialized separately with isolated deterministic Git configuration.

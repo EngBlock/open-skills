@@ -4,6 +4,8 @@ node_modules
 # output
 out
 dist
+build
+.native-dist
 *.tgz
 
 # code coverage

@@ -65,3 +65,71 @@ jobs:
 
       - name: Type check
         run: pnpm type-check
+
+  native:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        run: test -z "$(gofmt -l cmd internal)"
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Tests
+        run: go test ./...
+
+      - name: Build standalone executable
+        env:
+          CGO_ENABLED: '0'
+        run: mkdir -p .native-dist && go build -trimpath -o .native-dist/open-skills ./cmd/open-skills
+
+      - name: Smoke test standalone executable
+        env:
+          PATH: ''
+        run: ./.native-dist/open-skills
+
+      - name: Verify native executable name
+        run: test "$(find .native-dist -maxdepth 1 -type f -printf '%f\n')" = open-skills
+
+  native-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Tests
+        run: go test ./...
+
+      - name: Build standalone executable
+        env:
+          CGO_ENABLED: '0'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .native-dist | Out-Null
+          go build -trimpath -o .native-dist/open-skills.exe ./cmd/open-skills
+
+      - name: Smoke test standalone executable
+        run: ./.native-dist/open-skills.exe
+
+      - name: Verify native executable name
+        shell: pwsh
+        run: |
+          $files = @(Get-ChildItem .native-dist -File | Select-Object -ExpandProperty Name)
+          if ($files.Count -ne 1 -or $files[0] -ne 'open-skills.exe') { throw "unexpected native artifacts: $files" }
