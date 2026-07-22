@@ -6,7 +6,6 @@ import { detectInstalledAgents, getEveSubagents } from '../src/agents.ts';
 import {
   getAgentBaseDir,
   getEveSubagentSkillsDir,
-  installBlobSkillForAgent,
   installSkillForAgent,
   isSkillInstalled,
   listInstalledSkills,
@@ -86,38 +85,6 @@ describe('Eve agent support', () => {
       await rm(root, { recursive: true, force: true });
     }
   });
-
-  it('installs blob skills without unsupported name frontmatter', async () => {
-    const projectDir = await makeEveProject();
-
-    try {
-      const result = await installBlobSkillForAgent(
-        {
-          installName: 'blob-skill',
-          files: [
-            {
-              path: 'SKILL.md',
-              contents: '---\nname: blob-skill\ndescription: Blob skill\n---\n# Blob\n',
-            },
-          ],
-        },
-        'eve',
-        { cwd: projectDir, mode: 'copy', global: false }
-      );
-
-      expect(result.success).toBe(true);
-      expect(result.path).toBe(join(projectDir, 'agent/skills/blob-skill'));
-
-      const installed = await readFile(
-        join(projectDir, 'agent/skills/blob-skill/SKILL.md'),
-        'utf-8'
-      );
-      expect(installed).toContain('description: "Blob skill"');
-      expect(installed).not.toContain('name:');
-    } finally {
-      await rm(projectDir, { recursive: true, force: true });
-    }
-  });
 });
 
 describe('Eve subagents', () => {
@@ -186,32 +153,6 @@ describe('Eve subagents', () => {
     } finally {
       await rm(projectDir, { recursive: true, force: true });
       await rm(root, { recursive: true, force: true });
-    }
-  });
-
-  it('installs a blob skill into a subagent skills directory', async () => {
-    const projectDir = await makeEveProject();
-    await addEveSubagent(projectDir, 'research');
-
-    try {
-      const result = await installBlobSkillForAgent(
-        {
-          installName: 'blob-subagent',
-          files: [
-            {
-              path: 'SKILL.md',
-              contents: '---\nname: blob-subagent\ndescription: Blob subagent\n---\n# Blob\n',
-            },
-          ],
-        },
-        'eve',
-        { cwd: projectDir, mode: 'copy', global: false, eveSubagent: 'research' }
-      );
-
-      expect(result.success).toBe(true);
-      expect(result.path).toBe(join(projectDir, 'agent/subagents/research/skills/blob-subagent'));
-    } finally {
-      await rm(projectDir, { recursive: true, force: true });
     }
   });
 

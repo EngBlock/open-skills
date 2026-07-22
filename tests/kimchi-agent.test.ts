@@ -3,7 +3,6 @@ import { homedir, tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { agents, isKimchiInstalled } from '../src/agents.ts';
-import { findSkillMdPaths } from '../src/blob.ts';
 import { discoverSkills } from '../src/skills.ts';
 
 const skillFile = (name: string) => `---
@@ -59,26 +58,5 @@ describe('Kimchi agent support', () => {
       'kimchi-skill',
       'standard-skill',
     ]);
-  });
-
-  it('discovers .kimchi/skills through the GitHub tree fast path', () => {
-    const discovered = findSkillMdPaths({
-      sha: 'root-sha',
-      branch: 'main',
-      tree: [
-        {
-          path: '.claude/skills/standard-skill/SKILL.md',
-          type: 'blob',
-          sha: 'standard-sha',
-        },
-        {
-          path: '.kimchi/skills/kimchi-skill/SKILL.md',
-          type: 'blob',
-          sha: 'kimchi-sha',
-        },
-      ],
-    });
-
-    expect(discovered).toContain('.kimchi/skills/kimchi-skill/SKILL.md');
   });
 });

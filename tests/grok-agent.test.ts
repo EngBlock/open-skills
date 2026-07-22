@@ -2,8 +2,6 @@ import { mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { findSkillMdPaths } from '../src/blob.ts';
-import type { RepoTree } from '../src/github-tree.ts';
 import { discoverSkills } from '../src/skills.ts';
 
 describe('Grok Build agent support', () => {
@@ -69,29 +67,5 @@ describe('Grok Build agent support', () => {
     } finally {
       rmSync(projectDir, { recursive: true, force: true });
     }
-  });
-
-  it('discovers grouped Grok project skills from remote repository trees', () => {
-    const tree: RepoTree = {
-      sha: 'root-sha',
-      branch: 'main',
-      tree: [
-        {
-          path: 'skills/source/SKILL.md',
-          type: 'blob',
-          sha: 'source-skill-sha',
-        },
-        {
-          path: '.grok/skills/team/review/SKILL.md',
-          type: 'blob',
-          sha: 'skill-sha',
-        },
-      ],
-    };
-
-    expect(findSkillMdPaths(tree).sort()).toEqual([
-      '.grok/skills/team/review/SKILL.md',
-      'skills/source/SKILL.md',
-    ]);
   });
 });

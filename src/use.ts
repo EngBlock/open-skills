@@ -4,10 +4,8 @@ import { cp, mkdir, mkdtemp, readdir, readFile, writeFile } from 'fs/promises';
 import { dirname, join, normalize, relative, resolve, sep } from 'path';
 import { tmpdir } from 'os';
 import { agents } from './agents.ts';
-import { tryBlobInstall, type BlobInstallResult, type BlobSkill } from './blob.ts';
 import { cloneRepo, cleanupTempDir, GitCloneError } from './git.ts';
 import { sanitizeName } from './installer.ts';
-import { getGitHubToken } from './skill-lock.ts';
 import { discoverSkills, filterSkills, getSkillDisplayName } from './skills.ts';
 import { getOwnerRepo, parseSource } from './source-parser.ts';
 import type { AgentType, Skill } from './types.ts';
@@ -32,13 +30,6 @@ export interface ParseUseOptionsResult {
 }
 
 export type UseSkill =
-  | {
-      kind: 'blob';
-      name: string;
-      directoryName: string;
-      rawContent: string;
-      files: Array<{ path: string; contents: string }>;
-    }
   | {
       kind: 'disk';
       name: string;
@@ -76,7 +67,6 @@ interface UseAgentConfig {
   args: string[];
 }
 
-const BLOB_ALLOWED_OWNERS = ['vercel', 'vercel-labs', 'heygen-com'];
 const EXCLUDE_FILES = new Set(['metadata.json']);
 const EXCLUDE_DIRS = new Set(['.git', '__pycache__', '__pypackages__']);
 const USE_AGENT_CONFIGS: Partial<Record<AgentType, UseAgentConfig>> = {
@@ -167,9 +157,7 @@ export async function materializeUseSkill(skill: UseSkill): Promise<Materialized
 
   await mkdir(skillDir, { recursive: true });
 
-  if (skill.kind === 'blob') {
-    await writeSnapshotFiles(skillDir, skill.files);
-  } else if (skill.kind === 'well-known') {
+  if (skill.kind === 'well-known') {
     await writeMapFiles(skillDir, skill.files);
   } else {
     await copySkillDirectory(skill.path, skillDir);
@@ -213,8 +201,7 @@ export async function runUse(
 
     const source = sourceArgs[0]!;
     const parsed = parseSource(source);
-    const ownerRepoRaw = getOwnerRepo(parsed);
-    const sourceOwner = ownerRepoRaw?.split('/')[0]?.toLowerCase();
+    const sourceOwner = getOwnerRepo(parsed)?.split('/')[0]?.toLowerCase();
 
     if (sourceOwner === 'openclaw' && !options.dangerouslyAcceptOpenclawRisks) {
       fail(
@@ -236,7 +223,6 @@ export async function runUse(
       selectedSkill = selectWellKnownSkill(skills, selector, source);
     } else {
       let skills: Skill[];
-      let blobResult: BlobInstallResult | null = null;
 
       if (parsed.type === 'local') {
         if (!existsSync(parsed.localPath!)) {
@@ -246,28 +232,6 @@ export async function runUse(
           includeInternal,
           fullDepth: options.fullDepth,
         });
-      } else if (parsed.type === 'github' && !options.fullDepth) {
-        const ownerRepo = getOwnerRepo(parsed);
-        const owner = ownerRepo?.split('/')[0]?.toLowerCase();
-        if (ownerRepo && owner && BLOB_ALLOWED_OWNERS.includes(owner)) {
-          blobResult = await tryBlobInstall(ownerRepo, {
-            subpath: parsed.subpath,
-            skillFilter: selector,
-            ref: parsed.ref,
-            getToken: getGitHubToken,
-            includeInternal,
-          });
-        }
-
-        if (blobResult) {
-          skills = blobResult.skills;
-        } else {
-          cloneTempDir = await cloneRepo(parsed.url, parsed.ref);
-          skills = await discoverSkills(cloneTempDir, parsed.subpath, {
-            includeInternal,
-            fullDepth: options.fullDepth,
-          });
-        }
       } else {
         cloneTempDir = await cloneRepo(parsed.url, parsed.ref);
         skills = await discoverSkills(cloneTempDir, parsed.subpath, {
@@ -277,23 +241,13 @@ export async function runUse(
       }
 
       const selected = selectSkill(skills, selector, source);
-      if (blobResult && isBlobSkill(selected)) {
-        selectedSkill = {
-          kind: 'blob',
-          name: selected.name,
-          directoryName: selected.name,
-          rawContent: selected.rawContent ?? getSkillMdFromSnapshot(selected.files),
-          files: selected.files,
-        };
-      } else {
-        selectedSkill = {
-          kind: 'disk',
-          name: selected.name,
-          directoryName: selected.name,
-          rawContent: selected.rawContent,
-          path: selected.path,
-        };
-      }
+      selectedSkill = {
+        kind: 'disk',
+        name: selected.name,
+        directoryName: selected.name,
+        rawContent: selected.rawContent,
+        path: selected.path,
+      };
     }
 
     const materialized = await materializeUseSkill(selectedSkill);
@@ -523,15 +477,6 @@ function formatUnsupportedAgentError(agent: AgentType): string {
   ].join('\n');
 }
 
-async function writeSnapshotFiles(
-  targetDir: string,
-  files: Array<{ path: string; contents: string }>
-): Promise<void> {
-  for (const file of files) {
-    await writeSafeFile(targetDir, file.path, file.contents);
-  }
-}
-
 async function writeMapFiles(
   targetDir: string,
   files: Map<string, WellKnownFileContent>
@@ -606,15 +551,6 @@ async function containsSupportingFiles(rootDir: string, currentDir: string): Pro
   }
 
   return false;
-}
-
-function isBlobSkill(skill: Skill): skill is BlobSkill {
-  return Array.isArray((skill as BlobSkill).files);
-}
-
-function getSkillMdFromSnapshot(files: Array<{ path: string; contents: string }>): string {
-  const skillMd = files.find((file) => file.path.toLowerCase() === 'skill.md');
-  return skillMd?.contents ?? '';
 }
 
 function isExcluded(name: string, isDirectory: boolean): boolean {

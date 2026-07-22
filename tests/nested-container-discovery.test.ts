@@ -3,7 +3,7 @@
  *
  * Layouts like `skills/<category>/<skill>/SKILL.md` are common when a repo
  * groups skills by product or category. They should be discovered by
- * `discoverSkills()` and `findSkillMdPaths()` without users having to pass
+ * `discoverSkills()` without users having to pass
  * `--full-depth`, while keeping the flat-layout, manifest, and
  * `examples/` / `tests/` behaviors intact.
  *
@@ -15,8 +15,6 @@ import { mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { discoverSkills } from '../src/skills.ts';
-import { findSkillMdPaths } from '../src/blob.ts';
-import type { RepoTree, TreeEntry } from '../src/github-tree.ts';
 
 function writeSkill(dir: string, name: string): void {
   mkdirSync(dir, { recursive: true });
@@ -24,15 +22,6 @@ function writeSkill(dir: string, name: string): void {
     join(dir, 'SKILL.md'),
     `---\nname: ${name}\ndescription: ${name} description\n---\n\n# ${name}\n`
   );
-}
-
-function makeTree(paths: string[]): RepoTree {
-  const entries: TreeEntry[] = paths.map((path) => ({
-    path,
-    type: path.toLowerCase().endsWith('skill.md') ? 'blob' : 'tree',
-    sha: 'sha-' + path.replace(/[^a-z0-9]/gi, '_'),
-  }));
-  return { sha: 'root-sha', branch: 'main', tree: entries };
 }
 
 describe('discoverSkills — bounded depth-2 inside skill container dirs', () => {
@@ -153,69 +142,5 @@ describe('discoverSkills — bounded depth-2 inside skill container dirs', () =>
 
     expect(skills).toHaveLength(1);
     expect(skills[0].name).toBe('root-skill');
-  });
-});
-
-describe('findSkillMdPaths — bounded depth-2 inside skill container prefixes', () => {
-  it('returns nested SKILL.md paths under skills/<category>/<skill>/', () => {
-    const tree = makeTree([
-      'skills/product-a/skill-one/SKILL.md',
-      'skills/product-a/skill-two/SKILL.md',
-      'skills/product-b/skill-three/SKILL.md',
-    ]);
-
-    expect(findSkillMdPaths(tree).sort()).toEqual([
-      'skills/product-a/skill-one/SKILL.md',
-      'skills/product-a/skill-two/SKILL.md',
-      'skills/product-b/skill-three/SKILL.md',
-    ]);
-  });
-
-  it('returns mixed flat and nested paths from the same container', () => {
-    const tree = makeTree(['skills/flat-skill/SKILL.md', 'skills/category/nested-skill/SKILL.md']);
-
-    expect(findSkillMdPaths(tree).sort()).toEqual([
-      'skills/category/nested-skill/SKILL.md',
-      'skills/flat-skill/SKILL.md',
-    ]);
-  });
-
-  it('does not descend past a SKILL.md found at depth 1', () => {
-    const tree = makeTree(['skills/foo/SKILL.md', 'skills/foo/inner/SKILL.md']);
-
-    expect(findSkillMdPaths(tree)).toEqual(['skills/foo/SKILL.md']);
-  });
-
-  it('is case-insensitive about the parent SKILL.md when checking for shadowing', () => {
-    const tree = makeTree(['skills/foo/skill.md', 'skills/foo/inner/SKILL.md']);
-
-    expect(findSkillMdPaths(tree)).toEqual(['skills/foo/skill.md']);
-  });
-
-  it('skips depth-2 entries whose intermediate dir is an ignored directory', () => {
-    const tree = makeTree([
-      'skills/node_modules/pkg-skill/SKILL.md',
-      'skills/real-category/real-skill/SKILL.md',
-    ]);
-
-    expect(findSkillMdPaths(tree)).toEqual(['skills/real-category/real-skill/SKILL.md']);
-  });
-
-  it('does not surface depth-2 entries under the root prefix', () => {
-    const tree = makeTree([
-      'examples/category/example-skill/SKILL.md',
-      'skills/real-skill/SKILL.md',
-    ]);
-
-    expect(findSkillMdPaths(tree)).toEqual(['skills/real-skill/SKILL.md']);
-  });
-
-  it('respects the subpath filter while applying depth-2 discovery', () => {
-    const tree = makeTree([
-      'skills/category/in-scope/SKILL.md',
-      'other/category/out-of-scope/SKILL.md',
-    ]);
-
-    expect(findSkillMdPaths(tree, 'skills')).toEqual(['skills/category/in-scope/SKILL.md']);
   });
 });
