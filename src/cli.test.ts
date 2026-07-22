@@ -1,7 +1,27 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
 import { join } from 'path';
 import { runCli, runCliOutput, stripLogo, hasLogo } from './test-utils.ts';
+
+const FAIL_ON_FETCH =
+  '--import=data:text/javascript,globalThis.fetch%3D()%3D%3E%7Bprocess.stdout.write(%22UNEXPECTED_FETCH%5Cn%22)%3Bthrow%20new%20Error(%22fetch%20disabled%22)%7D';
+const RECORD_EMPTY_SEARCH_FETCHES =
+  '--import=data:text/javascript,globalThis.fetch%3D(u)%3D%3E%7Bprocess.stdout.write(%22FETCH%20%22%2Bu%2B%22%5Cn%22)%3Breturn%20Promise.resolve(%7Bok%3Atrue%2Cjson%3Aasync()%3D%3E(%7Bskills%3A%5B%5D%7D)%7D)%7D';
+
+function expectSuccessfulWithoutFetch(result: ReturnType<typeof runCli>): void {
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout).not.toContain('UNEXPECTED_FETCH');
+}
+
+function withTemporaryDirectory(prefix: string, test: (directory: string) => void): void {
+  const directory = mkdtempSync(join(tmpdir(), prefix));
+  try {
+    test(directory);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
 
 describe('skills CLI', () => {
   describe('--help', () => {
@@ -21,6 +41,7 @@ describe('skills CLI', () => {
       expect(output).toContain('-l, --list');
       expect(output).toContain('-y, --yes');
       expect(output).toContain('--all');
+      expect(output).not.toContain('--metadata');
     });
 
     it('should show same output for -h alias', () => {
@@ -58,6 +79,104 @@ describe('skills CLI', () => {
     });
   });
 
+  describe('offline local commands', () => {
+    it.each([
+      ['help', ['--help']],
+      ['version', ['--version']],
+    ])('runs %s without fetching', (_label, args) => {
+      expectSuccessfulWithoutFetch(runCli(args, undefined, { NODE_OPTIONS: FAIL_ON_FETCH }));
+    });
+
+    it('initializes a skill without fetching', () => {
+      withTemporaryDirectory('skills-offline-init-', (cwd) => {
+        const result = runCli(['init', 'demo'], cwd, { NODE_OPTIONS: FAIL_ON_FETCH });
+
+        expectSuccessfulWithoutFetch(result);
+        expect(readFileSync(join(cwd, 'demo', 'SKILL.md'), 'utf-8')).toContain('name: demo');
+      });
+    });
+
+    it('lists local skills without fetching', () => {
+      withTemporaryDirectory('skills-offline-list-', (cwd) => {
+        expectSuccessfulWithoutFetch(runCli(['list'], cwd, { NODE_OPTIONS: FAIL_ON_FETCH }));
+      });
+    });
+
+    it('installs a local source without fetching', () => {
+      withTemporaryDirectory('skills-offline-add-', (base) => {
+        const source = join(base, 'source');
+        const cwd = join(base, 'project');
+        mkdirSync(source, { recursive: true });
+        mkdirSync(cwd, { recursive: true });
+        writeFileSync(join(source, 'SKILL.md'), '---\nname: demo\ndescription: Demo\n---\n');
+
+        const result = runCli(['add', source, '--agent', 'universal', '--copy', '--yes'], cwd, {
+          NODE_OPTIONS: FAIL_ON_FETCH,
+        });
+
+        expectSuccessfulWithoutFetch(result);
+        expect(readFileSync(join(cwd, '.agents', 'skills', 'demo', 'SKILL.md'), 'utf-8')).toContain(
+          'name: demo'
+        );
+      });
+    });
+
+    it('syncs a local node_modules skill without fetching', () => {
+      withTemporaryDirectory('skills-offline-sync-', (cwd) => {
+        const skillDir = join(cwd, 'node_modules', 'demo-package');
+        mkdirSync(skillDir, { recursive: true });
+        writeFileSync(join(skillDir, 'SKILL.md'), '---\nname: demo\ndescription: Demo\n---\n');
+
+        const result = runCli(['experimental_sync', '--agent', 'universal', '--yes'], cwd, {
+          NODE_OPTIONS: FAIL_ON_FETCH,
+        });
+        expectSuccessfulWithoutFetch(result);
+      });
+    });
+
+    it('updates an empty local installation without fetching', () => {
+      withTemporaryDirectory('skills-offline-update-', (cwd) => {
+        const result = runCli(['update', '--yes'], cwd, { NODE_OPTIONS: FAIL_ON_FETCH });
+        expectSuccessfulWithoutFetch(result);
+      });
+    });
+
+    it('removes a local skill without fetching', () => {
+      withTemporaryDirectory('skills-offline-remove-', (cwd) => {
+        const skillDir = join(cwd, '.agents', 'skills', 'demo');
+        mkdirSync(skillDir, { recursive: true });
+        writeFileSync(join(skillDir, 'SKILL.md'), '---\nname: demo\ndescription: Demo\n---\n');
+
+        const result = runCli(['remove', 'demo', '--yes'], cwd, {
+          NODE_OPTIONS: FAIL_ON_FETCH,
+        });
+        expectSuccessfulWithoutFetch(result);
+      });
+    });
+  });
+
+  describe('remote commands', () => {
+    it('sends only the requested search fetch for find', () => {
+      const result = runCli(['find', 'react'], undefined, {
+        NODE_OPTIONS: RECORD_EMPTY_SEARCH_FETCHES,
+        SKILLS_API_URL: 'https://search.example.test',
+      });
+      const fetches = result.stdout.split('\n').filter((line) => line.startsWith('FETCH '));
+
+      expect(result.exitCode).toBe(0);
+      expect(fetches).toEqual(['FETCH https://search.example.test/api/search?q=react&limit=10']);
+    });
+  });
+
+  describe('removed options', () => {
+    it('rejects the removed telemetry metadata option as unknown', () => {
+      const result = runCli(['add', 'local-skill', '--metadata', '{}']);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('Error: Unknown option: --metadata');
+    });
+  });
+
   describe('unknown command', () => {
     it('should show error for unknown command', () => {
       const output = runCliOutput(['unknown-command']);
@@ -86,8 +205,8 @@ describe('skills CLI', () => {
 
   describe('subcommand --help', () => {
     // Each subcommand invoked with --help/-h must short-circuit to help output
-    // before the subcommand handler runs, so no side effects (telemetry,
-    // network calls, lock-file writes) can happen.
+    // before the subcommand handler runs, so no side effects (network calls
+    // or lock-file writes) can happen.
     const cases: Array<[string, string]> = [
       ['add --help routes to top-level help', 'add'],
       ['update --help routes to top-level help', 'update'],

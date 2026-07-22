@@ -51,27 +51,11 @@ vi.mock('picocolors', () => {
   return { default: obj };
 });
 
-vi.mock('../src/telemetry.ts', () => ({
-  track: vi.fn(),
-  setVersion: vi.fn(),
-  fetchAuditData: vi.fn().mockResolvedValue(null),
-}));
-
 vi.mock('../src/detect-agent.ts', () => ({
   detectAgent: vi.fn().mockResolvedValue({ isAgent: false, agent: { name: 'none' } }),
   getAgentType: vi.fn(),
   ensureUniversalAgents: vi.fn((x: string[]) => x),
 }));
-
-// Keep parseSource/getOwnerRepo real, but stub the only network call (isRepoPrivate)
-// so the test runs offline.
-vi.mock('../src/source-parser.ts', async (importActual) => {
-  const actual = await importActual<typeof import('../src/source-parser.ts')>();
-  return {
-    ...actual,
-    isRepoPrivate: vi.fn().mockResolvedValue(false),
-  };
-});
 
 // Simulate a GitHub clone without touching the network: cloneRepo returns a local
 // fixture directory.

@@ -18,7 +18,6 @@ import { discoverSkills } from './skills.ts';
 import { fetchRepoTree, getSkillFolderHashFromTree } from './github-tree.ts';
 import { removeCommand } from './remove.ts';
 import { sanitizeMetadata } from './sanitize.ts';
-import { track } from './telemetry.ts';
 import { agents, isUniversalAgent } from './agents.ts';
 import type { AgentType } from './types.ts';
 
@@ -738,14 +737,6 @@ export async function runUpdate(args: string[] = []): Promise<void> {
     console.log(`${DIM}Failed to update ${totalFail} skill(s)${RESET}`);
     process.exitCode = 1;
   }
-
-  track({
-    event: 'update',
-    scope,
-    skillCount: String(totalSuccess + totalFail),
-    successCount: String(totalSuccess),
-    failCount: String(totalFail),
-  });
 
   console.log();
 }

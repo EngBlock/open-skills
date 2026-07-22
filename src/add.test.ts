@@ -551,28 +551,6 @@ describe('parseAddOptions', () => {
     expect(result.options.global).toBe(true);
   });
 
-  it('should parse valid JSON metadata', () => {
-    const metadata = '{"origin":"workflow","runId":42}';
-    const result = parseAddOptions(['source', '--metadata', metadata]);
-
-    expect(result.source).toEqual(['source']);
-    expect(result.options.metadata).toBe(metadata);
-    expect(result.errors).toEqual([]);
-  });
-
-  it('should reject invalid JSON metadata', () => {
-    const result = parseAddOptions(['source', '--metadata', '{not-json}']);
-
-    expect(result.options.metadata).toBeUndefined();
-    expect(result.errors).toEqual(['--metadata must be valid JSON']);
-  });
-
-  it('should reject a missing metadata value', () => {
-    const result = parseAddOptions(['source', '--metadata']);
-
-    expect(result.errors).toEqual(['--metadata requires a JSON value']);
-  });
-
   it('should parse a single --subagent value', () => {
     const result = parseAddOptions(['source', '--subagent', 'research']);
     expect(result.source).toEqual(['source']);

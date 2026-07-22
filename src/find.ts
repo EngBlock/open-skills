@@ -1,7 +1,6 @@
 import * as readline from 'readline';
 import { runAdd, parseAddOptions } from './add.ts';
 import { sanitizeMetadata } from './sanitize.ts';
-import { track } from './telemetry.ts';
 import { isRepoPrivate } from './source-parser.ts';
 import { isRunningInAgent } from './detect-agent.ts';
 
@@ -340,13 +339,6 @@ ${DIM}  2) npx skills add <owner/repo@skill>${RESET}`;
   if (query) {
     const results = await searchSkillsAPI(query, owner);
 
-    // Track telemetry for non-interactive search
-    track({
-      event: 'find',
-      query,
-      resultCount: String(results.length),
-    });
-
     if (results.length === 0) {
       const ownerSuffix = owner ? ` from owner "${owner}"` : '';
       console.log(`${DIM}No skills found for "${query}"${ownerSuffix}${RESET}`);
@@ -377,14 +369,6 @@ ${DIM}  2) npx skills add <owner/repo@skill>${RESET}`;
   }
 
   const selected = await runSearchPrompt('', owner);
-
-  // Track telemetry for interactive search
-  track({
-    event: 'find',
-    query: '',
-    resultCount: selected ? '1' : '0',
-    interactive: '1',
-  });
 
   if (!selected) {
     console.log(`${DIM}Search cancelled${RESET}`);

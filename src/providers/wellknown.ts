@@ -782,7 +782,7 @@ export class WellKnownProvider implements HostProvider {
   }
 
   /**
-   * Get the source identifier for telemetry/storage.
+   * Get the source identifier for lock storage.
    * Returns the full hostname with www. stripped.
    */
   getSourceIdentifier(url: string): string {

@@ -44,7 +44,6 @@ src/
 ├── sync.ts          # Sync command - crawl node_modules for skills
 ├── source-parser.ts # Parse git URLs, GitHub shorthand, local paths
 ├── git.ts           # Git clone operations
-├── telemetry.ts     # Anonymous usage tracking
 ├── types.ts         # TypeScript types
 ├── mintlify.ts      # Mintlify skill fetching (legacy)
 ├── plugin-manifest.ts # Plugin manifest discovery support
@@ -72,7 +71,6 @@ tests/
 ├── source-parser.test.ts     # Tests for URL/path parsing
 ├── installer-symlink.test.ts # Tests for symlink installation
 ├── list-installed.test.ts    # Tests for listing installed skills
-├── skill-path.test.ts        # Tests for skill path handling
 ├── wellknown-provider.test.ts # Tests for well-known provider
 ├── xdg-config-paths.test.ts   # XDG global path handling tests
 └── dist.test.ts               # Tests for built distribution
