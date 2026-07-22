@@ -3,7 +3,7 @@ import { spawnSync } from 'child_process';
 import { updateProjectSkills, updateGlobalSkills, runUpdate } from '../src/update.ts';
 import * as git from '../src/git.ts';
 import * as skills from '../src/skills.ts';
-import * as blob from '../src/blob.ts';
+import * as githubTree from '../src/github-tree.ts';
 import * as localLock from '../src/local-lock.ts';
 import * as skillLock from '../src/skill-lock.ts';
 import * as remove from '../src/remove.ts';
@@ -14,7 +14,7 @@ import { join } from 'path';
 // Mock dependencies
 vi.mock('../src/git.ts');
 vi.mock('../src/skills.ts');
-vi.mock('../src/blob.ts');
+vi.mock('../src/github-tree.ts');
 vi.mock('../src/local-lock.ts');
 vi.mock('../src/skill-lock.ts');
 vi.mock('../src/remove.ts');
@@ -351,7 +351,7 @@ describe('Update Cleanup Unit Tests', () => {
         },
       });
 
-      vi.mocked(blob.fetchRepoTree).mockResolvedValue({
+      vi.mocked(githubTree.fetchRepoTree).mockResolvedValue({
         sha: 'rootsha',
         branch: 'main',
         tree: [
@@ -359,7 +359,7 @@ describe('Update Cleanup Unit Tests', () => {
           { path: 'skills/skill-a', type: 'tree', sha: 'abc' },
         ],
       });
-      vi.mocked(blob.findSkillMdPaths).mockReturnValue(['skills/skill-a/SKILL.md']);
+      vi.mocked(githubTree.getSkillFolderHashFromTree).mockReturnValue('abc');
 
       vi.mocked(p.confirm).mockResolvedValue(true);
 
@@ -370,6 +370,11 @@ describe('Update Cleanup Unit Tests', () => {
         ['skill-b'],
         expect.objectContaining({ yes: true, global: true })
       );
+      expect(githubTree.getSkillFolderHashFromTree).toHaveBeenCalledWith(
+        expect.objectContaining({ sha: 'rootsha' }),
+        'skills/skill-a/SKILL.md'
+      );
+      expect(spawnSync).not.toHaveBeenCalled();
     });
 
     it('does not report a locked plugin skill as deleted when it exists in the GitHub tree', async () => {
@@ -387,7 +392,7 @@ describe('Update Cleanup Unit Tests', () => {
           },
         },
       });
-      vi.mocked(blob.fetchRepoTree).mockResolvedValue({
+      vi.mocked(githubTree.fetchRepoTree).mockResolvedValue({
         sha: 'rootsha',
         branch: 'main',
         tree: [
@@ -404,7 +409,6 @@ describe('Update Cleanup Unit Tests', () => {
           },
         ],
       });
-      vi.mocked(blob.findSkillMdPaths).mockReturnValue(['.claude/skills/shallow/SKILL.md']);
       vi.mocked(p.confirm).mockResolvedValue(false);
 
       await updateGlobalSkills();
@@ -558,14 +562,13 @@ describe('Update Cleanup Unit Tests', () => {
           },
         });
 
-        vi.mocked(blob.fetchRepoTree).mockResolvedValue({
+        vi.mocked(githubTree.fetchRepoTree).mockResolvedValue({
           sha: 'rootsha',
           branch: 'main',
           tree: [{ path: 'skills/skill-a/SKILL.md', type: 'blob', sha: 'sha1' }],
         });
-        vi.mocked(blob.findSkillMdPaths).mockReturnValue(['skills/skill-a/SKILL.md']);
         // Latest hash differs from the lock -> an update is queued -> spawnSync runs.
-        vi.mocked(blob.getSkillFolderHashFromTree).mockReturnValue('new-hash');
+        vi.mocked(githubTree.getSkillFolderHashFromTree).mockReturnValue('new-hash');
 
         await updateGlobalSkills({ yes: true });
 

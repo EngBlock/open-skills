@@ -84,10 +84,10 @@ tests/
 
 1. Read `~/.agents/.skill-lock.json` for installed skills
 2. Filter to GitHub-backed skills that have both `skillFolderHash` and `skillPath`
-3. For each skill, call `fetchSkillFolderHash(source, skillPath, token)`. Optional auth token is sourced from `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token` to improve rate limits.
-4. `fetchSkillFolderHash` calls GitHub Trees API directly (`/git/trees/<branch>?recursive=1` for `main`, then `master` fallback)
-5. Compare latest folder tree SHA with lock file `skillFolderHash`; mismatch means update available
-6. `skills update` reinstalls changed skills by invoking the current CLI entrypoint directly (`node <repo>/bin/cli.mjs add <source-tree-url> -g -y`) to avoid nested npm exec/npx behavior
+3. Group skills by source and fetch each repository tree once through `src/github-tree.ts`. Optional auth is sourced lazily from `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token` after an anonymous request is rate-limited or identifies a private-repository retry.
+4. Tree retrieval uses an explicit recorded ref when present; otherwise it tries `HEAD`, `main`, then `master`.
+5. Resolve each skill folder's tree SHA and compare it with the lock file's `skillFolderHash`; a mismatch means an update is available.
+6. `skills update` reinstalls changed skills by invoking the current CLI entrypoint directly (`node <repo>/bin/cli.mjs add <source-tree-url> -g -y`) to avoid nested npm exec/npx behavior.
 
 ### Lock File Compatibility
 
@@ -97,12 +97,12 @@ If reading an older lock file version, it's wiped. Users must reinstall skills t
 
 ## Key Integration Points
 
-| Feature                    | Implementation                                                |
-| -------------------------- | ------------------------------------------------------------- |
-| `skills add`               | `src/add.ts` - full implementation                            |
-| `skills experimental_sync` | `src/sync.ts` - crawl node_modules                            |
-| `skills check`             | `src/cli.ts` + `fetchSkillFolderHash` in `src/skill-lock.ts`  |
-| `skills update`            | `src/cli.ts` direct hash compare + reinstall via `skills add` |
+| Feature                    | Implementation                                                  |
+| -------------------------- | --------------------------------------------------------------- |
+| `skills add`               | `src/add.ts` - full implementation                              |
+| `skills experimental_sync` | `src/sync.ts` - crawl node_modules                              |
+| `skills check`             | `src/cli.ts` + GitHub tree/hash helpers in `src/github-tree.ts` |
+| `skills update`            | `src/update.ts` hash compare + reinstall via `skills add`       |
 
 ## Development
 

@@ -26,7 +26,7 @@ export interface SkillLockEntry {
   /**
    * GitHub tree SHA for the entire skill folder.
    * This hash changes when ANY file in the skill folder changes.
-   * Fetched via GitHub Trees API by the telemetry server.
+   * Fetched directly from GitHub's Trees API for the recorded repository.
    */
   skillFolderHash: string;
   /** ISO timestamp when the skill was first installed */
@@ -177,29 +177,9 @@ export function getGitHubToken(): string | null {
   return null;
 }
 
-/**
- * Fetch the tree SHA (folder hash) for a skill folder using GitHub's Trees API.
- * This makes ONE API call to get the entire repo tree, then extracts the SHA
- * for the specific skill folder.
- *
- * @param ownerRepo - GitHub owner/repo (e.g., "vercel-labs/agent-skills")
- * @param skillPath - Path to skill folder or SKILL.md (e.g., "skills/react-best-practices/SKILL.md")
- * @param getToken - Optional lazy token resolver. Invoked only if the
- *                   unauthenticated request hits a rate limit.
- * @param ref - Optional branch/tag ref. Defaults to trying main then master.
- * @returns The tree SHA for the skill folder, or null if not found
- */
-export async function fetchSkillFolderHash(
-  ownerRepo: string,
-  skillPath: string,
-  getToken?: (() => string | null) | null,
-  ref?: string
-): Promise<string | null> {
-  const { fetchRepoTree, getSkillFolderHashFromTree } = await import('./blob.ts');
-  const tree = await fetchRepoTree(ownerRepo, ref, getToken ?? undefined);
-  if (!tree) return null;
-  return getSkillFolderHashFromTree(tree, skillPath);
-}
+// Preserve the existing skill-lock export while the GitHub-specific behavior
+// lives behind the focused GitHub tree capability.
+export { fetchSkillFolderHash } from './github-tree.ts';
 
 /**
  * Add or update a skill entry in the lock file.

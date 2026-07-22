@@ -2,7 +2,8 @@ import { mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { findSkillMdPaths, type RepoTree } from '../src/blob.ts';
+import { findSkillMdPaths } from '../src/blob.ts';
+import type { RepoTree } from '../src/github-tree.ts';
 import { discoverSkills } from '../src/skills.ts';
 
 describe('Grok Build agent support', () => {
