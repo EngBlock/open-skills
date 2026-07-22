@@ -10,6 +10,8 @@ import { searchMultiselect } from './prompts/search-multiselect.ts';
 // Helper to check if a value is a cancel symbol (works with both clack and our custom prompts)
 const isCancelled = (value: unknown): value is symbol => typeof value === 'symbol';
 const EVE_AGENT_LABEL = 'eve agent';
+const FIND_SKILLS_SOURCE = 'NathanBeddoeWebDev/open-skills';
+const FIND_SKILLS_INSTALL_COMMAND = `npx skills add ${FIND_SKILLS_SOURCE}@find-skills`;
 
 export function getLockSource(parsedUrl: string, normalizedSource: string | null): string | null {
   // Preserve SSH URLs in lock files instead of normalizing to owner/repo shorthand.
@@ -1738,6 +1740,24 @@ async function cleanup(tempDir: string | null) {
   }
 }
 
+export async function installFindSkillsAfterAcceptance(
+  targetAgents: AgentType[] | undefined,
+  install: typeof runAdd = runAdd
+): Promise<void> {
+  const findSkillsAgents = targetAgents?.filter((agent) => agent !== 'replit');
+  if (!findSkillsAgents || findSkillsAgents.length === 0) return;
+
+  console.log();
+  p.log.step('Installing find-skills skill…');
+
+  await install([FIND_SKILLS_SOURCE], {
+    skill: ['find-skills'],
+    global: true,
+    yes: true,
+    agent: findSkillsAgents,
+  });
+}
+
 /**
  * Prompt user to install the find-skills skill after their first installation.
  */
@@ -1778,35 +1798,16 @@ async function promptForFindSkills(
       // Install find-skills to the same agents the user selected, excluding replit
       await dismissPrompt('findSkillsPrompt');
 
-      // Filter out replit from target agents
-      const findSkillsAgents = targetAgents?.filter((a) => a !== 'replit');
-
-      // Skip if no valid agents remain after filtering
-      if (!findSkillsAgents || findSkillsAgents.length === 0) {
-        return;
-      }
-
-      console.log();
-      p.log.step('Installing find-skills skill…');
-
       try {
-        // Call runAdd directly
-        await runAdd(['vercel-labs/skills'], {
-          skill: ['find-skills'],
-          global: true,
-          yes: true,
-          agent: findSkillsAgents,
-        });
+        await installFindSkillsAfterAcceptance(targetAgents);
       } catch {
         p.log.warn('Failed to install find-skills. You can try again with:');
-        p.log.message(pc.dim('  npx skills add vercel-labs/skills@find-skills -g -y --all'));
+        p.log.message(pc.dim(`  ${FIND_SKILLS_INSTALL_COMMAND} -g -y --all`));
       }
     } else {
       // User declined - dismiss the prompt
       await dismissPrompt('findSkillsPrompt');
-      p.log.message(
-        pc.dim('You can install it later with: npx skills add vercel-labs/skills@find-skills')
-      );
+      p.log.message(pc.dim(`You can install it later with: ${FIND_SKILLS_INSTALL_COMMAND}`));
     }
   } catch {
     // Don't fail the main installation if prompt fails

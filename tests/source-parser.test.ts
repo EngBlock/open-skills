@@ -430,10 +430,10 @@ describe('Source aliases', () => {
     expect(result.url).toBe('https://github.com/coinbase/agentic-wallet-skills.git');
   });
 
-  it('resolves vercel-labs/vercel-skills to vercel-labs/agent-skills', () => {
+  it('treats an explicitly supplied Vercel repository as a generic GitHub source', () => {
     const result = parseSource('vercel-labs/vercel-skills');
     expect(result.type).toBe('github');
-    expect(result.url).toBe('https://github.com/vercel-labs/agent-skills.git');
+    expect(result.url).toBe('https://github.com/vercel-labs/vercel-skills.git');
   });
 });
 

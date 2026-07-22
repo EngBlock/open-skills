@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { promptForAgents } from './add.js';
+import { installFindSkillsAfterAcceptance, promptForAgents } from './add.js';
 import * as skillLock from './skill-lock.js';
 import * as searchMultiselectModule from './prompts/search-multiselect.js';
 
@@ -9,6 +9,21 @@ vi.mock('./prompts/search-multiselect.js');
 vi.mock('../package.json', () => ({
   default: { version: '1.0.0' },
 }));
+
+describe('find-skills offer', () => {
+  it('installs from the independent repository after acceptance', async () => {
+    const install = vi.fn().mockResolvedValue(undefined);
+
+    await installFindSkillsAfterAcceptance(['claude-code', 'replit'], install);
+
+    expect(install).toHaveBeenCalledWith(['NathanBeddoeWebDev/open-skills'], {
+      skill: ['find-skills'],
+      global: true,
+      yes: true,
+      agent: ['claude-code'],
+    });
+  });
+});
 
 describe('promptForAgents', () => {
   // Cast to any to avoid AgentType validation in tests
