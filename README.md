@@ -511,7 +511,7 @@ INSTALL_INTERNAL_SKILLS=1 open-skills add owner/repo --list
 - [Claude Code Skills Documentation](https://code.claude.com/docs/en/skills)
 - [OpenClaw Skills Documentation](https://docs.openclaw.ai/tools/skills)
 - [Cline Skills Documentation](https://docs.cline.bot/features/skills)
-- [CodeBuddy Skills Documentation](https://www.codebuddy.ai/docs/ide/Features/Skills)
+- [CodeBuddy Skills Documentation](http://web.archive.org/web/20260302051741/https://www.codebuddy.ai/docs/ide/Features/Skills)
 - [Codex Skills Documentation](https://developers.openai.com/codex/skills)
 - [Command Code Skills Documentation](https://commandcode.ai/docs/skills)
 - [Crush Skills Documentation](https://github.com/charmbracelet/crush?tab=readme-ov-file#agent-skills)
