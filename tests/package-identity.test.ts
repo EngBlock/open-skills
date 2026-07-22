@@ -14,7 +14,7 @@ describe('@engblock/open-skills package identity', () => {
       publishConfig: {
         access: 'public',
       },
-      version: '0.1.0',
+      version: '0.1.1',
       author: 'Nathan Beddoe',
       repository: {
         type: 'git',
@@ -37,7 +37,7 @@ describe('@engblock/open-skills package identity', () => {
     const notices = readFileSync(join(rootDir, 'ThirdPartyNoticeText.txt'), 'utf-8');
 
     expect(packed.name).toBe('@engblock/open-skills');
-    expect(packed.version).toBe('0.1.0');
+    expect(packed.version).toBe('0.1.1');
     expect(files).toEqual(
       expect.arrayContaining([
         'bin/cli.mjs',
@@ -69,7 +69,7 @@ describe('@engblock/open-skills package identity', () => {
       });
 
       expect(stripTerminalEscapes(help)).toContain('Usage: open-skills <command> [options]');
-      expect(version.trim()).toBe('0.1.0');
+      expect(version.trim()).toBe('0.1.1');
     }
   });
 });
