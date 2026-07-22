@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Scope string
@@ -56,6 +57,18 @@ type LockEntry struct {
 	SourceType string
 	PluginName string
 	raw        map[string]json.RawMessage
+}
+
+// InstallationRecord is the stable information recorded for a locally
+// installed skill. It intentionally contains no credentials or project-scoped
+// timestamps. Content identity and the owned file list let later mutating
+// commands detect local changes without rediscovering the source.
+type InstallationRecord struct {
+	Source               string
+	SourceURL            string
+	SourceType           string
+	InstalledContentHash string
+	OwnedFiles           []string
 }
 
 type Document struct {
@@ -345,6 +358,104 @@ func (document *Document) Marshal() ([]byte, error) {
 	return append(encoded, '\n'), nil
 }
 
+// RecordInstallation adds or replaces one supported lock entry while retaining
+// unknown fields elsewhere in the document. Project records deliberately omit
+// timestamps; the legacy global schema requires them, so global records add
+// them only there.
+func (document *Document) RecordInstallation(name string, record InstallationRecord) error {
+	if strings.TrimSpace(name) == "" {
+		return errors.New("skill name must not be empty")
+	}
+	if strings.TrimSpace(record.Source) == "" || strings.TrimSpace(record.SourceType) == "" || strings.TrimSpace(record.InstalledContentHash) == "" {
+		return errors.New("installation record is incomplete")
+	}
+	if document.raw == nil {
+		document.raw = make(map[string]json.RawMessage)
+	}
+	entry := document.Skills[name]
+	fields := cloneRawMap(entry.raw)
+	if fields == nil {
+		fields = make(map[string]json.RawMessage)
+	}
+	setString := func(field, value string) error {
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return err
+		}
+		fields[field] = encoded
+		return nil
+	}
+	for field, value := range map[string]string{
+		"source": record.Source, "sourceType": record.SourceType,
+	} {
+		if err := setString(field, value); err != nil {
+			return err
+		}
+	}
+	if document.Version == 1 {
+		if err := setString("computedHash", record.InstalledContentHash); err != nil {
+			return err
+		}
+	} else {
+		if err := setString("sourceUrl", record.SourceURL); err != nil {
+			return err
+		}
+		if err := setString("skillFolderHash", record.InstalledContentHash); err != nil {
+			return err
+		}
+		now := time.Now().UTC().Format(time.RFC3339Nano)
+		for _, field := range []string{"installedAt", "updatedAt"} {
+			if _, exists := fields[field]; !exists {
+				if err := setString(field, now); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if err := setString("installedContentHash", record.InstalledContentHash); err != nil {
+		return err
+	}
+	owned, err := json.Marshal(record.OwnedFiles)
+	if err != nil {
+		return err
+	}
+	fields["ownedFiles"] = owned
+	document.Skills[name] = LockEntry{
+		Source: record.Source, SourceURL: record.SourceURL, SourceType: record.SourceType, raw: fields,
+	}
+	return nil
+}
+
+// Write stores a validated document atomically so a failed local install never
+// leaves a partially written lock file.
+func (document *Document) Write(path string) error {
+	data, err := document.Marshal()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".skills-lock-*")
+	if err != nil {
+		return err
+	}
+	temporaryName := temporary.Name()
+	defer os.Remove(temporaryName)
+	if err := temporary.Chmod(0o600); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(data); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	return os.Rename(temporaryName, path)
+}
+
 func cloneRawMap(source map[string]json.RawMessage) map[string]json.RawMessage {
 	result := make(map[string]json.RawMessage, len(source))
 	for name, value := range source {
@@ -608,6 +719,11 @@ func stripYAMLComment(value string) string {
 		escaped = false
 	}
 	return value
+}
+
+// SanitizeName returns the canonical on-disk directory name for a skill.
+func SanitizeName(name string) string {
+	return sanitizeName(name)
 }
 
 func sanitizeName(name string) string {

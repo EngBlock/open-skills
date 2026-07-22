@@ -46,6 +46,42 @@ func TestGlobalStateAcceptsEmptyFolderHashAndPreservesUnknownFields(t *testing.T
 	}
 }
 
+func TestRecordInstallationWritesDeterministicTimestampFreeProjectState(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "skills-lock.json")
+	document, err := Read(path, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"zeta", "alpha"} {
+		if err := document.RecordInstallation(name, InstallationRecord{
+			Source: "/source/" + name, SourceType: "local", InstalledContentHash: name + "-hash", OwnedFiles: []string{"SKILL.md"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := document.Write(path); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Index(data, []byte(`"alpha"`)) > bytes.Index(data, []byte(`"zeta"`)) {
+		t.Fatalf("skill keys are not deterministic: %s", data)
+	}
+	if bytes.Contains(data, []byte("installedAt")) || bytes.Contains(data, []byte("updatedAt")) {
+		t.Fatalf("project state includes timestamps: %s", data)
+	}
+	var output map[string]any
+	if err := json.Unmarshal(data, &output); err != nil {
+		t.Fatal(err)
+	}
+	entry := output["skills"].(map[string]any)["alpha"].(map[string]any)
+	if entry["installedContentHash"] != "alpha-hash" || !reflect.DeepEqual(entry["ownedFiles"], []any{"SKILL.md"}) {
+		t.Fatalf("installation metadata = %#v", entry)
+	}
+}
+
 func TestSkillFrontmatterRejectsNonStringNames(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "SKILL.md")
 	if err := os.WriteFile(path, []byte("---\nname: 123\ndescription: invalid name\n---\n"), 0o600); err != nil {

@@ -116,6 +116,24 @@ func AgentDisplayName(id string) string {
 	return id
 }
 
+// AgentSkillsPath resolves the established skills directory for an agent. The
+// boolean result reports whether the path is the canonical .agents/skills
+// topology shared by universal agents.
+func AgentSkillsPath(id string, scope Scope, project, home, xdgConfigHome string) (string, bool, bool) {
+	for _, agent := range agentConfigs {
+		if agent.ID != id || (scope == Global && agent.NoGlobal) {
+			continue
+		}
+		options := InspectOptions{
+			Scope: scope, Project: project, Home: home, XDGConfigHome: xdgConfigHome,
+		}
+		path := agentSkillsDir(agent, options)
+		canonical := agent.ProjectDir == ".agents/skills"
+		return path, canonical, true
+	}
+	return "", false, false
+}
+
 func selectedAgentConfigs(filter []string) []agentConfig {
 	if len(filter) == 0 {
 		return append([]agentConfig(nil), agentConfigs...)
