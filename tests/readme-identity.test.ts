@@ -13,7 +13,9 @@ describe('README identity', () => {
     expect(readme).toContain(
       '[![npm version](https://img.shields.io/npm/v/@engblock/open-skills.svg)](https://www.npmjs.com/package/@engblock/open-skills)'
     );
-    expect(readme).toContain('npx @engblock/open-skills add EngBlock/open-skills@find-skills');
+    expect(readme).toContain('npm install --global @engblock/open-skills');
+    expect(readme).toContain('open-skills add EngBlock/open-skills@find-skills');
+    expect(readme).not.toContain('npx @engblock/open-skills');
     expect(readme).not.toContain('npx skills');
   });
 

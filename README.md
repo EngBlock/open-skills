@@ -9,10 +9,16 @@ Supports **OpenCode**, **Claude Code**, **Codex**, **Cursor**, and [70 more](#su
 [![CI](https://github.com/EngBlock/open-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/EngBlock/open-skills/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/@engblock/open-skills.svg)](https://www.npmjs.com/package/@engblock/open-skills)
 
+## Install
+
+```bash
+npm install --global @engblock/open-skills
+```
+
 ## Install a Skill
 
 ```bash
-npx @engblock/open-skills add EngBlock/open-skills@find-skills
+open-skills add EngBlock/open-skills@find-skills
 ```
 
 ## Use a Skill Without Installing
@@ -20,8 +26,8 @@ npx @engblock/open-skills add EngBlock/open-skills@find-skills
 Generate a prompt for one skill, or start a supported coding agent interactively:
 
 ```bash
-npx @engblock/open-skills use owner/repo@web-design-guidelines | claude
-npx @engblock/open-skills use owner/repo --skill web-design-guidelines --agent claude-code
+open-skills use owner/repo@web-design-guidelines | claude
+open-skills use owner/repo --skill web-design-guidelines --agent claude-code
 ```
 
 `open-skills use` resolves sources the same way as `open-skills add`, writes the selected skill files to a temporary directory, and prints only the generated prompt to stdout unless `--agent` is provided. With `--agent`, it starts one supported agent interactively with the generated prompt.
@@ -30,22 +36,22 @@ npx @engblock/open-skills use owner/repo --skill web-design-guidelines --agent c
 
 ```bash
 # GitHub shorthand (owner/repo)
-npx @engblock/open-skills add owner/repo
+open-skills add owner/repo
 
 # Full GitHub URL
-npx @engblock/open-skills add https://github.com/owner/repo
+open-skills add https://github.com/owner/repo
 
 # Direct path to a skill in a repo
-npx @engblock/open-skills add https://github.com/owner/repo/tree/main/skills/web-design-guidelines
+open-skills add https://github.com/owner/repo/tree/main/skills/web-design-guidelines
 
 # GitLab URL
-npx @engblock/open-skills add https://gitlab.com/org/repo
+open-skills add https://gitlab.com/org/repo
 
 # Any git URL
-npx @engblock/open-skills add git@github.com:owner/repo.git
+open-skills add git@github.com:owner/repo.git
 
 # Local path
-npx @engblock/open-skills add ./my-local-skills
+open-skills add ./my-local-skills
 ```
 
 ### Options
@@ -64,28 +70,28 @@ npx @engblock/open-skills add ./my-local-skills
 
 ```bash
 # List skills in a repository
-npx @engblock/open-skills add owner/repo --list
+open-skills add owner/repo --list
 
 # Install specific skills
-npx @engblock/open-skills add owner/repo --skill frontend-design --skill skill-creator
+open-skills add owner/repo --skill frontend-design --skill skill-creator
 
 # Install a skill with spaces in the name (must be quoted)
-npx @engblock/open-skills add owner/repo --skill "Convex Best Practices"
+open-skills add owner/repo --skill "Convex Best Practices"
 
 # Install to specific agents
-npx @engblock/open-skills add owner/repo -a claude-code -a opencode
+open-skills add owner/repo -a claude-code -a opencode
 
 # Non-interactive installation (CI/CD friendly)
-npx @engblock/open-skills add owner/repo --skill frontend-design -g -a claude-code -y
+open-skills add owner/repo --skill frontend-design -g -a claude-code -y
 
 # Install all skills from a repo to all agents
-npx @engblock/open-skills add owner/repo --all
+open-skills add owner/repo --all
 
 # Install all skills to specific agents
-npx @engblock/open-skills add owner/repo --skill '*' -a claude-code
+open-skills add owner/repo --skill '*' -a claude-code
 
 # Install specific skills to all agents
-npx @engblock/open-skills add owner/repo --agent '*' --skill frontend-design
+open-skills add owner/repo --agent '*' --skill frontend-design
 ```
 
 ### Installation Scope
@@ -106,14 +112,14 @@ When installing interactively, you can choose:
 
 ## Other Commands
 
-| Command                      | Description                                   |
-| ---------------------------- | --------------------------------------------- |
-| `npx @engblock/open-skills use <source>`    | Use one skill without installing              |
-| `npx @engblock/open-skills list`            | List installed skills (alias: `ls`)           |
-| `npx @engblock/open-skills find [query]`    | Show decentralized-discovery migration guidance |
-| `npx @engblock/open-skills remove [skills]` | Remove installed skills from agents           |
-| `npx @engblock/open-skills update [skills]` | Update installed skills to latest versions    |
-| `npx @engblock/open-skills init [name]`     | Create a new SKILL.md template                |
+| Command                        | Description                                       |
+| ------------------------------ | ------------------------------------------------- |
+| `open-skills use <source>`      | Use one skill without installing                  |
+| `open-skills list`              | List installed skills (alias: `ls`)               |
+| `open-skills find [query]`      | Show decentralized-discovery migration guidance   |
+| `open-skills remove [skills]`   | Remove installed skills from agents               |
+| `open-skills update [skills]`   | Update installed skills to latest versions        |
+| `open-skills init [name]`       | Create a new SKILL.md template                    |
 
 ### `open-skills list`
 
@@ -121,13 +127,13 @@ List all installed skills. Similar to `npm ls`.
 
 ```bash
 # List all installed skills (project and global)
-npx @engblock/open-skills list
+open-skills list
 
 # List only global skills
-npx @engblock/open-skills ls -g
+open-skills ls -g
 
 # Filter by specific agents
-npx @engblock/open-skills ls -a claude-code -a cursor
+open-skills ls -a claude-code -a cursor
 ```
 
 ### `open-skills find`
@@ -137,27 +143,27 @@ Hosted skill search has been removed. The legacy `find`, `search`, `f`, and `s` 
 Discover skills by searching GitHub and the web for relevant `SKILL.md` files and inspecting their contents. Install a discovered skill directly from its source:
 
 ```bash
-npx @engblock/open-skills add <owner>/<repo>@<skill>
+open-skills add <owner>/<repo>@<skill>
 ```
 
 ### `open-skills update`
 
 ```bash
 # Update all skills (interactive scope prompt)
-npx @engblock/open-skills update
+open-skills update
 
 # Update a single skill by name
-npx @engblock/open-skills update my-skill
+open-skills update my-skill
 
 # Update multiple specific skills
-npx @engblock/open-skills update frontend-design web-design-guidelines
+open-skills update frontend-design web-design-guidelines
 
 # Update only global or project skills
-npx @engblock/open-skills update -g
-npx @engblock/open-skills update -p
+open-skills update -g
+open-skills update -p
 
 # Non-interactive (auto-detects scope: project if in a project, else global)
-npx @engblock/open-skills update -y
+open-skills update -y
 ```
 
 | Option          | Description                                                               |
@@ -171,10 +177,10 @@ npx @engblock/open-skills update -y
 
 ```bash
 # Create SKILL.md in current directory
-npx @engblock/open-skills init
+open-skills init
 
 # Create a new skill in a subdirectory
-npx @engblock/open-skills init my-skill
+open-skills init my-skill
 ```
 
 ### `open-skills remove`
@@ -183,31 +189,31 @@ Remove installed skills from agents.
 
 ```bash
 # Remove interactively (select from installed skills)
-npx @engblock/open-skills remove
+open-skills remove
 
 # Remove specific skill by name
-npx @engblock/open-skills remove web-design-guidelines
+open-skills remove web-design-guidelines
 
 # Remove multiple skills
-npx @engblock/open-skills remove frontend-design web-design-guidelines
+open-skills remove frontend-design web-design-guidelines
 
 # Remove from global scope
-npx @engblock/open-skills remove --global web-design-guidelines
+open-skills remove --global web-design-guidelines
 
 # Remove from specific agents only
-npx @engblock/open-skills remove --agent claude-code cursor my-skill
+open-skills remove --agent claude-code cursor my-skill
 
 # Remove all installed skills without confirmation
-npx @engblock/open-skills remove --all
+open-skills remove --all
 
 # Remove all skills from a specific agent
-npx @engblock/open-skills remove --skill '*' -a cursor
+open-skills remove --skill '*' -a cursor
 
 # Remove a specific skill from all agents
-npx @engblock/open-skills remove my-skill --agent '*'
+open-skills remove my-skill --agent '*'
 
 # Use 'rm' alias
-npx @engblock/open-skills rm my-skill
+open-skills rm my-skill
 ```
 
 | Option         | Description                                      |
@@ -493,7 +499,7 @@ Ensure you have write access to the target directory.
 
 ```bash
 # Install internal skills
-INSTALL_INTERNAL_SKILLS=1 npx @engblock/open-skills add owner/repo --list
+INSTALL_INTERNAL_SKILLS=1 open-skills add owner/repo --list
 ```
 
 ## Related Links

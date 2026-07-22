@@ -355,16 +355,16 @@ description: ${description}
 
     it('should include list examples in help', () => {
       const result = runCli(['--help']);
-      expect(result.stdout).toContain('npx @engblock/open-skills list');
-      expect(result.stdout).toContain('npx @engblock/open-skills ls -g');
-      expect(result.stdout).toContain('npx @engblock/open-skills ls -a claude-code');
+      expect(result.stdout).toContain('open-skills list');
+      expect(result.stdout).toContain('open-skills ls -g');
+      expect(result.stdout).toContain('open-skills ls -a claude-code');
     });
   });
 
   describe('banner', () => {
     it('should include list command in banner', () => {
       const result = runCli([]);
-      expect(result.stdout).toContain('npx @engblock/open-skills list');
+      expect(result.stdout).toContain('open-skills list');
       expect(result.stdout).toContain('List installed skills');
     });
   });
