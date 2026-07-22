@@ -8,14 +8,12 @@ describe('README identity', () => {
   it('documents open-skills as the preferred independent CLI', () => {
     expect(readme).toMatch(/^# open-skills$/m);
     expect(readme).toContain(
-      '[![CI](https://github.com/NathanBeddoeWebDev/open-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/NathanBeddoeWebDev/open-skills/actions/workflows/ci.yml)'
+      '[![CI](https://github.com/EngBlock/open-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/EngBlock/open-skills/actions/workflows/ci.yml)'
     );
     expect(readme).toContain(
       '[![npm version](https://img.shields.io/npm/v/@engblock/open-skills.svg)](https://www.npmjs.com/package/@engblock/open-skills)'
     );
-    expect(readme).toContain(
-      'npx @engblock/open-skills add NathanBeddoeWebDev/open-skills@find-skills'
-    );
+    expect(readme).toContain('npx @engblock/open-skills add EngBlock/open-skills@find-skills');
     expect(readme).not.toContain('npx skills');
   });
 

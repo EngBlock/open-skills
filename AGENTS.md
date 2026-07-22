@@ -112,7 +112,7 @@ pnpm install
 pnpm build
 
 # Test locally
-pnpm dev add NathanBeddoeWebDev/open-skills --list
+pnpm dev add EngBlock/open-skills --list
 pnpm dev experimental_sync
 pnpm dev check
 pnpm dev update

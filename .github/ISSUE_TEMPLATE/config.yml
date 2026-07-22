@@ -1,7 +1,7 @@
 blank_issues_enabled: true
 contact_links:
   - name: Documentation
-    url: https://github.com/NathanBeddoeWebDev/open-skills#readme
+    url: https://github.com/EngBlock/open-skills#readme
     about: Check the README for usage instructions
   - name: Agent Skills Specification
     url: https://agentskills.io/home

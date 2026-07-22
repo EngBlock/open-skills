@@ -16,7 +16,7 @@ describe('find-skills offer', () => {
 
     await installFindSkillsAfterAcceptance(['claude-code', 'replit'], install);
 
-    expect(install).toHaveBeenCalledWith(['NathanBeddoeWebDev/open-skills'], {
+    expect(install).toHaveBeenCalledWith(['EngBlock/open-skills'], {
       skill: ['find-skills'],
       global: true,
       yes: true,

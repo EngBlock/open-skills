@@ -26,7 +26,7 @@ describe('skills CLI', () => {
     it('should display help message', () => {
       const output = runCliOutput(['--help']);
       expect(output).toContain('Usage: open-skills <command> [options]');
-      expect(output).toContain('npx @engblock/open-skills add NathanBeddoeWebDev/open-skills');
+      expect(output).toContain('npx @engblock/open-skills add EngBlock/open-skills');
       expect(output).not.toContain('npx skills');
       expect(output).not.toContain('vercel-labs');
       expect(output).toContain('Manage Skills:');
@@ -84,7 +84,7 @@ describe('skills CLI', () => {
       expect(output).toContain('npx @engblock/open-skills use');
       expect(output).toContain('npx @engblock/open-skills update');
       expect(output).toContain('npx @engblock/open-skills init');
-      expect(output).toContain('NathanBeddoeWebDev/open-skills');
+      expect(output).toContain('EngBlock/open-skills');
       expect(output).not.toContain('npx skills');
       expect(output).not.toContain('Search for skills');
       expect(output).not.toContain('skills.sh');

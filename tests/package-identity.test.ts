@@ -18,11 +18,11 @@ describe('@engblock/open-skills package identity', () => {
       author: 'Nathan Beddoe',
       repository: {
         type: 'git',
-        url: 'git+https://github.com/NathanBeddoeWebDev/open-skills.git',
+        url: 'git+https://github.com/EngBlock/open-skills.git',
       },
-      homepage: 'https://github.com/NathanBeddoeWebDev/open-skills#readme',
+      homepage: 'https://github.com/EngBlock/open-skills#readme',
       bugs: {
-        url: 'https://github.com/NathanBeddoeWebDev/open-skills/issues',
+        url: 'https://github.com/EngBlock/open-skills/issues',
       },
     });
   });
