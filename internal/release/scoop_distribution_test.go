@@ -100,6 +100,7 @@ func TestNativePreviewWorkflowGatesPublicationOnScoopSmoke(t *testing.T) {
 		"repository: ScoopInstaller/Scoop",
 		"ref: b588a06e41d920d2123ec70aee682bae14935939",
 		"path: scoop-core",
+		`$artifact = "native-dist/open-skills_$($env:GITHUB_REF_NAME.Substring(1))_windows_amd64.zip"`,
 		"scripts/scoop-smoke.ps1 scoop/open-skills.json $artifact scoop-core",
 		"needs: [build, homebrew, scoop]",
 	} {

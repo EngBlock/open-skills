@@ -188,7 +188,7 @@ jobs:
       - name: Validate manifest and smoke-test Scoop
         shell: pwsh
         run: |
-          $artifact = "native-dist/open-skills_${env:GITHUB_REF_NAME.Substring(1)}_windows_amd64.zip"
+          $artifact = "native-dist/open-skills_$($env:GITHUB_REF_NAME.Substring(1))_windows_amd64.zip"
           scripts/scoop-smoke.ps1 scoop/open-skills.json $artifact scoop-core
 
   production-approval:

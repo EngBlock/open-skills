@@ -1,0 +1,247 @@
+name: Resume verified native production release
+
+on:
+  workflow_dispatch:
+    inputs:
+      source-run-id:
+        description: Failed v0.2.0 tag workflow run whose build job produced the verified bundle
+        required: true
+        default: '30039890752'
+        type: string
+      release-tag:
+        description: Immutable production tag
+        required: true
+        default: v0.2.0
+        type: string
+
+concurrency:
+  group: native-release-recovery-${{ inputs.release-tag }}
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  attestations: read
+  contents: read
+
+jobs:
+  verify:
+    name: Revalidate tagged release bundle
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout immutable production tag
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ inputs.release-tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require the canonical failed tag run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+          SOURCE_RUN_ID: ${{ inputs.source-run-id }}
+        run: |
+          set -euo pipefail
+          if [[ "${RELEASE_TAG}" != "v0.2.0" ]]; then
+            echo "production recovery only accepts immutable tag v0.2.0" >&2
+            exit 1
+          fi
+          if [[ "${SOURCE_RUN_ID}" != "30039890752" ]]; then
+            echo "production recovery only accepts canonical source run 30039890752" >&2
+            exit 1
+          fi
+          tag_sha="$(git rev-parse HEAD)"
+          run_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN_ID}")"
+          if [[ "$(jq -r .event <<<"${run_json}")" != "push" ||
+                "$(jq -r .path <<<"${run_json}")" != ".github/workflows/native-preview.yml" ||
+                "$(jq -r .head_branch <<<"${run_json}")" != "${RELEASE_TAG}" ||
+                "$(jq -r .head_sha <<<"${run_json}")" != "${tag_sha}" ]]; then
+            echo "source run ${SOURCE_RUN_ID} did not build ${RELEASE_TAG} at ${tag_sha}" >&2
+            exit 1
+          fi
+          jobs_json="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN_ID}/jobs?per_page=100")"
+          if [[ "$(jq -r '.jobs[] | select(.name == "Build canonical native release") | .conclusion' <<<"${jobs_json}")" != "success" ]]; then
+            echo "source run ${SOURCE_RUN_ID} did not complete the canonical build successfully" >&2
+            exit 1
+          fi
+
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download the source run's signed bundle
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: native-preview-${{ inputs.release-tag }}
+          path: .
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source-run-id }}
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: 'v3.0.6'
+
+      - name: Reverify structure, checksums, signatures, and provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: |
+          set -euo pipefail
+          go run ./internal/release/cmd/verify-native-release --tag "${RELEASE_TAG}" --output native-dist
+          (
+            cd native-dist
+            sha256sum --check checksums.txt
+          )
+
+          identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/native-preview.yml@refs/tags/${RELEASE_TAG}"
+          workflow="${GITHUB_REPOSITORY}/.github/workflows/native-preview.yml"
+          for subject in native-dist/open-skills_*.tar.gz native-dist/open-skills_*.zip; do
+            cosign verify-blob \
+              --bundle "${subject}.sigstore.json" \
+              --certificate-identity "${identity}" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              "${subject}"
+            gh attestation verify "${subject}" \
+              --bundle native-dist/provenance.sigstore.json \
+              --repo "${GITHUB_REPOSITORY}" \
+              --signer-workflow "${workflow}" \
+              --deny-self-hosted-runners
+          done
+          cosign verify-blob \
+            --bundle native-dist/checksums.txt.sigstore.json \
+            --certificate-identity "${identity}" \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            native-dist/checksums.txt
+
+  homebrew:
+    name: Recheck supported Homebrew package
+    needs: verify
+    runs-on: macos-15
+    env:
+      RELEASE_TAG: ${{ inputs.release-tag }}
+
+    steps:
+      - name: Checkout immutable production tag
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ inputs.release-tag }}
+          persist-credentials: false
+
+      - name: Download the source run's signed bundle
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: native-preview-${{ inputs.release-tag }}
+          path: .
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source-run-id }}
+
+      - name: Require macOS ARM64 and smoke-test Homebrew
+        run: |
+          test "$(uname -m)" = arm64
+          artifact="native-dist/open-skills_${RELEASE_TAG#v}_darwin_arm64.tar.gz"
+          OPEN_SKILLS_HOMEBREW_ARTIFACT="$artifact" scripts/homebrew-smoke.sh homebrew/open-skills.rb
+
+  scoop:
+    name: Recheck experimental Windows Scoop package
+    needs: verify
+    runs-on: windows-2025
+    env:
+      RELEASE_TAG: ${{ inputs.release-tag }}
+
+    steps:
+      - name: Checkout immutable production tag
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ inputs.release-tag }}
+          persist-credentials: false
+
+      - name: Checkout pinned Scoop core
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          repository: ScoopInstaller/Scoop
+          ref: b588a06e41d920d2123ec70aee682bae14935939
+          path: scoop-core
+          persist-credentials: false
+
+      - name: Download the source run's signed bundle
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: native-preview-${{ inputs.release-tag }}
+          path: .
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source-run-id }}
+
+      - name: Validate manifest and smoke-test Scoop
+        shell: pwsh
+        run: |
+          $artifact = "native-dist/open-skills_$($env:RELEASE_TAG.Substring(1))_windows_amd64.zip"
+          scripts/scoop-smoke.ps1 scoop/open-skills.json $artifact scoop-core
+
+  production-approval:
+    name: Approve recovered production native cutover
+    needs: [verify, homebrew, scoop]
+    runs-on: ubuntu-latest
+    environment: native-production
+
+    steps:
+      - name: Record protected maintainer approval
+        run: echo "Recovered production bundle approved after repeat signature, provenance, Homebrew, and Scoop verification."
+
+  release:
+    name: Publish recovered canonical native release
+    needs: [verify, homebrew, scoop, production-approval]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Checkout immutable production tag
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ inputs.release-tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download the source run's signed bundle
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: native-preview-${{ inputs.release-tag }}
+          path: .
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source-run-id }}
+
+      - name: Revalidate immutable tag and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: |
+          set -euo pipefail
+          export GITHUB_REF_TYPE=tag
+          export GITHUB_REF_NAME="${RELEASE_TAG}"
+          export GITHUB_SHA="$(git rev-parse HEAD)"
+          scripts/verify-native-release-tag.sh
+          go run ./internal/release/cmd/verify-native-release --tag "${RELEASE_TAG}" --output native-dist
+          (
+            cd native-dist
+            sha256sum --check checksums.txt
+          )
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "release ${RELEASE_TAG} already exists; refusing to replace immutable artifacts" >&2
+            exit 1
+          fi
+          gh release create "${RELEASE_TAG}" \
+            native-dist/* \
+            --verify-tag \
+            --title "open-skills ${RELEASE_TAG} native release" \
+            --notes-file native-preview-notes.md

@@ -139,6 +139,39 @@ func TestProductionCutoverChecklistCoversEveryApprovalGate(t *testing.T) {
 	}
 }
 
+func TestProductionRecoveryWorkflowReusesOnlyTheVerifiedTaggedBundle(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	workflow := readRepositoryFile(t, root, ".github", "workflows", "native-release-recovery.yml")
+	for _, text := range []string{
+		"workflow_dispatch:",
+		"source-run-id:",
+		"release-tag:",
+		`if [[ "${RELEASE_TAG}" != "v0.2.0" ]]`,
+		`if [[ "${SOURCE_RUN_ID}" != "30039890752" ]]`,
+		`"$(jq -r .path <<<"${run_json}")" != ".github/workflows/native-preview.yml"`,
+		`run-id: ${{ inputs.source-run-id }}`,
+		`name: native-preview-${{ inputs.release-tag }}`,
+		"go run ./internal/release/cmd/verify-native-release",
+		"cosign verify-blob",
+		"gh attestation verify",
+		`OPEN_SKILLS_HOMEBREW_ARTIFACT="$artifact" scripts/homebrew-smoke.sh homebrew/open-skills.rb`,
+		`$artifact = "native-dist/open-skills_$($env:RELEASE_TAG.Substring(1))_windows_amd64.zip"`,
+		"scripts/scoop-smoke.ps1 scoop/open-skills.json $artifact scoop-core",
+		"environment: native-production",
+		`gh release create "${RELEASE_TAG}"`,
+		"--verify-tag",
+	} {
+		if !strings.Contains(workflow, text) {
+			t.Errorf("native production recovery workflow does not contain %q", text)
+		}
+	}
+	for _, forbidden := range []string{"cosign sign-blob", "attest-build-provenance", "--prerelease"} {
+		if strings.Contains(workflow, forbidden) {
+			t.Errorf("native production recovery workflow unexpectedly contains %q", forbidden)
+		}
+	}
+}
+
 func TestOfflineCIPrefetchesGoModulesBeforeDisablingNetwork(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
 	workflow := readRepositoryFile(t, root, ".github", "workflows", "ci.yml")
