@@ -290,8 +290,15 @@ func materializeFiles(paths SandboxPaths, fixtures []FileFixture, expand func(st
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return err
 		}
-		if fixture.Symlink != "" {
-			target := expand(fixture.Symlink)
+		if fixture.Symlink != "" || fixture.Junction != "" {
+			if fixture.Symlink != "" && fixture.Junction != "" {
+				return fmt.Errorf("fixture %q: choose either symlink or junction", fixture.Path)
+			}
+			target := fixture.Symlink
+			if fixture.Junction != "" {
+				target = fixture.Junction
+			}
+			target = expand(target)
 			resolved := target
 			if !filepath.IsAbs(resolved) {
 				resolved = filepath.Join(filepath.Dir(path), resolved)
@@ -299,7 +306,11 @@ func materializeFiles(paths SandboxPaths, fixtures []FileFixture, expand func(st
 			if !pathWithin(paths.Root, resolved) {
 				return fmt.Errorf("fixture %q: symlink target escapes sandbox", fixture.Path)
 			}
-			if err := os.Symlink(target, path); err != nil {
+			if fixture.Junction != "" {
+				if err := createFixtureJunction(path, resolved); err != nil {
+					return err
+				}
+			} else if err := os.Symlink(target, path); err != nil {
 				return err
 			}
 			continue
@@ -307,6 +318,17 @@ func materializeFiles(paths SandboxPaths, fixtures []FileFixture, expand func(st
 		if err := os.WriteFile(path, []byte(expand(string(fixture.Data))), mode.Perm()); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func createFixtureJunction(path, target string) error {
+	if runtime.GOOS != "windows" {
+		return os.Symlink(target, path)
+	}
+	command := exec.Command("cmd.exe", "/c", "mklink", "/J", path, target)
+	if output, err := command.CombinedOutput(); err != nil {
+		return fmt.Errorf("create fixture junction: %w: %s", err, output)
 	}
 	return nil
 }

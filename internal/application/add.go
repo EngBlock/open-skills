@@ -2,7 +2,6 @@ package application
 
 import (
 	"bufio"
-	"crypto/sha256"
 	"fmt"
 	"io"
 	"io/fs"
@@ -36,6 +35,7 @@ type localSkill struct {
 	Name         string
 	Path         string
 	RelativePath string
+	content      *skillContent
 }
 
 func materializeWellKnownSkills(fetched []wellKnownFetchedSkill) (string, map[string]string, error) {
@@ -199,11 +199,25 @@ func runAdd(invocation Invocation, arguments []string) int {
 		return 1
 	}
 	if isGit {
+		if err := materializeGitLinkFallbacksForSkills(&workspace, selected); err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Install repository links: %v\n", err)
+			return 1
+		}
 		for _, skill := range selected {
 			if err := rejectLFSPointers(skill.Path); err != nil {
 				_, _ = fmt.Fprintf(invocation.Stderr, "Install %s: %v\n", skill.Name, err)
 				return 1
 			}
+		}
+	}
+	// Validate every selected tree before mutating any installation. This makes
+	// an unsafe link in one selection fail the whole command without installing
+	// an earlier selection first.
+	for index := range selected {
+		selected[index].content, err = prepareSkillContent(selected[index].Path)
+		if err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Install %s: %v\n", selected[index].Name, err)
+			return 1
 		}
 	}
 	project, err := os.Getwd()
@@ -749,6 +763,17 @@ type installationProvenance struct {
 }
 
 func installLocalSkill(skill localSkill, provenance installationProvenance, scope state.Scope, base, project, home string, agents []string, copyMode bool, subagents []string) error {
+	content := skill.content
+	if content == nil {
+		if err := materializeGitLinkFallbacksForSkills(provenance.Workspace, []localSkill{skill}); err != nil {
+			return err
+		}
+		var err error
+		content, err = prepareSkillContent(skill.Path)
+		if err != nil {
+			return err
+		}
+	}
 	canonical := filepath.Join(base, ".agents", "skills", state.SanitizeName(skill.Name))
 	allEve := len(agents) > 0
 	for _, agent := range agents {
@@ -756,7 +781,7 @@ func installLocalSkill(skill localSkill, provenance installationProvenance, scop
 	}
 	needsCanonical := (!copyMode && !allEve) || len(agents) == 0 || contains(agents, "universal")
 	if needsCanonical && !pathsOverlap(skill.Path, canonical) {
-		if err := replaceDirectoryFromSource(skill.Path, canonical); err != nil {
+		if err := content.replaceDirectory(canonical); err != nil {
 			return err
 		}
 	}
@@ -768,7 +793,7 @@ func installLocalSkill(skill localSkill, provenance installationProvenance, scop
 				if pathsOverlap(skill.Path, destination) {
 					continue
 				}
-				if err := replaceEveDirectoryFromSource(skill.Path, destination); err != nil {
+				if err := replaceEveDirectoryFromContent(content, destination); err != nil {
 					return err
 				}
 			}
@@ -784,7 +809,7 @@ func installLocalSkill(skill localSkill, provenance installationProvenance, scop
 			// Universal adapters share canonical content in both project and global scope.
 			destination = canonical
 			if !pathsOverlap(skill.Path, destination) {
-				if err := replaceDirectoryFromSource(skill.Path, destination); err != nil {
+				if err := content.replaceDirectory(destination); err != nil {
 					return err
 				}
 			}
@@ -799,7 +824,7 @@ func installLocalSkill(skill localSkill, provenance installationProvenance, scop
 			continue
 		}
 		if copyMode {
-			if err := replaceDirectoryFromSource(skill.Path, destination); err != nil {
+			if err := content.replaceDirectory(destination); err != nil {
 				return err
 			}
 		} else if !sameLocalPath(canonical, destination) {
@@ -809,7 +834,7 @@ func installLocalSkill(skill localSkill, provenance installationProvenance, scop
 		}
 		installedAgents = append(installedAgents, agent)
 	}
-	hash, owned, err := contentIdentity(skill.Path)
+	hash, owned, err := content.identity()
 	if err != nil {
 		return err
 	}
@@ -890,8 +915,8 @@ func recordedEveTargets(agents, subagents []string) []string {
 	return targets
 }
 
-func replaceEveDirectoryFromSource(source, destination string) error {
-	if err := replaceDirectoryFromSource(source, destination); err != nil {
+func replaceEveDirectoryFromContent(content *skillContent, destination string) error {
+	if err := content.replaceDirectory(destination); err != nil {
 		return err
 	}
 	skillPath := filepath.Join(destination, "SKILL.md")
@@ -964,50 +989,6 @@ func isEveMetadataString(value string) bool {
 	return true
 }
 
-func replaceDirectoryFromSource(source, destination string) error {
-	if err := os.RemoveAll(destination); err != nil {
-		return err
-	}
-	return copyDirectory(source, destination)
-}
-
-func copyDirectory(source, destination string) error {
-	return filepath.WalkDir(source, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		relative, err := filepath.Rel(source, path)
-		if err != nil {
-			return err
-		}
-		if relative == ".git" || strings.HasPrefix(filepath.ToSlash(relative), ".git/") {
-			if entry.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		target := filepath.Join(destination, relative)
-		if entry.IsDir() {
-			return os.MkdirAll(target, 0o755)
-		}
-		if !entry.Type().IsRegular() {
-			return fmt.Errorf("unsupported non-regular source file: %s", path)
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return err
-		}
-		return os.WriteFile(target, data, info.Mode().Perm())
-	})
-}
-
 func replaceWithSymlink(source, destination string) error {
 	if err := os.RemoveAll(destination); err != nil {
 		return err
@@ -1020,47 +1001,6 @@ func replaceWithSymlink(source, destination string) error {
 		return err
 	}
 	return os.Symlink(relative, destination)
-}
-
-func contentIdentity(directory string) (string, []string, error) {
-	files := []string{}
-	contents := make(map[string][]byte)
-	err := filepath.WalkDir(directory, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() {
-			if entry.Name() == ".git" || entry.Name() == "node_modules" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !entry.Type().IsRegular() {
-			return fmt.Errorf("unsupported installed file: %s", path)
-		}
-		relative, err := filepath.Rel(directory, path)
-		if err != nil {
-			return err
-		}
-		relative = filepath.ToSlash(relative)
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		files = append(files, relative)
-		contents[relative] = data
-		return nil
-	})
-	if err != nil {
-		return "", nil, err
-	}
-	sort.Strings(files)
-	hash := sha256.New()
-	for _, file := range files {
-		_, _ = hash.Write([]byte(file))
-		_, _ = hash.Write(contents[file])
-	}
-	return fmt.Sprintf("%x", hash.Sum(nil)), files, nil
 }
 
 func sameLocalPath(left, right string) bool {

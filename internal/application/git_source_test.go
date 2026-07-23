@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -147,6 +148,56 @@ func TestD04GitSourceInstallsExactCommitAndCleansWorkspace(t *testing.T) {
 	}
 }
 
+func TestGitSourceInstallsConfinedRepositorySymlink(t *testing.T) {
+	repository := filepath.Join(t.TempDir(), "repository")
+	skill := filepath.Join(repository, "skills", "fixture")
+	if err := os.MkdirAll(skill, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skill, "SKILL.md"), []byte("---\nname: fixture\ndescription: Git fixture\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skill, "payload.txt"), []byte("confined\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("payload.txt", filepath.Join(skill, "alias.txt")); err != nil {
+		t.Skipf("symlink creation is unavailable: %v", err)
+	}
+	runFixtureGit(t, repository, "init", "-q", "-b", "main")
+	runFixtureGit(t, repository, "add", ".")
+	runFixtureGit(t, repository, "commit", "-q", "-m", "fixture")
+	commit := strings.TrimSpace(runFixtureGit(t, repository, "rev-parse", "HEAD"))
+
+	project, home := t.TempDir(), t.TempDir()
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previous) })
+	if err := os.Chdir(project); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_STATE_HOME", filepath.Join(home, "state"))
+	var stdout, stderr bytes.Buffer
+	source := "file://" + filepath.ToSlash(repository) + "#" + commit
+	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{source, "--yes", "--agent", "universal"}); exit != 0 {
+		t.Fatalf("runAdd = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+	installed := filepath.Join(project, ".agents", "skills", "fixture", "alias.txt")
+	info, err := os.Lstat(installed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(installed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.Mode().IsRegular() || string(data) != "confined\n" {
+		t.Fatalf("installed Git symlink = mode %v content %q", info.Mode(), data)
+	}
+}
+
 func TestD03MaterializeGitSourceRejectsPlaintextTransportBeforeGitRuns(t *testing.T) {
 	for _, source := range []gitSource{{URL: "http://example.test/repository.git"}, {URL: "git://example.test/repository.git"}, {URL: "ext::command"}} {
 		if _, err := materializeGitSource(source); err == nil {
@@ -177,6 +228,141 @@ func TestD06MaterializeGitSourceCleansFailedWorkspace(t *testing.T) {
 	}
 	if len(entries) != 0 {
 		t.Fatalf("failed Git acquisition left workspace entries: %#v", entries)
+	}
+}
+
+func TestExtractGitArchivePreservesSymlinksForConfinement(t *testing.T) {
+	var archive bytes.Buffer
+	writer := tar.NewWriter(&archive)
+	for _, header := range []*tar.Header{
+		{Name: "skill/", Typeflag: tar.TypeDir, Mode: 0o755},
+		{Name: "skill/payload.txt", Typeflag: tar.TypeReg, Mode: 0o644, Size: int64(len("inside\n"))},
+	} {
+		if err := writer.WriteHeader(header); err != nil {
+			t.Fatal(err)
+		}
+		if header.Name == "skill/payload.txt" {
+			if _, err := writer.Write([]byte("inside\n")); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := writer.WriteHeader(&tar.Header{Name: "skill/alias.txt", Typeflag: tar.TypeSymlink, Linkname: "payload.txt", Mode: 0o777}); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	destination := t.TempDir()
+	if err := extractGitArchive(archive.Bytes(), destination); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(destination, "skill", "alias.txt")
+	info, err := os.Lstat(alias)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("archive symlink mode = %v", info.Mode())
+	}
+	target, err := os.Readlink(alias)
+	if err != nil || target != "payload.txt" {
+		t.Fatalf("archive symlink target = %q, %v", target, err)
+	}
+}
+
+func TestArchiveSymlinkFallbackDereferencesConfinedContent(t *testing.T) {
+	root := t.TempDir()
+	skill := filepath.Join(root, "skill")
+	if err := os.MkdirAll(filepath.Join(skill, "references"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skill, "payload.txt"), []byte("inside\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skill, "references", "guide.md"), []byte("guide\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	links := []archiveSymlink{
+		{path: filepath.Join(skill, "alias.txt"), target: "payload.txt"},
+		{path: filepath.Join(skill, "reference-copy"), target: "references"},
+	}
+	if err := materializeArchiveLinkFallbacks(root, links); err != nil {
+		t.Fatal(err)
+	}
+	for path, expected := range map[string]string{
+		filepath.Join(skill, "alias.txt"):                  "inside\n",
+		filepath.Join(skill, "reference-copy", "guide.md"): "guide\n",
+	} {
+		info, err := os.Lstat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 || string(data) != expected {
+			t.Fatalf("fallback content %s = mode %v data %q", path, info.Mode(), data)
+		}
+	}
+}
+
+func TestGitLinkFallbacksIgnoreUnselectedRepositoryLinks(t *testing.T) {
+	root := t.TempDir()
+	selected := filepath.Join(root, "selected")
+	unselected := filepath.Join(root, "unselected")
+	for _, directory := range []string{selected, unselected} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(selected, "payload.txt"), []byte("inside\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	workspace := gitWorkspace{Root: root, FallbackLinks: []archiveSymlink{
+		{path: filepath.Join(selected, "alias.txt"), target: "payload.txt"},
+		{path: filepath.Join(unselected, "escape"), target: "../outside"},
+	}}
+	if err := materializeGitLinkFallbacksForSkills(&workspace, []localSkill{{Name: "selected", Path: selected}}); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := os.ReadFile(filepath.Join(selected, "alias.txt")); err != nil || string(data) != "inside\n" {
+		t.Fatalf("selected fallback = %q, %v", data, err)
+	}
+	if len(workspace.FallbackLinks) != 1 || workspace.FallbackLinks[0].path != filepath.Join(unselected, "escape") {
+		t.Fatalf("remaining fallbacks = %#v", workspace.FallbackLinks)
+	}
+	if _, err := os.Lstat(filepath.Join(unselected, "escape")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("unselected fallback was materialized: %v", err)
+	}
+}
+
+func TestArchiveSymlinkFallbackRejectsParentBrokenAndCyclicLinks(t *testing.T) {
+	for name, links := range map[string][]archiveSymlink{
+		"parent": {{path: filepath.Join(t.TempDir(), "skill", "link"), target: "../outside"}},
+		"broken": {{path: filepath.Join(t.TempDir(), "skill", "link"), target: "missing"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := filepath.Dir(filepath.Dir(links[0].path))
+			if err := os.MkdirAll(filepath.Dir(links[0].path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := materializeArchiveLinkFallbacks(root, links); err == nil {
+				t.Fatalf("%s fallback succeeded", name)
+			}
+		})
+	}
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "skill"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cycle := []archiveSymlink{
+		{path: filepath.Join(root, "skill", "first"), target: "second"},
+		{path: filepath.Join(root, "skill", "second"), target: "first"},
+	}
+	if err := materializeArchiveLinkFallbacks(root, cycle); err == nil || !strings.Contains(err.Error(), "cyclic") {
+		t.Fatalf("cyclic fallback error = %v", err)
 	}
 }
 

@@ -36,6 +36,7 @@ type FileFixture struct {
 	Data      []byte
 	Mode      fs.FileMode
 	Symlink   string
+	Junction  string
 	Directory bool
 }
 

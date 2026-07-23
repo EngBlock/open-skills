@@ -12,6 +12,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -28,10 +30,16 @@ type gitSource struct {
 }
 
 type gitWorkspace struct {
-	Root       string
-	Repository string
-	Commit     string
-	remove     func() error
+	Root          string
+	Repository    string
+	Commit        string
+	FallbackLinks []archiveSymlink
+	remove        func() error
+}
+
+type archiveSymlink struct {
+	path   string
+	target string
 }
 
 const (
@@ -258,7 +266,7 @@ func materializeGitSource(source gitSource) (gitWorkspace, error) {
 	if output, err = runGitArchive("-C", workspace.Repository, "archive", "--format=tar", workspace.Commit); err != nil {
 		return fail(fmt.Errorf("archive resolved Git commit: %w: %s", err, strings.TrimSpace(string(output))))
 	}
-	if err := extractGitArchive(output, workspace.Root); err != nil {
+	if err := extractGitArchive(output, workspace.Root, &workspace.FallbackLinks); err != nil {
 		return fail(fmt.Errorf("extract resolved Git commit: %w", err))
 	}
 	return workspace, nil
@@ -385,13 +393,14 @@ func gitTreeHash(workspace gitWorkspace, skillDirectory string) (string, error) 
 	return strings.TrimSpace(string(output)), nil
 }
 
-func extractGitArchive(data []byte, destination string) error {
+func extractGitArchive(data []byte, destination string, fallbackOutput ...*[]archiveSymlink) error {
 	reader := tar.NewReader(bytes.NewReader(data))
 	entries := 0
+	links := []archiveSymlink{}
 	for {
 		header, err := reader.Next()
 		if errors.Is(err, io.EOF) {
-			return nil
+			break
 		}
 		if err != nil {
 			return err
@@ -437,10 +446,193 @@ func extractGitArchive(data []byte, destination string) error {
 			if closeErr != nil {
 				return closeErr
 			}
+		case tar.TypeSymlink:
+			links = append(links, archiveSymlink{path: target, target: header.Linkname})
 		default:
 			return fmt.Errorf("unsupported archive entry %q", header.Name)
 		}
 	}
+	// Materialize repository links only after every regular archive entry. A
+	// repository-controlled link can therefore never redirect extraction writes.
+	fallbacks := []archiveSymlink{}
+	for _, link := range links {
+		if err := rejectArchiveSymlinkParents(destination, filepath.Dir(link.path)); err != nil {
+			return err
+		}
+		if err := os.Symlink(link.target, link.path); err != nil {
+			if runtime.GOOS != "windows" {
+				return fmt.Errorf("create repository symlink %q: %w", link.path, err)
+			}
+			fallbacks = append(fallbacks, link)
+		}
+	}
+	if len(fallbackOutput) > 0 {
+		*fallbackOutput[0] = fallbacks
+		return nil
+	}
+	return materializeArchiveLinkFallbacks(destination, fallbacks)
+}
+
+func rejectArchiveSymlinkParents(root, parent string) error {
+	relative, err := filepath.Rel(root, parent)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("archive symlink parent escapes checkout: %s", parent)
+	}
+	current := root
+	for _, component := range strings.Split(relative, string(filepath.Separator)) {
+		if component == "" || component == "." {
+			continue
+		}
+		current = filepath.Join(current, component)
+		info, err := os.Lstat(current)
+		if err != nil {
+			return fmt.Errorf("inspect archive symlink parent %q: %w", current, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("archive symlink parent contains repository symlink: %s", current)
+		}
+	}
+	return nil
+}
+
+func materializeGitLinkFallbacksForSkills(workspace *gitWorkspace, skills []localSkill) error {
+	if workspace == nil || len(workspace.FallbackLinks) == 0 {
+		return nil
+	}
+	selected := make([]archiveSymlink, 0, len(workspace.FallbackLinks))
+	remaining := make([]archiveSymlink, 0, len(workspace.FallbackLinks))
+	for _, link := range workspace.FallbackLinks {
+		included := false
+		for _, skill := range skills {
+			if archivePathWithin(skill.Path, link.path) {
+				included = true
+				break
+			}
+		}
+		if included {
+			selected = append(selected, link)
+		} else {
+			remaining = append(remaining, link)
+		}
+	}
+	if err := materializeArchiveLinkFallbacks(workspace.Root, selected); err != nil {
+		return err
+	}
+	workspace.FallbackLinks = remaining
+	return nil
+}
+
+func materializeArchiveLinkFallbacks(root string, links []archiveSymlink) error {
+	pending := append([]archiveSymlink(nil), links...)
+	for len(pending) > 0 {
+		progress := false
+		next := make([]archiveSymlink, 0, len(pending))
+		for _, link := range pending {
+			if !filepath.IsAbs(link.target) && hasParentPathComponent(link.target) {
+				return fmt.Errorf("repository symlink %q has parent-directory symlink target %q", link.path, link.target)
+			}
+			target := link.target
+			if !filepath.IsAbs(target) {
+				target = filepath.Join(filepath.Dir(link.path), target)
+			}
+			target = filepath.Clean(target)
+			if !archivePathWithin(root, target) {
+				return fmt.Errorf("repository symlink target escapes checkout at %q: %s", link.path, link.target)
+			}
+			info, err := os.Lstat(target)
+			if errors.Is(err, os.ErrNotExist) {
+				next = append(next, link)
+				continue
+			}
+			if err != nil {
+				return fmt.Errorf("inspect repository symlink fallback target %q: %w", link.target, err)
+			}
+			if info.Mode()&os.ModeSymlink != 0 {
+				return fmt.Errorf("repository symlink fallback target %q contains another symbolic link", link.target)
+			}
+			if info.IsDir() && archiveLinkPendingInside(target, pending) {
+				next = append(next, link)
+				continue
+			}
+			switch {
+			case info.Mode().IsRegular():
+				if err := os.Link(target, link.path); err != nil {
+					data, readErr := os.ReadFile(target)
+					if readErr != nil {
+						return readErr
+					}
+					if writeErr := os.WriteFile(link.path, data, info.Mode().Perm()); writeErr != nil {
+						return writeErr
+					}
+				}
+			case info.IsDir():
+				if err := copyArchiveFallbackDirectory(target, link.path); err != nil {
+					return err
+				}
+			default:
+				return fmt.Errorf("repository symlink fallback target %q is not regular content", link.target)
+			}
+			progress = true
+		}
+		if !progress {
+			paths := make([]string, 0, len(next))
+			for _, link := range next {
+				paths = append(paths, link.path)
+			}
+			sort.Strings(paths)
+			return fmt.Errorf("broken or cyclic repository symlink fallback: %s", strings.Join(paths, ", "))
+		}
+		pending = next
+	}
+	return nil
+}
+
+func archiveLinkPendingInside(directory string, links []archiveSymlink) bool {
+	for _, link := range links {
+		if archivePathWithin(directory, link.path) {
+			return true
+		}
+	}
+	return false
+}
+
+func archivePathWithin(root, candidate string) bool {
+	relative, err := filepath.Rel(root, candidate)
+	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
+}
+
+func copyArchiveFallbackDirectory(source, destination string) error {
+	return filepath.WalkDir(source, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		relative, err := filepath.Rel(source, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(destination, relative)
+		if entry.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("repository directory link fallback contains symbolic link: %s", path)
+		}
+		if entry.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		if !entry.Type().IsRegular() {
+			return fmt.Errorf("repository directory link fallback contains non-regular file: %s", path)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, info.Mode().Perm())
+	})
 }
 
 func rejectLFSPointers(directory string) error {
