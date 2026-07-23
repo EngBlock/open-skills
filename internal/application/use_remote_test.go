@@ -38,16 +38,43 @@ func TestRemoteUseEnforcesAndOverridesResourceLimits(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	tooSmall := fmt.Sprintf("%d", len(skillMD)-1)
-	if exit := runUse(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{server.URL, "--max-file-bytes", tooSmall}); exit != 1 || stdout.String() != "" || !strings.Contains(stderr.String(), "--max-file-bytes") {
+	if exit := runUse(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{server.URL, "--allow-insecure-transport", "--max-file-bytes", tooSmall}); exit != 1 || stdout.String() != "" || !strings.Contains(stderr.String(), "--max-file-bytes") {
 		t.Fatalf("limited use = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
 	}
 
 	stdout.Reset()
 	stderr.Reset()
 	exact := fmt.Sprintf("%d", len(skillMD))
-	arguments := []string{server.URL, "--max-file-bytes", exact, "--max-total-bytes", exact, "--max-files", "1"}
-	if exit := runUse(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, arguments); exit != 0 || stderr.String() != "" || !strings.Contains(stdout.String(), string(skillMD)) {
+	arguments := []string{server.URL, "--allow-insecure-transport", "--max-file-bytes", exact, "--max-total-bytes", exact, "--max-files", "1"}
+	if exit := runUse(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, arguments); exit != 0 || !strings.Contains(stderr.String(), "Warning: allowing insecure HTTP") || !strings.Contains(stdout.String(), string(skillMD)) {
 		t.Fatalf("exact-boundary use = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+}
+
+func TestRemoteUseFollowsBoundedRedirectPolicy(t *testing.T) {
+	destination := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/.well-known/agent-skills/index.json":
+			_, _ = response.Write([]byte(`{"skills":[{"name":"redirected-use","description":"redirected use","files":["SKILL.md"]}]}`))
+		case "/.well-known/agent-skills/redirected-use/SKILL.md":
+			_, _ = response.Write([]byte("---\nname: redirected-use\ndescription: redirected use\n---\n\nUse redirected instructions.\n"))
+		default:
+			http.NotFound(response, request)
+		}
+	}))
+	defer destination.Close()
+	source := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		http.Redirect(response, request, destination.URL+request.URL.Path, http.StatusFound)
+	}))
+	defer source.Close()
+
+	var stdout, stderr bytes.Buffer
+	arguments := []string{source.URL, "--allow-insecure-transport"}
+	if exit := runUse(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, arguments); exit != 0 {
+		t.Fatalf("redirected use = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Use redirected instructions.") || !strings.Contains(stderr.String(), "final host "+strings.TrimPrefix(destination.URL, "http://")) {
+		t.Fatalf("redirected use stdout %q stderr %q", stdout.String(), stderr.String())
 	}
 }
 

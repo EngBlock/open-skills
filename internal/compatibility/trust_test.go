@@ -11,7 +11,7 @@ import (
 
 func TestNativeRemoteWellKnownAgentUseRecordsExactTrustBeforeInjection(t *testing.T) {
 	observation, err := (Harness{}).Run(context.Background(), buildShellTarget(t), Scenario{
-		Args: []string{"use", "{{http:url}}", "--agent", "codex", "--trust"},
+		Args: []string{"use", "{{http:url}}", "--agent", "codex", "--trust", "--allow-insecure-transport"},
 		HTTPRoutes: []HTTPRoute{
 			{Method: http.MethodGet, Path: "/.well-known/agent-skills/index.json", Body: []byte(`{"skills":[{"name":"remote","description":"Remote skill","files":["SKILL.md"]}]}`)},
 			{Method: http.MethodGet, Path: "/.well-known/agent-skills/remote/SKILL.md", Body: []byte("---\nname: remote\ndescription: Remote skill\n---\n\n# Remote\n\nDo remote work.\n")},

@@ -126,7 +126,7 @@ func runAdd(invocation Invocation, arguments []string) int {
 			_, _ = fmt.Fprintln(invocation.Stderr, parseErr)
 			return 1
 		}
-		fetched, fetchErr := fetchWellKnownSkills(wellKnown, options.Limits, options.Skills)
+		fetched, fetchErr := fetchWellKnownSkills(wellKnown, options.Limits, options.Skills, newHTTPAcquisitionPolicy(options.AllowInsecureTransport, invocation.Stderr))
 		if fetchErr != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Discover well-known skills: %v\n", fetchErr)
 			return 1

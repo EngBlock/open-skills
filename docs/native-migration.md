@@ -14,7 +14,17 @@ The native executable has no binary self-updater. `open-skills update` continues
 
 Process-level regressions for these rules are labeled `D01` and `D02` in `internal/compatibility`. Offline shell scenarios use recorded proxy and child-command traps, an application dependency boundary, and a network-disabled Linux CI run.
 
-## D03-D06: Git-source acquisition
+## D03-D06: remote-source acquisition
+
+Native well-known HTTP acquisition follows at most five redirects and reports the
+sanitized final host whenever a redirect succeeds. Redirect loops and excessive
+chains fail deterministically. Cross-host redirects never forward authorization,
+proxy-authorization, cookie, token, API-key, credential, or secret headers.
+Plaintext HTTP sources and redirect targets require
+`--allow-insecure-transport`; authorization emits a warning and `--yes` never
+implies it. Request URLs, redirect diagnostics, persisted provenance, and JSON
+strip user-info, query tokens, and fragments, while HTTP failures never print
+response bodies or headers.
 
 `open-skills add`, `use`, `check`, and `update` accept GitHub/GitLab shorthands
 and URLs plus generic `file`, SSH, and HTTPS Git sources. Plaintext HTTP and

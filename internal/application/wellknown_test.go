@@ -46,7 +46,7 @@ func TestWellKnownCurrentIndexListsSelectsInstallsAndRecordsMultifileSkill(t *te
 	project := t.TempDir()
 	withWorkingDirectory(t, project)
 	var listed, listErrors bytes.Buffer
-	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &listed, Stderr: &listErrors}, []string{server.URL, "--list"}); exit != 0 {
+	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &listed, Stderr: &listErrors}, []string{server.URL, "--list", "--allow-insecure-transport"}); exit != 0 {
 		t.Fatalf("list exit = %d, stdout %q, stderr %q", exit, listed.String(), listErrors.String())
 	}
 	if !strings.Contains(listed.String(), "single-file") || !strings.Contains(listed.String(), "multi-file") {
@@ -54,7 +54,7 @@ func TestWellKnownCurrentIndexListsSelectsInstallsAndRecordsMultifileSkill(t *te
 	}
 
 	var stdout, stderr bytes.Buffer
-	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{server.URL, "--skill", "multi-file", "--agent", "universal", "--copy", "--yes"}); exit != 0 {
+	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{server.URL, "--skill", "multi-file", "--agent", "universal", "--copy", "--yes", "--allow-insecure-transport"}); exit != 0 {
 		t.Fatalf("install exit = %d, stdout %q, stderr %q", exit, stdout.String(), stderr.String())
 	}
 	installed := filepath.Join(project, ".agents", "skills", "multi-file")
@@ -87,6 +87,84 @@ func TestWellKnownCurrentIndexListsSelectsInstallsAndRecordsMultifileSkill(t *te
 	assertOnlyFixtureRequests(t, server, requests)
 }
 
+func TestWellKnownHTTPRequiresDedicatedAuthorizationAndWarnsBeforeAcquisition(t *testing.T) {
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		requests.Add(1)
+		switch request.URL.Path {
+		case "/.well-known/agent-skills/index.json":
+			_, _ = response.Write([]byte(`{"skills":[{"name":"insecure","description":"insecure fixture","files":["SKILL.md"]}]}`))
+		case "/.well-known/agent-skills/insecure/SKILL.md":
+			_, _ = response.Write([]byte("---\nname: insecure\ndescription: insecure fixture\n---\n"))
+		default:
+			http.NotFound(response, request)
+		}
+	}))
+	defer server.Close()
+
+	project := t.TempDir()
+	withWorkingDirectory(t, project)
+	var stdout, stderr bytes.Buffer
+	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{server.URL, "--agent", "universal", "--yes"}); exit != 1 || !strings.Contains(stderr.String(), "--allow-insecure-transport") {
+		t.Fatalf("unauthorized HTTP source = exit %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+	if requests.Load() != 0 {
+		t.Fatalf("unauthorized HTTP source made %d requests", requests.Load())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{server.URL, "--agent", "universal", "--yes", "--allow-insecure-transport"}); exit != 0 || !strings.Contains(stderr.String(), "Warning: allowing insecure HTTP well-known source") {
+		t.Fatalf("authorized HTTP source = exit %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+}
+
+func TestWellKnownCrossHostRedirectReportsAndRecordsRedactedFinalHost(t *testing.T) {
+	const querySecret = "redirect-query-secret"
+	destination := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/.well-known/agent-skills/index.json":
+			_, _ = response.Write([]byte(`{"skills":[{"name":"redirected","description":"redirect fixture","files":["SKILL.md"]}]}`))
+		case "/.well-known/agent-skills/redirected/SKILL.md":
+			_, _ = response.Write([]byte("---\nname: redirected\ndescription: redirect fixture\n---\n"))
+		default:
+			http.NotFound(response, request)
+		}
+	}))
+	defer destination.Close()
+	source := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		http.Redirect(response, request, destination.URL+request.URL.Path+"?access_token="+querySecret, http.StatusFound)
+	}))
+	defer source.Close()
+
+	project := t.TempDir()
+	withWorkingDirectory(t, project)
+	var stdout, stderr bytes.Buffer
+	arguments := []string{source.URL, "--agent", "universal", "--yes", "--allow-insecure-transport"}
+	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, arguments); exit != 0 {
+		t.Fatalf("redirected install = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+	destinationHost := strings.TrimPrefix(destination.URL, "http://")
+	if !strings.Contains(stderr.String(), "final host "+destinationHost) {
+		t.Fatalf("redirect diagnostics = %q", stderr.String())
+	}
+	lock, err := os.ReadFile(filepath.Join(project, "skills-lock.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var listJSON, listErrors bytes.Buffer
+	if exit := runList(Invocation{Stdout: &listJSON, Stderr: &listErrors}, []string{"--json"}); exit != 0 {
+		t.Fatalf("list JSON = %d stdout %q stderr %q", exit, listJSON.String(), listErrors.String())
+	}
+	combined := stdout.String() + stderr.String() + string(lock) + listJSON.String() + listErrors.String()
+	if strings.Contains(combined, querySecret) || strings.Contains(combined, "access_token") {
+		t.Fatalf("redirect token leaked into diagnostics, JSON, or provenance: %q", combined)
+	}
+	if !strings.Contains(string(lock), destination.URL+"/.well-known/agent-skills/redirected/SKILL.md") {
+		t.Fatalf("lock omits redirected final URL: %s", lock)
+	}
+}
+
 func TestWellKnownV2ArchiveInstallsMultifileSkill(t *testing.T) {
 	archive := createWellKnownZIP(t, map[string]string{
 		"SKILL.md":            "---\nname: v2-archive\ndescription: V2 archive\n---\n",
@@ -108,7 +186,7 @@ func TestWellKnownV2ArchiveInstallsMultifileSkill(t *testing.T) {
 	project := t.TempDir()
 	withWorkingDirectory(t, project)
 	var stdout, stderr bytes.Buffer
-	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{server.URL, "--agent", "universal", "--yes"}); exit != 0 {
+	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{server.URL, "--agent", "universal", "--yes", "--allow-insecure-transport"}); exit != 0 {
 		t.Fatalf("install exit = %d, stdout %q, stderr %q", exit, stdout.String(), stderr.String())
 	}
 	if data, err := os.ReadFile(filepath.Join(project, ".agents", "skills", "v2-archive", "references", "guide.md")); err != nil || string(data) != "v2 reference\n" {
@@ -138,7 +216,7 @@ func TestWellKnownSelectedContentLimitsIgnoreUnselectedSkillSize(t *testing.T) {
 	project := t.TempDir()
 	withWorkingDirectory(t, project)
 	var stdout, stderr bytes.Buffer
-	arguments := []string{server.URL, "--skill", "small", "--agent", "universal", "--yes"}
+	arguments := []string{server.URL, "--skill", "small", "--agent", "universal", "--yes", "--allow-insecure-transport"}
 	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, arguments); exit != 0 {
 		t.Fatalf("selected install = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
 	}
@@ -171,7 +249,7 @@ func TestWellKnownResourceFailureIsActionableAndLeavesNoState(t *testing.T) {
 	withWorkingDirectory(t, project)
 	var stdout, stderr bytes.Buffer
 	tooSmall := fmt.Sprintf("%d", len(skillMD)-1)
-	arguments := []string{server.URL, "--agent", "universal", "--yes", "--max-file-bytes", tooSmall}
+	arguments := []string{server.URL, "--agent", "universal", "--yes", "--allow-insecure-transport", "--max-file-bytes", tooSmall}
 	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, arguments); exit != 1 || !strings.Contains(stderr.String(), "--max-file-bytes") {
 		t.Fatalf("bounded install = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
 	}
@@ -185,7 +263,7 @@ func TestWellKnownResourceFailureIsActionableAndLeavesNoState(t *testing.T) {
 	stdout.Reset()
 	stderr.Reset()
 	exact := fmt.Sprintf("%d", len(skillMD))
-	arguments = []string{server.URL, "--agent", "universal", "--yes", "--max-file-bytes", exact, "--max-total-bytes", exact, "--max-files", "1"}
+	arguments = []string{server.URL, "--agent", "universal", "--yes", "--allow-insecure-transport", "--max-file-bytes", exact, "--max-total-bytes", exact, "--max-files", "1"}
 	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, arguments); exit != 0 {
 		t.Fatalf("exact-boundary install = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
 	}
@@ -272,7 +350,7 @@ func TestWellKnownLegacyIndexAndDirectURLs(t *testing.T) {
 			withWorkingDirectory(t, project)
 			source := server.URL + test.sourcePath
 			var stdout, stderr bytes.Buffer
-			if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{source, "--agent", "universal", "--yes"}); exit != 0 {
+			if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{source, "--agent", "universal", "--yes", "--allow-insecure-transport"}); exit != 0 {
 				t.Fatalf("install exit = %d, stdout %q, stderr %q", exit, stdout.String(), stderr.String())
 			}
 			if _, err := os.Stat(filepath.Join(project, ".agents", "skills", test.skillName, "SKILL.md")); err != nil {

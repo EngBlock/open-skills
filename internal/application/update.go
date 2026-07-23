@@ -496,7 +496,7 @@ func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names
 		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", displaySource, err)
 		return updateResult{checked: len(names), failed: len(names)}
 	}
-	fetched, err := fetchWellKnownSkills(provider, options.Limits, names)
+	fetched, err := fetchWellKnownSkills(provider, options.Limits, names, newHTTPAcquisitionPolicy(options.AllowInsecureTransport, invocation.Stderr))
 	if err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", displaySource, err)
 		return updateResult{checked: len(names), failed: len(names)}

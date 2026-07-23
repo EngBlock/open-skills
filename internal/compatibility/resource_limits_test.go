@@ -45,7 +45,7 @@ func TestNativeRemoteResourceFailureLeavesNoInstalledContentOrLock(t *testing.T)
 	target := buildShellTarget(t)
 	failure, err := (Harness{}).Run(context.Background(), target, Scenario{
 		Args: []string{
-			"add", "{{http:url}}", "--agent", "universal", "--yes",
+			"add", "{{http:url}}", "--agent", "universal", "--yes", "--allow-insecure-transport",
 			"--max-file-bytes", fmt.Sprintf("%d", len(skillMD)-1),
 		},
 		HTTPRoutes: []HTTPRoute{
@@ -69,7 +69,7 @@ func TestNativeRemoteResourceFailureLeavesNoInstalledContentOrLock(t *testing.T)
 	exact := fmt.Sprintf("%d", len(skillMD))
 	success, err := (Harness{}).Run(context.Background(), target, Scenario{
 		Args: []string{
-			"add", "{{http:url}}", "--agent", "universal", "--yes",
+			"add", "{{http:url}}", "--agent", "universal", "--yes", "--allow-insecure-transport",
 			"--max-file-bytes", exact, "--max-total-bytes", exact, "--max-files", "1",
 		},
 		HTTPRoutes: []HTTPRoute{
@@ -80,7 +80,7 @@ func TestNativeRemoteResourceFailureLeavesNoInstalledContentOrLock(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if success.ExitCode != 0 || success.Stderr != "" || success.Stdout != "Installed bounded\n" {
+	if success.ExitCode != 0 || !strings.Contains(success.Stderr, "Warning: allowing insecure HTTP") || success.Stdout != "Installed bounded\n" {
 		t.Fatalf("success = exit %d stdout %q stderr %q", success.ExitCode, success.Stdout, success.Stderr)
 	}
 	installed := success.Files[filepath.Join("project", ".agents", "skills", "bounded", "SKILL.md")]

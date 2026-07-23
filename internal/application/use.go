@@ -111,7 +111,7 @@ func runUse(invocation Invocation, arguments []string) int {
 		if selector != "" {
 			selectors = []string{selector}
 		}
-		fetched, err := fetchWellKnownSkills(wellKnown, options.Limits, selectors)
+		fetched, err := fetchWellKnownSkills(wellKnown, options.Limits, selectors, newHTTPAcquisitionPolicy(options.AllowInsecureTransport, invocation.Stderr))
 		if err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Discover well-known skills: %v\n", err)
 			return 1

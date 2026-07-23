@@ -226,10 +226,10 @@ func TestUpdateReconstructsCredentialRedactedSSHSource(t *testing.T) {
 	}
 }
 
-func TestUpdateChecksWellKnownSourceWithControlledHTTP(t *testing.T) {
+func TestUpdateChecksAndAppliesRedirectedWellKnownSource(t *testing.T) {
 	project, _ := updateTestDirectories(t)
 	var requests atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+	destination := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		requests.Add(1)
 		switch request.URL.Path {
 		case "/.well-known/agent-skills/index.json":
@@ -240,17 +240,41 @@ func TestUpdateChecksWellKnownSourceWithControlledHTTP(t *testing.T) {
 			http.NotFound(response, request)
 		}
 	}))
-	defer server.Close()
-	lock := `{"version":1,"skills":{"fixture":{"source":"` + server.URL + `","sourceType":"well-known","sourceUrl":"` + server.URL + `/.well-known/agent-skills/fixture/SKILL.md","skillPath":"fixture/SKILL.md","computedHash":"old","agents":["universal"]}}}`
+	defer destination.Close()
+	source := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		http.Redirect(response, request, destination.URL+request.URL.Path, http.StatusFound)
+	}))
+	defer source.Close()
+	lock := `{"version":1,"skills":{"fixture":{"source":"` + source.URL + `","sourceType":"well-known","sourceUrl":"` + source.URL + `/.well-known/agent-skills/fixture/SKILL.md","skillPath":"fixture/SKILL.md","computedHash":"old","agents":["universal"]}}}`
 	if err := os.WriteFile(filepath.Join(project, "skills-lock.json"), []byte(lock), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	arguments := []string{"check", "--project", "--yes", "--allow-insecure-transport"}
 	var stdout, stderr bytes.Buffer
-	if exit := Run(nil, Invocation{Args: []string{"check", "--project", "--yes"}, Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}); exit != 0 {
+	if exit := Run(nil, Invocation{Args: arguments, Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}); exit != 0 {
 		t.Fatalf("check = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
 	}
-	if requests.Load() == 0 || !strings.Contains(stdout.String(), "Update available: fixture") {
-		t.Fatalf("well-known check requests=%d output=%q", requests.Load(), stdout.String())
+	destinationHost := strings.TrimPrefix(destination.URL, "http://")
+	if requests.Load() == 0 || !strings.Contains(stdout.String(), "Update available: fixture") || !strings.Contains(stderr.String(), "final host "+destinationHost) {
+		t.Fatalf("well-known check requests=%d stdout=%q stderr=%q", requests.Load(), stdout.String(), stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	arguments[0] = "update"
+	if exit := Run(nil, Invocation{Args: arguments, Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}); exit != 0 {
+		t.Fatalf("update = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+	installed, err := os.ReadFile(filepath.Join(project, ".agents", "skills", "fixture", "SKILL.md"))
+	if err != nil || !strings.Contains(string(installed), "changed") {
+		t.Fatalf("updated content = %q, %v", installed, err)
+	}
+	updatedLock, err := os.ReadFile(filepath.Join(project, "skills-lock.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(updatedLock), destination.URL+"/.well-known/agent-skills/fixture/SKILL.md") {
+		t.Fatalf("updated provenance omits redirected final URL: %s", updatedLock)
 	}
 }
 
@@ -273,13 +297,13 @@ func TestCheckUsesDirectWellKnownFallbackWithoutAnIndex(t *testing.T) {
 	defer server.Close()
 	direct := server.URL + "/.well-known/agent-skills/fixture/SKILL.md"
 	var stdout, stderr bytes.Buffer
-	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{direct, "--yes", "--agent", "universal"}); exit != 0 {
+	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{direct, "--yes", "--agent", "universal", "--allow-insecure-transport"}); exit != 0 {
 		t.Fatalf("install = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
 	}
 	changed.Store(true)
 	stdout.Reset()
 	stderr.Reset()
-	if exit := Run(nil, Invocation{Args: []string{"check", "--project", "--yes"}, Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}); exit != 0 {
+	if exit := Run(nil, Invocation{Args: []string{"check", "--project", "--yes", "--allow-insecure-transport"}, Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}); exit != 0 {
 		t.Fatalf("check = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
 	}
 	if directRequests.Load() < 2 || !strings.Contains(stdout.String(), "Update available: fixture") {

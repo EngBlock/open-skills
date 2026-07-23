@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -31,12 +30,7 @@ const (
 var wellKnownSkillName = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 var wellKnownDigest = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
 
-var wellKnownHTTPClient = &http.Client{
-	Timeout: wellKnownRequestTimeout,
-	CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-		return http.ErrUseLastResponse
-	},
-}
+var wellKnownHTTPClient = &http.Client{Timeout: wellKnownRequestTimeout}
 
 type wellKnownSource struct {
 	baseURL    *url.URL
@@ -80,10 +74,6 @@ func parseWellKnownSource(raw string) (wellKnownSource, bool, error) {
 	if parsed.User != nil {
 		return wellKnownSource{}, true, errors.New("well-known source URLs must not contain user credentials")
 	}
-	if parsed.Scheme == "http" && !isLoopbackHost(parsed.Hostname()) {
-		return wellKnownSource{}, true, errors.New("well-known sources must use HTTPS")
-	}
-
 	parsed.RawQuery = ""
 	parsed.Fragment = ""
 	source := wellKnownSource{baseURL: cloneURL(parsed), identity: wellKnownIdentity(parsed)}
@@ -107,14 +97,6 @@ func parseWellKnownSource(raw string) (wellKnownSource, bool, error) {
 	}
 	source.indexes = wellKnownIndexCandidates(parsed)
 	return source, true, nil
-}
-
-func isLoopbackHost(host string) bool {
-	if strings.EqualFold(host, "localhost") {
-		return true
-	}
-	address := net.ParseIP(host)
-	return address != nil && address.IsLoopback()
 }
 
 func cloneURL(value *url.URL) *url.URL {
@@ -206,15 +188,18 @@ func validWellKnownFilePath(file string) bool {
 	return true
 }
 
-func fetchWellKnownSkills(source wellKnownSource, selectedLimits resourceLimits, selectors []string) ([]wellKnownFetchedSkill, error) {
+func fetchWellKnownSkills(source wellKnownSource, selectedLimits resourceLimits, selectors []string, policy *httpAcquisitionPolicy) ([]wellKnownFetchedSkill, error) {
 	limits := acquisitionResourceLimits(selectedLimits)
+	if err := policy.authorize(source.baseURL, "well-known source"); err != nil {
+		return nil, err
+	}
 	// A candidate may be stale, malformed, or unavailable while another
 	// namespace remains valid. Preserve the provider's current-to-legacy
 	// fallback behavior instead of treating an unusable candidate as terminal.
 	for _, indexURL := range source.indexes {
-		index, found, err := fetchWellKnownIndex(source, indexURL)
+		index, found, resolvedIndexURL, err := fetchWellKnownIndex(source, indexURL, policy)
 		if err != nil || !found {
-			if isResourceLimitError(err) {
+			if isResourceLimitError(err) || isHTTPPolicyError(err) {
 				return nil, err
 			}
 			continue
@@ -227,7 +212,7 @@ func fetchWellKnownSkills(source wellKnownSource, selectedLimits resourceLimits,
 				}
 				continue
 			}
-			result, fetchErr := fetchWellKnownEntries(source, indexURL, entries, selectors, limits, fetchWellKnownV2Entry)
+			result, fetchErr := fetchWellKnownEntries(source, resolvedIndexURL, entries, selectors, limits, policy, fetchWellKnownV2Entry)
 			if fetchErr != nil {
 				return nil, fetchErr
 			}
@@ -246,7 +231,7 @@ func fetchWellKnownSkills(source wellKnownSource, selectedLimits resourceLimits,
 			}
 			continue
 		}
-		result, fetchErr := fetchWellKnownEntries(source, indexURL, entries, selectors, limits, fetchWellKnownEntry)
+		result, fetchErr := fetchWellKnownEntries(source, resolvedIndexURL, entries, selectors, limits, policy, fetchWellKnownEntry)
 		if fetchErr != nil {
 			return nil, fetchErr
 		}
@@ -256,7 +241,7 @@ func fetchWellKnownSkills(source wellKnownSource, selectedLimits resourceLimits,
 	}
 
 	if source.directName != "" && source.directURL != nil {
-		data, err := fetchWellKnownURL(source, source.directURL, limits.MaxFileBytes)
+		data, finalURL, err := fetchWellKnownURL(source, source.directURL, limits.MaxFileBytes, policy)
 		if err != nil {
 			return nil, err
 		}
@@ -264,41 +249,41 @@ func fetchWellKnownSkills(source wellKnownSource, selectedLimits resourceLimits,
 		if err := budget.addFile("SKILL.md", int64(len(data))); err != nil {
 			return nil, err
 		}
-		return []wellKnownFetchedSkill{{Name: source.directName, Files: map[string][]byte{"SKILL.md": data}, SourceURL: source.directURL.String()}}, nil
+		return []wellKnownFetchedSkill{{Name: source.directName, Files: map[string][]byte{"SKILL.md": data}, SourceURL: redactedHTTPURL(finalURL)}}, nil
 	}
 	return nil, errors.New("no well-known skills found")
 }
 
-func fetchWellKnownIndex(source wellKnownSource, indexURL *url.URL) (wellKnownIndex, bool, error) {
-	data, status, err := fetchWellKnownURLStatus(source, indexURL, maxWellKnownIndexBytes)
+func fetchWellKnownIndex(source wellKnownSource, indexURL *url.URL, policy *httpAcquisitionPolicy) (wellKnownIndex, bool, *url.URL, error) {
+	data, status, finalURL, err := fetchWellKnownURLStatus(source, indexURL, maxWellKnownIndexBytes, policy)
 	if err != nil {
-		return wellKnownIndex{}, false, err
+		return wellKnownIndex{}, false, nil, err
 	}
 	if status == http.StatusNotFound {
-		return wellKnownIndex{}, false, nil
+		return wellKnownIndex{}, false, finalURL, nil
 	}
 	if status < http.StatusOK || status >= http.StatusMultipleChoices {
-		return wellKnownIndex{}, false, fmt.Errorf("fetch well-known index %s: HTTP %d", indexURL, status)
+		return wellKnownIndex{}, false, finalURL, fmt.Errorf("fetch well-known index %s: HTTP %d", redactedHTTPURL(finalURL), status)
 	}
 	index := wellKnownIndex{}
 	if err := jsonUnmarshalStrict(data, &index); err != nil {
-		return wellKnownIndex{}, false, fmt.Errorf("decode well-known index %s: %w", indexURL, err)
+		return wellKnownIndex{}, false, finalURL, fmt.Errorf("decode well-known index %s: %w", redactedHTTPURL(finalURL), err)
 	}
-	return index, true, nil
+	return index, true, finalURL, nil
 }
 
-type fetchWellKnownEntryFunc func(wellKnownSource, *url.URL, wellKnownIndexEntry, resourceLimits) (wellKnownFetchedSkill, error)
+type fetchWellKnownEntryFunc func(wellKnownSource, *url.URL, wellKnownIndexEntry, resourceLimits, *httpAcquisitionPolicy) (wellKnownFetchedSkill, error)
 
-func fetchWellKnownEntries(source wellKnownSource, indexURL *url.URL, entries []wellKnownIndexEntry, selectors []string, limits resourceLimits, fetchEntry fetchWellKnownEntryFunc) ([]wellKnownFetchedSkill, error) {
+func fetchWellKnownEntries(source wellKnownSource, indexURL *url.URL, entries []wellKnownIndexEntry, selectors []string, limits resourceLimits, policy *httpAcquisitionPolicy, fetchEntry fetchWellKnownEntryFunc) ([]wellKnownFetchedSkill, error) {
 	result := make([]wellKnownFetchedSkill, 0, len(entries))
 	budget := newResourceBudget(limits)
 	for _, entry := range entries {
 		if !wellKnownEntryRequested(source, entry.Name, selectors) {
 			continue
 		}
-		skill, err := fetchEntry(source, indexURL, entry, limits)
+		skill, err := fetchEntry(source, indexURL, entry, limits, policy)
 		if err != nil {
-			if isResourceLimitError(err) {
+			if isResourceLimitError(err) || isHTTPPolicyError(err) {
 				return nil, err
 			}
 			continue
@@ -397,19 +382,18 @@ func validWellKnownV2Entries(index wellKnownIndex, limits resourceLimits) ([]wel
 	return result, nil
 }
 
-func fetchWellKnownV2Entry(source wellKnownSource, indexURL *url.URL, entry wellKnownIndexEntry, limits resourceLimits) (wellKnownFetchedSkill, error) {
+func fetchWellKnownV2Entry(source wellKnownSource, indexURL *url.URL, entry wellKnownIndexEntry, limits resourceLimits, policy *httpAcquisitionPolicy) (wellKnownFetchedSkill, error) {
 	artifact, err := url.Parse(entry.URL)
 	if err != nil {
 		return wellKnownFetchedSkill{}, err
 	}
 	artifact = indexURL.ResolveReference(artifact)
-	artifact.RawQuery = ""
 	artifact.Fragment = ""
 	downloadLimit := limits.MaxTotalBytes
 	if entry.Type == "skill-md" {
 		downloadLimit = limits.MaxFileBytes
 	}
-	data, err := fetchWellKnownURL(source, artifact, downloadLimit)
+	data, finalURL, err := fetchWellKnownURL(source, artifact, downloadLimit, policy)
 	if err != nil {
 		return wellKnownFetchedSkill{}, err
 	}
@@ -423,7 +407,7 @@ func fetchWellKnownV2Entry(source wellKnownSource, indexURL *url.URL, entry well
 			return wellKnownFetchedSkill{}, err
 		}
 	}
-	return wellKnownFetchedSkill{Name: entry.Name, Files: files, SourceURL: artifact.String()}, nil
+	return wellKnownFetchedSkill{Name: entry.Name, Files: files, SourceURL: redactedHTTPURL(finalURL)}, nil
 }
 
 func extractWellKnownArchive(data []byte, artifactPath string, limits resourceLimits) (map[string][]byte, error) {
@@ -565,7 +549,7 @@ func readWellKnownZIPFile(file *zip.File, limits resourceLimits) ([]byte, error)
 	return contents, nil
 }
 
-func fetchWellKnownEntry(source wellKnownSource, indexURL *url.URL, entry wellKnownIndexEntry, limits resourceLimits) (wellKnownFetchedSkill, error) {
+func fetchWellKnownEntry(source wellKnownSource, indexURL *url.URL, entry wellKnownIndexEntry, limits resourceLimits, policy *httpAcquisitionPolicy) (wellKnownFetchedSkill, error) {
 	files := make(map[string][]byte, len(entry.Files))
 	budget := newResourceBudget(limits)
 	var skillURL string
@@ -573,7 +557,7 @@ func fetchWellKnownEntry(source wellKnownSource, indexURL *url.URL, entry wellKn
 		fileURL := cloneURL(indexURL)
 		fileURL.Path = path.Join(strings.TrimSuffix(indexURL.Path, "/"+wellKnownIndexFile), entry.Name, file)
 		fileURL.RawPath = ""
-		data, err := fetchWellKnownURL(source, fileURL, limits.MaxFileBytes)
+		data, finalURL, err := fetchWellKnownURL(source, fileURL, limits.MaxFileBytes, policy)
 		if err != nil {
 			return wellKnownFetchedSkill{}, err
 		}
@@ -585,50 +569,29 @@ func fetchWellKnownEntry(source wellKnownSource, indexURL *url.URL, entry wellKn
 		}
 		files[file] = data
 		if strings.EqualFold(file, "SKILL.md") {
-			skillURL = fileURL.String()
+			skillURL = redactedHTTPURL(finalURL)
 		}
 	}
 	return wellKnownFetchedSkill{Name: entry.Name, Files: files, SourceURL: skillURL}, nil
 }
 
-func fetchWellKnownURL(source wellKnownSource, target *url.URL, limit int64) ([]byte, error) {
-	data, status, err := fetchWellKnownURLStatus(source, target, limit)
+func fetchWellKnownURL(source wellKnownSource, target *url.URL, limit int64, policy *httpAcquisitionPolicy) ([]byte, *url.URL, error) {
+	data, status, finalURL, err := fetchWellKnownURLStatus(source, target, limit, policy)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if status < http.StatusOK || status >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("fetch well-known skill %s: HTTP %d", target, status)
+		return nil, finalURL, fmt.Errorf("fetch well-known skill %s: HTTP %d", redactedHTTPURL(finalURL), status)
 	}
-	return data, nil
+	return data, finalURL, nil
 }
 
-func fetchWellKnownURLStatus(source wellKnownSource, target *url.URL, limit int64) ([]byte, int, error) {
-	if target.Scheme != source.baseURL.Scheme || !strings.EqualFold(target.Host, source.baseURL.Host) {
-		return nil, 0, errors.New("well-known provider refuses cross-origin requests")
-	}
-	request, err := http.NewRequest(http.MethodGet, target.String(), nil)
+func fetchWellKnownURLStatus(_ wellKnownSource, target *url.URL, limit int64, policy *httpAcquisitionPolicy) ([]byte, int, *url.URL, error) {
+	result, err := fetchHTTPURL(wellKnownHTTPClient, target, nil, limit, policy)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
-	response, err := wellKnownHTTPClient.Do(request)
-	if err != nil {
-		return nil, 0, fmt.Errorf("request %s: %w", target, err)
-	}
-	defer response.Body.Close()
-	if response.StatusCode >= http.StatusMultipleChoices && response.StatusCode < http.StatusBadRequest {
-		return nil, response.StatusCode, errors.New("well-known provider refuses redirects")
-	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
-	if err != nil {
-		return nil, response.StatusCode, err
-	}
-	if int64(len(data)) > limit {
-		if strings.HasSuffix(target.Path, "/"+wellKnownIndexFile) {
-			return nil, response.StatusCode, fmt.Errorf("well-known index response from %s exceeds the fixed %d-byte limit", target, limit)
-		}
-		return nil, response.StatusCode, resourceError("response from %s exceeds the %d-byte limit; raise it with --max-file-bytes or --max-total-bytes", target, limit)
-	}
-	return data, response.StatusCode, nil
+	return result.Data, result.Status, result.FinalURL, nil
 }
 
 func jsonUnmarshalStrict(data []byte, destination any) error {
