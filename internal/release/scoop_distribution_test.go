@@ -74,6 +74,7 @@ func TestScoopSmokeValidatesManifestInstallCommandsAndUpgradeMetadata(t *testing
 		"$olderVersion = '0.1.9'",
 		"$isProduction",
 		"$currentPrerelease = 'false'",
+		"Set-StrictMode -Off",
 		"apps/scoop/current",
 		"-ItemType Junction",
 		"scoop.ps1",

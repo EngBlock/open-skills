@@ -94,6 +94,9 @@ try {
     $upgrade.checkver.url = [Uri]::new($releaseIndex, [UriKind]::Absolute).AbsoluteUri
     $upgrade | ConvertTo-Json -Depth 20 | Set-Content $upgradeManifest -Encoding utf8NoBOM
 
+    # Scoop core intentionally reads absent optional config properties. Exercise it
+    # under Scoop's normal non-strict semantics after validating our own setup.
+    Set-StrictMode -Off
     & (Join-Path $scoopCore 'bin/checkver.ps1') -App $upgradeManifest -ForceUpdate -ThrowError
     $updated = Get-Content $upgradeManifest -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($updated.version -cne $version -or $updated.architecture.'64bit'.url -cne $canonicalUrl -or $updated.architecture.'64bit'.hash -cne $windows.hash) {

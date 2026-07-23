@@ -155,6 +155,7 @@ func TestProductionRecoveryWorkflowReusesOnlyTheVerifiedTaggedBundle(t *testing.
 		"cosign verify-blob",
 		"gh attestation verify",
 		`OPEN_SKILLS_HOMEBREW_ARTIFACT="$artifact" scripts/homebrew-smoke.sh homebrew/open-skills.rb`,
+		"name: Checkout recovery tooling",
 		`$artifact = "native-dist/open-skills_$($env:RELEASE_TAG.Substring(1))_windows_amd64.zip"`,
 		"scripts/scoop-smoke.ps1 scoop/open-skills.json $artifact scoop-core",
 		"environment: native-production",
@@ -164,6 +165,18 @@ func TestProductionRecoveryWorkflowReusesOnlyTheVerifiedTaggedBundle(t *testing.
 		if !strings.Contains(workflow, text) {
 			t.Errorf("native production recovery workflow does not contain %q", text)
 		}
+	}
+	homebrewStart := strings.Index(workflow, "  homebrew:")
+	scoopStart := strings.Index(workflow, "  scoop:")
+	if homebrewStart < 0 || scoopStart <= homebrewStart {
+		t.Fatal("recovery workflow does not contain ordered Homebrew and Scoop jobs")
+	}
+	homebrew := workflow[homebrewStart:scoopStart]
+	checkoutIndex := strings.Index(homebrew, "name: Checkout immutable production tag")
+	setupGoIndex := strings.Index(homebrew, "name: Setup Go")
+	downloadIndex := strings.Index(homebrew, "name: Download the source run's signed bundle")
+	if checkoutIndex < 0 || setupGoIndex <= checkoutIndex || downloadIndex <= setupGoIndex {
+		t.Fatal("recovery Homebrew job must set up Go between checkout and artifact download")
 	}
 	for _, forbidden := range []string{"cosign sign-blob", "attest-build-provenance", "--prerelease"} {
 		if strings.Contains(workflow, forbidden) {
