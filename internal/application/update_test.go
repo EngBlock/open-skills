@@ -45,6 +45,70 @@ func TestCheckReportsUpdateWithoutChangingInstalledSkill(t *testing.T) {
 	}
 }
 
+func TestMissingUpstreamUpdateProtectsUnrecordedEveCopies(t *testing.T) {
+	project, home := t.TempDir(), t.TempDir()
+	root := filepath.Join(project, "agent", "skills", "fixture")
+	unrecorded := filepath.Join(project, "agent", "subagents", "secret", "skills", "fixture")
+	writeTestFile(t, filepath.Join(root, "SKILL.md"), "original", 0o644)
+	writeTestFile(t, filepath.Join(unrecorded, "notes.txt"), "local work", 0o644)
+	action := gitUpdateAction{
+		name: "fixture", remove: true,
+		entry: state.LockEntry{
+			Agents: []string{"eve"},
+			InstalledPlacements: map[string]state.InstalledPlacement{
+				"eve:root": captureTestPlacement(t, root, "copy"),
+			},
+		},
+	}
+	changes, err := updateActionLocalChanges(action, state.Snapshot{}, state.Project, project, home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsLocalChange(changes, "untracked", unrecorded) {
+		t.Fatalf("missing-upstream update did not protect unrecorded Eve copy: %#v", changes)
+	}
+}
+
+func TestUpdateRequiresForceBeforeOverwritingLocalChanges(t *testing.T) {
+	repository, first, second := createGitFixture(t)
+	project, home := updateTestDirectories(t)
+	installGitFixture(t, project, home, repository, first, "universal")
+
+	payloadPath := filepath.Join(project, ".agents", "skills", "fixture", "payload.txt")
+	if err := os.WriteFile(payloadPath, []byte("local edit\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	arguments := []string{"update", "--project", "--yes"}
+	if exit := Run(nil, Invocation{Args: arguments, Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}); exit != 1 {
+		t.Fatalf("unforced update = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "--force") {
+		t.Fatalf("unforced update omitted force guidance: %q", stderr.String())
+	}
+	payload, err := os.ReadFile(payloadPath)
+	if err != nil || string(payload) != "local edit\n" {
+		t.Fatalf("rejected update changed local content: %q, %v", payload, err)
+	}
+	if entry := readUpdateLock(t, filepath.Join(project, "skills-lock.json"), "fixture"); entry.Ref != first {
+		t.Fatalf("rejected update changed lock ref to %q", entry.Ref)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	arguments = append(arguments, "--force")
+	if exit := Run(nil, Invocation{Args: arguments, Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}); exit != 0 {
+		t.Fatalf("forced update = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+	payload, err = os.ReadFile(payloadPath)
+	if err != nil || string(payload) != "second\n" {
+		t.Fatalf("forced update content = %q, %v", payload, err)
+	}
+	if entry := readUpdateLock(t, filepath.Join(project, "skills-lock.json"), "fixture"); entry.Ref != second {
+		t.Fatalf("forced update lock ref = %q; want %q", entry.Ref, second)
+	}
+}
+
 func TestUpdateInstallsExactlyCheckedCommitWhenBranchMoves(t *testing.T) {
 	repository, first, second := createGitFixture(t)
 	project, home := updateTestDirectories(t)

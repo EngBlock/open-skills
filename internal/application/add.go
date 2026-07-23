@@ -25,6 +25,7 @@ type addOptions struct {
 	SkillPaths             []string
 	List                   bool
 	Yes                    bool
+	Force                  bool
 	Replace                bool
 	All                    bool
 	FullDepth              bool
@@ -258,6 +259,25 @@ func runAdd(invocation Invocation, arguments []string) int {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
 	}
+	localChanges := []localChange{}
+	lockPath, lockVersion := installationLockLocation(scope, project, home)
+	installationState, err := state.Read(lockPath, lockVersion)
+	if err != nil {
+		_, _ = fmt.Fprintf(invocation.Stderr, "read installation state: %v\n", err)
+		return 1
+	}
+	for _, skill := range selected {
+		changes, changeErr := installationLocalChanges(skill.Name, installationState.Entry(skill.Name), scope, project, home, agents, options.Copy, options.Subagents, skill.Path)
+		if changeErr != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "inspect installed %s: %v\n", skill.Name, changeErr)
+			return 1
+		}
+		localChanges = append(localChanges, changes...)
+	}
+	if err := authorizeLocalChanges(invocation, localChanges, options.Force); err != nil {
+		_, _ = fmt.Fprintln(invocation.Stderr, err)
+		return 1
+	}
 	installSelected := func() error {
 		for _, skill := range selected {
 			skillProvenance := provenance
@@ -310,6 +330,8 @@ func parseAddOptions(arguments []string) (string, addOptions, error) {
 			options.Global = true
 		case "-y", "--yes":
 			options.Yes = true
+		case "-f", "--force":
+			options.Force = true
 		case "--replace":
 			options.Replace = true
 		case "-l", "--list":
@@ -929,10 +951,15 @@ func installLocalSkill(skill localSkill, provenance installationProvenance, scop
 		}
 		skillPath = filepath.ToSlash(relative)
 	}
+	recordedSubagents := recordedEveTargets(installedAgents, subagents)
+	placements, err := captureInstalledPlacements(skill.Name, scope, project, home, installedAgents, copyMode, recordedSubagents, needsCanonical)
+	if err != nil {
+		return err
+	}
 	if err := document.RecordInstallation(skill.Name, state.InstallationRecord{
 		Source: provenance.Identity, SourceURL: provenance.URL, SourceType: provenance.Type,
 		Ref: provenance.Ref, SkillPath: skillPath, InstalledContentHash: hash, SkillFolderHash: folderHash, OwnedFiles: owned,
-		Agents: installedAgents, Subagents: recordedEveTargets(installedAgents, subagents),
+		InstalledPlacements: placements, Agents: installedAgents, Subagents: recordedSubagents,
 	}); err != nil {
 		return err
 	}

@@ -225,6 +225,118 @@ func TestSupportedStateRoundTripPreservesSafeUnknownFields(t *testing.T) {
 	}
 }
 
+func TestInstalledPlacementsRoundTripAndValidate(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "skills-lock.json")
+	document, err := Read(path, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := map[string]InstalledPlacement{
+		"canonical": {Kind: "canonical", Paths: map[string]InstalledPathState{
+			"SKILL.md": {Kind: "file", Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Executable: true},
+		}},
+		"agent:claude-code": {Kind: "link", LinkTarget: "canonical"},
+		"eve:research": {Kind: "copy", Paths: map[string]InstalledPathState{
+			"references": {Kind: "directory"},
+		}},
+	}
+	if err := document.RecordInstallation("placed", InstallationRecord{
+		Source: "source", SourceType: "local", InstalledContentHash: "content", OwnedFiles: []string{"SKILL.md"},
+		InstalledPlacements: manifest, Agents: []string{"claude-code", "eve"}, Subagents: []string{"research"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := document.Write(path); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := Read(path, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := restored.Entry("placed")
+	if entry == nil || !reflect.DeepEqual(entry.OwnedFiles, []string{"SKILL.md"}) || !reflect.DeepEqual(entry.InstalledPlacements, manifest) {
+		t.Fatalf("restored native ownership metadata = %#v", entry)
+	}
+	if !restored.RetainInstallationPlacements("placed", []string{"eve"}, []string{"research"}) {
+		t.Fatal("placement retention failed")
+	}
+	entry = restored.Entry("placed")
+	if _, exists := entry.InstalledPlacements["agent:claude-code"]; exists {
+		t.Fatalf("removed agent manifest survived: %#v", entry.InstalledPlacements)
+	}
+	if _, exists := entry.InstalledPlacements["canonical"]; !exists {
+		t.Fatalf("canonical manifest was removed: %#v", entry.InstalledPlacements)
+	}
+	if _, exists := entry.InstalledPlacements["eve:research"]; !exists {
+		t.Fatalf("retained Eve manifest was removed: %#v", entry.InstalledPlacements)
+	}
+}
+
+func TestGlobalNativePlacementMetadataSupportsPartialRemoval(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".skill-lock.json")
+	document, err := Read(path, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := map[string]InstalledPlacement{
+		"canonical": {Kind: "canonical", Paths: map[string]InstalledPathState{
+			"SKILL.md": {Kind: "file", Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		}},
+		"agent:claude-code": {Kind: "copy", Paths: map[string]InstalledPathState{
+			"SKILL.md": {Kind: "file", Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		}},
+		"agent:continue": {Kind: "copy", Paths: map[string]InstalledPathState{
+			"SKILL.md": {Kind: "file", Hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		}},
+	}
+	if err := document.RecordInstallation("placed", InstallationRecord{
+		Source: "source", SourceURL: "source", SourceType: "local", InstalledContentHash: "content",
+		OwnedFiles: []string{"SKILL.md"}, InstalledPlacements: manifest, Agents: []string{"claude-code", "continue"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !document.RetainInstallationPlacements("placed", []string{"continue"}, nil) {
+		t.Fatal("global native placement retention failed")
+	}
+	entry := document.Entry("placed")
+	if entry == nil || !reflect.DeepEqual(entry.Agents, []string{"continue"}) {
+		t.Fatalf("retained global agents = %#v", entry)
+	}
+	if _, exists := entry.InstalledPlacements["agent:claude-code"]; exists {
+		t.Fatalf("removed global copy manifest survived: %#v", entry.InstalledPlacements)
+	}
+	if _, exists := entry.InstalledPlacements["agent:continue"]; !exists {
+		t.Fatalf("retained global copy manifest was removed: %#v", entry.InstalledPlacements)
+	}
+}
+
+func TestInstalledPlacementsRejectMalformedNativeMetadata(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		manifest string
+	}{
+		{name: "traversal", manifest: `{"canonical":{"kind":"canonical","paths":{"../escape":{"kind":"file","hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}}}`},
+		{name: "bad hash", manifest: `{"canonical":{"kind":"canonical","paths":{"SKILL.md":{"kind":"file","hash":"short"}}}}`},
+		{name: "bad link", manifest: `{"agent:claude-code":{"kind":"link","linkTarget":"elsewhere"}}`},
+		{name: "bad id", manifest: `{"agent:unknown":{"kind":"copy","paths":{"SKILL.md":{"kind":"file","hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}}}`},
+		{name: "empty paths", manifest: `{"canonical":{"kind":"canonical","paths":{}}}`},
+		{name: "Windows volume path", manifest: `{"canonical":{"kind":"canonical","paths":{"C:/escape":{"kind":"file","hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}}}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "skills-lock.json")
+			data := `{"version":1,"skills":{"skill":{"source":"source","sourceType":"local","computedHash":"hash","installedPlacements":` + test.manifest + `}}}`
+			if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := Read(path, 1); err == nil {
+				t.Fatal("malformed installedPlacements was accepted")
+			} else if failure, ok := err.(*InspectionError); !ok || failure.Code != ErrorMalformed {
+				t.Fatalf("error = %T %v; want malformed inspection error", err, err)
+			}
+		})
+	}
+}
+
 func TestRecordInstallationClearsStaleEveSubagents(t *testing.T) {
 	document, err := Read(filepath.Join(t.TempDir(), "skills-lock.json"), 1)
 	if err != nil {

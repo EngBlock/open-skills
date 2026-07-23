@@ -24,6 +24,7 @@ type updateOptions struct {
 	Global                 bool
 	Project                bool
 	Yes                    bool
+	Force                  bool
 	Skills                 []string
 	AllowInsecureTransport bool
 	Limits                 resourceLimits
@@ -34,6 +35,13 @@ type updateResult struct {
 	checked int
 	updated int
 	failed  int
+}
+
+type gitUpdateAction struct {
+	name   string
+	entry  state.LockEntry
+	skill  localSkill
+	remove bool
 }
 
 // materializeUpdateSource is a seam for controlled branch-movement tests. A
@@ -126,6 +134,8 @@ func parseUpdateOptions(arguments []string) updateOptions {
 			options.Project = true
 		case "-y", "--yes":
 			options.Yes = true
+		case "-f", "--force":
+			options.Force = true
 		case "--allow-insecure-transport":
 			options.AllowInsecureTransport = true
 		default:
@@ -349,17 +359,16 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 	}
 
 	result := updateResult{checked: len(names)}
+	actions := []gitUpdateAction{}
 	for _, name := range names {
 		entry := snapshot.Lock.Skills[name]
 		skill, found := byPath[entry.SkillPath]
 		if !found {
-			if apply && !options.Yes && promptDeleteMissing(invocation, name, displaySource) {
-				if err := removeInstalledSkill(name, snapshot.Lock, scope, project, home); err != nil {
-					_, _ = fmt.Fprintf(invocation.Stderr, "Remove missing %s: %v\n", name, err)
-					result.failed++
-				}
-			} else {
+			remove := apply && !options.Yes && promptDeleteMissing(invocation, name, displaySource)
+			if !remove {
 				_, _ = fmt.Fprintf(invocation.Stdout, "Missing upstream skill: %s\n", name)
+			} else {
+				actions = append(actions, gitUpdateAction{name: name, entry: entry, remove: true})
 			}
 			continue
 		}
@@ -373,11 +382,38 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 			continue
 		}
 		_, _ = fmt.Fprintf(invocation.Stdout, "Update available: %s (%s)\n", name, workspace.Commit)
-		if !apply {
+		if apply {
+			actions = append(actions, gitUpdateAction{name: name, entry: entry, skill: skill})
+		}
+	}
+	if !apply || len(actions) == 0 {
+		return result
+	}
+	localChanges := []localChange{}
+	for _, action := range actions {
+		changes, err := updateActionLocalChanges(action, snapshot, scope, project, home)
+		if err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Inspect installed %s: %v\n", action.name, err)
+			result.failed++
+			return result
+		}
+		localChanges = append(localChanges, changes...)
+	}
+	if err := authorizeLocalChanges(invocation, localChanges, options.Force); err != nil {
+		_, _ = fmt.Fprintln(invocation.Stderr, err)
+		result.failed++
+		return result
+	}
+	for _, action := range actions {
+		if action.remove {
+			if err := removeInstalledSkill(action.name, snapshot.Lock, scope, project, home); err != nil {
+				_, _ = fmt.Fprintf(invocation.Stderr, "Remove missing %s: %v\n", action.name, err)
+				result.failed++
+			}
 			continue
 		}
-		if err := refreshCheckedSkill(skill, entry, git, workspace, snapshot, scope, project, home); err != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Update %s: %v\n", name, err)
+		if err := refreshCheckedSkill(action.skill, action.entry, git, workspace, snapshot, scope, project, home); err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Update %s: %v\n", action.name, err)
 			result.failed++
 			continue
 		}
@@ -418,6 +454,18 @@ func checkedSkillChanged(entry state.LockEntry, scope state.Scope, workspace git
 		return treeHash != entry.SkillFolderHash, nil
 	}
 	return contentHash != entry.SkillFolderHash, nil
+}
+
+func updateActionLocalChanges(action gitUpdateAction, snapshot state.Snapshot, scope state.Scope, project, home string) ([]localChange, error) {
+	agents := append([]string(nil), action.entry.Agents...)
+	if len(agents) == 0 {
+		agents = installedAgents(snapshot, action.name)
+	}
+	if action.remove {
+		return removalLocalChanges(action.name, &action.entry, scope, project, home, agents, len(agents) == 0)
+	}
+	copyMode := copiedPlacementExists(action.name, agents, scope, project, home)
+	return installationLocalChanges(action.name, &action.entry, scope, project, home, agents, copyMode, action.entry.Subagents, "")
 }
 
 func refreshCheckedSkill(skill localSkill, entry state.LockEntry, source gitSource, workspace gitWorkspace, snapshot state.Snapshot, scope state.Scope, project, home string) error {
@@ -537,6 +585,7 @@ func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names
 		byName[skill.Name] = skill
 	}
 	result := updateResult{checked: len(names)}
+	actions := []gitUpdateAction{}
 	for _, name := range names {
 		entry := snapshot.Lock.Skills[name]
 		skill, found := byName[name]
@@ -557,15 +606,35 @@ func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names
 			continue
 		}
 		_, _ = fmt.Fprintf(invocation.Stdout, "Update available: %s\n", name)
-		if !apply {
-			continue
+		if apply {
+			actions = append(actions, gitUpdateAction{name: name, entry: entry, skill: skill})
 		}
-		agents := entry.Agents
+	}
+	if !apply || len(actions) == 0 {
+		return result
+	}
+	localChanges := []localChange{}
+	for _, action := range actions {
+		changes, err := updateActionLocalChanges(action, snapshot, scope, project, home)
+		if err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Inspect installed %s: %v\n", action.name, err)
+			result.failed++
+			return result
+		}
+		localChanges = append(localChanges, changes...)
+	}
+	if err := authorizeLocalChanges(invocation, localChanges, options.Force); err != nil {
+		_, _ = fmt.Fprintln(invocation.Stderr, err)
+		result.failed++
+		return result
+	}
+	for _, action := range actions {
+		agents := action.entry.Agents
 		if len(agents) == 0 {
-			agents = installedAgents(snapshot, skill.Name)
+			agents = installedAgents(snapshot, action.skill.Name)
 		}
-		if err := installLocalSkill(skill, installationProvenance{Identity: provider.identity, URL: credentialFreeSource(urls[name]), Type: entry.SourceType}, scope, scopeBase(scope, project, home), project, home, agents, copiedPlacementExists(skill.Name, agents, scope, project, home), entry.Subagents); err != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Update %s: %v\n", name, err)
+		if err := installLocalSkill(action.skill, installationProvenance{Identity: provider.identity, URL: credentialFreeSource(urls[action.name]), Type: action.entry.SourceType}, scope, scopeBase(scope, project, home), project, home, agents, copiedPlacementExists(action.skill.Name, agents, scope, project, home), action.entry.Subagents); err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Update %s: %v\n", action.name, err)
 			result.failed++
 			continue
 		}

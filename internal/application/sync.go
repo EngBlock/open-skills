@@ -79,6 +79,7 @@ func runSync(invocation Invocation, arguments []string) int {
 		return 1
 	}
 	hasReplacement := false
+	localChanges := []localChange{}
 	for _, skill := range toInstall {
 		provenance := installationProvenance{Identity: skill.Package, URL: skill.Package, Type: "node_modules"}
 		replacement, err := authorizeSourceReplacement(invocation, skill.Name, lock.Entry(skill.Name), provenance, project, options.Replace)
@@ -87,6 +88,16 @@ func runSync(invocation Invocation, arguments []string) int {
 			return 1
 		}
 		hasReplacement = hasReplacement || replacement
+		changes, changeErr := installationLocalChanges(skill.Name, lock.Entry(skill.Name), state.Project, project, "", agents, false, nil, skill.Path)
+		if changeErr != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Inspect installed %s: %v\n", skill.Name, changeErr)
+			return 1
+		}
+		localChanges = append(localChanges, changes...)
+	}
+	if err := authorizeLocalChanges(invocation, localChanges, options.Force); err != nil {
+		_, _ = fmt.Fprintln(invocation.Stderr, err)
+		return 1
 	}
 	syncSelected := func() error {
 		for _, skill := range toInstall {
@@ -407,7 +418,7 @@ func installRecordedSkill(skill localSkill, source, sourceType, project string, 
 	}
 	return recordAndWrite(lock, lockPath, skill.Name, state.InstallationRecord{
 		Source: source, SourceType: sourceType, InstalledContentHash: hash, OwnedFiles: owned,
-		Agents: actual.Agents, Subagents: recordedEveTargets(actual.Agents, subagents),
+		InstalledPlacements: actual.InstalledPlacements, Agents: actual.Agents, Subagents: recordedEveTargets(actual.Agents, subagents),
 	})
 }
 

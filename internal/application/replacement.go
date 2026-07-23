@@ -38,7 +38,7 @@ func authorizeSourceReplacement(invocation Invocation, skillName string, entry *
 	if explicitlyAllowed {
 		return true, nil
 	}
-	if !invocation.Interactive {
+	if !invocation.Interactive || runningInAgent() {
 		return false, fmt.Errorf("%s is installed from a different source; re-run with --replace to authorize replacement", sanitizeHuman(skillName))
 	}
 	_, _ = fmt.Fprintf(invocation.Stdout, "Installed source (%s): %s\n", sanitizeHuman(entry.SourceType), displaySourceIdentity(entry.SourceType, entry.Source))

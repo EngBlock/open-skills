@@ -56,7 +56,7 @@ is likewise preflighted before that source is changed. Local file/byte/count
 behavior stays compatible, while full-depth traversal always retains its finite
 ceiling.
 
-## D07: provenance-safe replacement
+## D07: provenance and local-content-safe replacement
 
 An installed skill may be reinstalled or updated from the same credential-free,
 normalized source identity without additional authorization. Add and sync
@@ -66,10 +66,24 @@ automation unless `--replace` is passed explicitly; `--yes` does not imply that
 authorization. Interactive replacement displays the sanitized installed and
 incoming source types and identities before asking for confirmation.
 
+Native installs also record a portable owned-path manifest for each canonical,
+copied, linked, and Eve placement. Add, replacement, update, sync, and removal
+compare every affected placement before mutation, including independent copies
+across multiple agent targets. Changed, added, deleted, executable-mode-changed,
+and retargeted linked paths are reported without following unexpected links.
+
+A terminal user sees the affected paths and must confirm discarding local work.
+Automation must pass `--force`; `--yes` never grants this authorization. Source
+replacement remains a separate decision, so an unattended operation with both
+provenance and content conflicts requires both `--replace` and `--force`.
+Legacy installations without enough native ownership metadata fail closed when
+their current content cannot be verified.
+
 Rejected replacements leave content, placements, and lock state unchanged.
 Authorized replacements snapshot affected placements and restore them when a
-placement or atomic lock write fails. The broader crash-recovery and durable
-journal guarantees remain assigned to the later transaction milestone.
+placement or atomic lock write fails. The broader crash-recovery, durable journal,
+and advisory-lock guarantees remain assigned to the later D08 transaction
+milestone.
 
 ## D09: safe existing-state inspection
 

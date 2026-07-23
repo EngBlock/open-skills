@@ -2,6 +2,8 @@ package compatibility
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,7 +13,9 @@ const priorProvenanceSkill = "---\nname: provenance-skill\ndescription: prior so
 const replacementProvenanceSkill = "---\nname: provenance-skill\ndescription: replacement source\n---\n# replacement\n"
 
 func provenanceLock(source string) []byte {
-	return []byte(`{"version":1,"skills":{"provenance-skill":{"source":` + quoteFixtureJSON(source) + `,"sourceType":"local","computedHash":"prior-hash","installedContentHash":"prior-hash","ownedFiles":["SKILL.md"],"agents":["universal"]}}}`)
+	contentHash := sha256.Sum256([]byte("SKILL.md" + priorProvenanceSkill))
+	fileHash := sha256.Sum256([]byte(priorProvenanceSkill))
+	return []byte(fmt.Sprintf(`{"version":1,"skills":{"provenance-skill":{"source":%s,"sourceType":"local","computedHash":"%x","installedContentHash":"%x","ownedFiles":["SKILL.md"],"agents":["universal"],"installedPlacements":{"canonical":{"kind":"canonical","paths":{"SKILL.md":{"kind":"file","hash":"%x"}}}}}}}`, quoteFixtureJSON(source), contentHash, contentHash, fileHash))
 }
 
 func quoteFixtureJSON(value string) string {
@@ -117,7 +121,7 @@ func TestNativeAddReplaceRollsBackContentAndLockWhenPlacementFails(t *testing.T)
 		FileFixture{Root: ProjectRoot, Path: ".pi", Data: []byte("placement obstruction")},
 	)
 	observation, err := (Harness{}).Run(context.Background(), buildShellTarget(t), Scenario{
-		Args:    []string{"add", "{{temp}}/replacement", "--agent", "universal", "claude-code", "pi", "--copy", "--replace", "--yes"},
+		Args:    []string{"add", "{{temp}}/replacement", "--agent", "universal", "claude-code", "pi", "--copy", "--replace", "--force", "--yes"},
 		Files:   fixtures,
 		Offline: true,
 	})

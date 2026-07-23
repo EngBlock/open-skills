@@ -17,6 +17,7 @@ type removeOptions struct {
 	Agents []string
 	Skills []string
 	Yes    bool
+	Force  bool
 	All    bool
 }
 
@@ -76,6 +77,20 @@ func runRemove(invocation Invocation, arguments []string) int {
 		_, _ = fmt.Fprintln(invocation.Stdout, "No skills found to remove.")
 		return 0
 	}
+	localChanges := []localChange{}
+	for _, skill := range selected {
+		changes, changeErr := removalLocalChanges(skill.Name, snapshot.Lock.Entry(skill.Name), scope, project, home, targetAgents, allAgents)
+		if changeErr != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Inspect installed %s: %v\n", skill.Name, changeErr)
+			return 1
+		}
+		localChanges = append(localChanges, changes...)
+	}
+	if err := authorizeLocalChanges(invocation, localChanges, options.Force); err != nil {
+		_, _ = fmt.Fprintln(invocation.Stderr, err)
+		return 1
+	}
+
 	if !options.Yes {
 		_, _ = fmt.Fprintln(invocation.Stdout, "Skills to remove:")
 		for _, skill := range selected {
@@ -123,6 +138,8 @@ func parseRemoveOptions(arguments []string) (removeOptions, error) {
 			options.Global = true
 		case "-y", "--yes":
 			options.Yes = true
+		case "-f", "--force":
+			options.Force = true
 		case "--all":
 			options.All = true
 			options.Yes = true
@@ -271,6 +288,14 @@ func selectRemoveSkills(invocation Invocation, candidates []removalCandidate, op
 	return selected, false, nil
 }
 
+func removalIsFinal(name string, entry *state.LockEntry, scope state.Scope, project, home string, targetAgents []string, allAgents bool) bool {
+	if entry != nil && len(entry.Agents) > 0 {
+		final := allAgents || len(subtractStrings(entry.Agents, targetAgents)) == 0
+		return final && !hasRemainingPlacement(name, scope, project, home, targetAgents)
+	}
+	return allAgents && !hasRemainingPlacement(name, scope, project, home, targetAgents)
+}
+
 func removeSkill(name string, document *state.Document, scope state.Scope, project, home string, targetAgents []string, allAgents bool) error {
 	lockName, entry := document.EntryWithName(name)
 	canonicalBase := project
@@ -280,7 +305,7 @@ func removeSkill(name string, document *state.Document, scope state.Scope, proje
 	canonical := filepath.Join(canonicalBase, ".agents", "skills", state.SanitizeName(name))
 	for _, agent := range targetAgents {
 		for _, placement := range removalAgentPaths(agent, name, scope, project, home) {
-			if sameLocalPath(placement, canonical) {
+			if sameLocalPath(placement, canonical) || pathSharedWithRemainingAgent(placement, name, scope, project, home, targetAgents, installedAgentOwnership(entry)) {
 				continue
 			}
 			if err := os.RemoveAll(placement); err != nil {
@@ -299,15 +324,9 @@ func removeSkill(name string, document *state.Document, scope state.Scope, proje
 			remainingSubagents = append([]string(nil), entry.Subagents...)
 		}
 	}
-	final := allAgents
-	if !final && entry != nil && len(entry.Agents) > 0 && len(remainingAgents) == 0 {
-		final = true
-	}
 	// A surviving noncanonical directory is an independently usable placement.
 	// Keep canonical content and state even if older lock data did not record it.
-	if final && hasRemainingPlacement(name, scope, project, home, targetAgents) {
-		final = false
-	}
+	final := removalIsFinal(name, entry, scope, project, home, targetAgents, allAgents)
 	if final {
 		if err := os.RemoveAll(canonical); err != nil {
 			return err
@@ -375,6 +394,18 @@ func removalAgentPaths(agent, name string, scope state.Scope, project, home stri
 }
 
 func hasRemainingPlacement(name string, scope state.Scope, project, home string, removedAgents []string) bool {
+	removedPaths := []string{}
+	for _, agent := range removedAgents {
+		removedPaths = append(removedPaths, removalAgentPaths(agent, name, scope, project, home)...)
+	}
+	isRemovedAlias := func(candidate string) bool {
+		for _, removed := range removedPaths {
+			if sameLocalPath(candidate, removed) {
+				return true
+			}
+		}
+		return false
+	}
 	for _, agent := range state.AgentIDs() {
 		if contains(removedAgents, agent) || agent == "eve" {
 			continue
@@ -383,13 +414,14 @@ func hasRemainingPlacement(name string, scope state.Scope, project, home string,
 		if !supported || universal {
 			continue
 		}
-		if _, err := os.Lstat(filepath.Join(base, state.SanitizeName(name))); err == nil {
+		candidate := filepath.Join(base, state.SanitizeName(name))
+		if _, err := os.Lstat(candidate); err == nil && !isRemovedAlias(candidate) {
 			return true
 		}
 	}
 	if scope == state.Project && !contains(removedAgents, "eve") {
 		for _, path := range removalAgentPaths("eve", name, scope, project, home) {
-			if _, err := os.Lstat(path); err == nil {
+			if _, err := os.Lstat(path); err == nil && !isRemovedAlias(path) {
 				return true
 			}
 		}

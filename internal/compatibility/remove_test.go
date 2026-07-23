@@ -2,7 +2,9 @@ package compatibility
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,12 +13,26 @@ import (
 const removeSkill = "---\nname: owned-skill\ndescription: remove fixture\n---\n# owned\n"
 
 func projectRemoveLock(agents []string) []byte {
+	contentHash := sha256.Sum256([]byte("SKILL.md" + removeSkill))
+	fileHash := sha256.Sum256([]byte(removeSkill))
+	placements := map[string]any{
+		"canonical": map[string]any{"kind": "canonical", "paths": map[string]any{"SKILL.md": map[string]any{"kind": "file", "hash": fmt.Sprintf("%x", fileHash)}}},
+	}
+	for _, agent := range agents {
+		switch agent {
+		case "claude-code":
+			placements["agent:claude-code"] = map[string]any{"kind": "link", "linkTarget": "canonical"}
+		case "cursor":
+			placements["agent:cursor"] = map[string]any{"kind": "copy", "paths": map[string]any{"SKILL.md": map[string]any{"kind": "file", "hash": fmt.Sprintf("%x", fileHash)}}}
+		}
+	}
 	encoded, _ := json.Marshal(map[string]any{
 		"version": 1,
 		"skills": map[string]any{
 			"owned-skill": map[string]any{
-				"source": "fixture", "sourceType": "local", "computedHash": "fixture-hash",
-				"installedContentHash": "fixture-hash", "ownedFiles": []string{"SKILL.md"}, "agents": agents,
+				"source": "fixture", "sourceType": "local", "computedHash": fmt.Sprintf("%x", contentHash),
+				"installedContentHash": fmt.Sprintf("%x", contentHash), "ownedFiles": []string{"SKILL.md"}, "agents": agents,
+				"installedPlacements": placements,
 			},
 		},
 	})
@@ -28,7 +44,7 @@ func TestNativeRemoveKeepsCanonicalAndOtherOwnedPlacement(t *testing.T) {
 		Args: []string{"remove", "owned-skill", "--agent", "claude-code", "--yes"},
 		Files: []FileFixture{
 			{Root: ProjectRoot, Path: ".agents/skills/owned-skill/SKILL.md", Data: []byte(removeSkill)},
-			{Root: ProjectRoot, Path: ".claude/skills/owned-skill", Symlink: "../../../.agents/skills/owned-skill"},
+			{Root: ProjectRoot, Path: ".claude/skills/owned-skill", Symlink: "../../.agents/skills/owned-skill"},
 			{Root: ProjectRoot, Path: ".cursor/skills/owned-skill/SKILL.md", Data: []byte(removeSkill)},
 			{Root: ProjectRoot, Path: "skills-lock.json", Data: projectRemoveLock([]string{"claude-code", "cursor"})},
 		},
@@ -67,7 +83,7 @@ func TestNativeRemoveAllDeletesFinalProjectState(t *testing.T) {
 		Args: []string{"rm", "--all"},
 		Files: []FileFixture{
 			{Root: ProjectRoot, Path: ".agents/skills/owned-skill/SKILL.md", Data: []byte(removeSkill)},
-			{Root: ProjectRoot, Path: ".claude/skills/owned-skill", Symlink: "../../../.agents/skills/owned-skill"},
+			{Root: ProjectRoot, Path: ".claude/skills/owned-skill", Symlink: "../../.agents/skills/owned-skill"},
 			{Root: ProjectRoot, Path: "skills-lock.json", Data: projectRemoveLock([]string{"claude-code"})},
 		},
 		Offline: true,
@@ -94,12 +110,16 @@ func TestNativeRemoveAllDeletesFinalProjectState(t *testing.T) {
 }
 
 func TestNativeRemoveSupportsSkillFlagInteractiveSelectionAndGlobalScope(t *testing.T) {
+	contentHash := sha256.Sum256([]byte("SKILL.md" + removeSkill))
+	fileHash := sha256.Sum256([]byte(removeSkill))
 	globalLock, _ := json.Marshal(map[string]any{
 		"version": 3,
 		"skills": map[string]any{
 			"owned-skill": map[string]any{
 				"source": "fixture", "sourceType": "local", "sourceUrl": "fixture", "skillFolderHash": "fixture-hash",
 				"installedAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z",
+				"installedContentHash": fmt.Sprintf("%x", contentHash), "ownedFiles": []string{"SKILL.md"},
+				"installedPlacements": map[string]any{"canonical": map[string]any{"kind": "canonical", "paths": map[string]any{"SKILL.md": map[string]any{"kind": "file", "hash": fmt.Sprintf("%x", fileHash)}}}},
 			},
 		},
 	})

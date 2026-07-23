@@ -5,10 +5,12 @@ package state
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -51,6 +53,18 @@ func (failure *InspectionError) Unwrap() error {
 	return failure.Cause
 }
 
+type InstalledPathState struct {
+	Kind       string `json:"kind"`
+	Hash       string `json:"hash,omitempty"`
+	Executable bool   `json:"executable,omitempty"`
+}
+
+type InstalledPlacement struct {
+	Kind       string                        `json:"kind"`
+	LinkTarget string                        `json:"linkTarget,omitempty"`
+	Paths      map[string]InstalledPathState `json:"paths,omitempty"`
+}
+
 type LockEntry struct {
 	Source               string
 	SourceURL            string
@@ -60,6 +74,8 @@ type LockEntry struct {
 	ComputedHash         string
 	SkillFolderHash      string
 	InstalledContentHash string
+	OwnedFiles           []string
+	InstalledPlacements  map[string]InstalledPlacement
 	PluginName           string
 	Agents               []string
 	Subagents            []string
@@ -79,6 +95,7 @@ type InstallationRecord struct {
 	InstalledContentHash string
 	SkillFolderHash      string
 	OwnedFiles           []string
+	InstalledPlacements  map[string]InstalledPlacement
 	// Agents records the selected adapter placements in stable registry order.
 	Agents []string
 	// Subagents records Eve placements; an empty value represents the root agent.
@@ -297,6 +314,22 @@ func decodeLockEntry(fields map[string]json.RawMessage, expectedVersion int) (Lo
 			entry.InstalledContentHash = decoded
 		}
 	}
+	if value, exists := fields["ownedFiles"]; exists {
+		if err := json.Unmarshal(value, &entry.OwnedFiles); err != nil {
+			return LockEntry{}, errors.New("ownedFiles must be an array of strings")
+		}
+		if err := validateOwnedFiles(entry.OwnedFiles); err != nil {
+			return LockEntry{}, err
+		}
+	}
+	if value, exists := fields["installedPlacements"]; exists {
+		if err := json.Unmarshal(value, &entry.InstalledPlacements); err != nil || entry.InstalledPlacements == nil {
+			return LockEntry{}, errors.New("installedPlacements must be an object")
+		}
+		if err := validateInstalledPlacements(entry.InstalledPlacements); err != nil {
+			return LockEntry{}, err
+		}
+	}
 	for field, destination := range map[string]*[]string{
 		"agents":    &entry.Agents,
 		"subagents": &entry.Subagents,
@@ -324,6 +357,126 @@ func decodeLockEntry(fields map[string]json.RawMessage, expectedVersion int) (Lo
 		}
 	}
 	return entry, nil
+}
+
+func validateOwnedFiles(files []string) error {
+	seen := make(map[string]bool, len(files))
+	for _, file := range files {
+		if err := validateInstalledRelativePath(file); err != nil {
+			return fmt.Errorf("ownedFiles: %w", err)
+		}
+		if seen[file] {
+			return fmt.Errorf("ownedFiles contains duplicate path %q", file)
+		}
+		seen[file] = true
+	}
+	return nil
+}
+
+func validateInstalledPlacements(placements map[string]InstalledPlacement) error {
+	for id, placement := range placements {
+		if err := validatePlacementID(id); err != nil {
+			return err
+		}
+		switch placement.Kind {
+		case "link":
+			if placement.LinkTarget != "canonical" || len(placement.Paths) != 0 {
+				return fmt.Errorf("installedPlacements.%s link must target canonical and contain no paths", id)
+			}
+		case "canonical", "copy":
+			if placement.LinkTarget != "" || len(placement.Paths) == 0 {
+				return fmt.Errorf("installedPlacements.%s %s must contain paths and no linkTarget", id, placement.Kind)
+			}
+			for relative, state := range placement.Paths {
+				if err := validateInstalledRelativePath(relative); err != nil {
+					return fmt.Errorf("installedPlacements.%s: %w", id, err)
+				}
+				switch state.Kind {
+				case "directory":
+					if state.Hash != "" || state.Executable {
+						return fmt.Errorf("installedPlacements.%s path %q has invalid directory metadata", id, relative)
+					}
+				case "file", "symlink":
+					decoded, err := hex.DecodeString(state.Hash)
+					if err != nil || len(decoded) != 32 {
+						return fmt.Errorf("installedPlacements.%s path %q hash must be a SHA-256 hex string", id, relative)
+					}
+					if state.Kind == "symlink" && state.Executable {
+						return fmt.Errorf("installedPlacements.%s path %q symlink cannot be executable", id, relative)
+					}
+				default:
+					return fmt.Errorf("installedPlacements.%s path %q has invalid kind %q", id, relative, state.Kind)
+				}
+			}
+		default:
+			return fmt.Errorf("installedPlacements.%s has invalid kind %q", id, placement.Kind)
+		}
+	}
+	return nil
+}
+
+func validatePlacementID(id string) error {
+	if id == "canonical" {
+		return nil
+	}
+	if strings.HasPrefix(id, "agent:") && IsAgentID(strings.TrimPrefix(id, "agent:")) {
+		return nil
+	}
+	if strings.HasPrefix(id, "eve:") {
+		name := strings.TrimPrefix(id, "eve:")
+		if name == "root" || name != "" && sanitizeName(name) == name {
+			return nil
+		}
+	}
+	return fmt.Errorf("installedPlacements has invalid logical placement ID %q", id)
+}
+
+func validateInstalledRelativePath(relative string) error {
+	windowsVolume := len(relative) >= 2 && ((relative[0] >= 'A' && relative[0] <= 'Z') || (relative[0] >= 'a' && relative[0] <= 'z')) && relative[1] == ':'
+	if relative == "" || strings.Contains(relative, "\\") || path.IsAbs(relative) || windowsVolume || path.Clean(relative) != relative || relative == "." || relative == ".." || strings.HasPrefix(relative, "../") || strings.IndexFunc(relative, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0 {
+		return fmt.Errorf("path %q must be a clean relative slash path", relative)
+	}
+	return nil
+}
+
+func cloneInstalledPlacements(source map[string]InstalledPlacement) map[string]InstalledPlacement {
+	if source == nil {
+		return nil
+	}
+	result := make(map[string]InstalledPlacement, len(source))
+	for id, placement := range source {
+		paths := make(map[string]InstalledPathState, len(placement.Paths))
+		for relative, state := range placement.Paths {
+			paths[relative] = state
+		}
+		placement.Paths = paths
+		result[id] = placement
+	}
+	return result
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
+func evePlacementIDs(subagents []string) []string {
+	if len(subagents) == 0 {
+		return []string{"eve:root"}
+	}
+	result := make([]string, 0, len(subagents))
+	for _, subagent := range subagents {
+		if subagent == "" {
+			result = append(result, "eve:root")
+		} else {
+			result = append(result, "eve:"+sanitizeName(subagent))
+		}
+	}
+	return result
 }
 
 func requiredString(fields map[string]json.RawMessage, name string) (string, error) {
@@ -479,11 +632,26 @@ func (document *Document) RecordInstallation(name string, record InstallationRec
 	if err := setString("installedContentHash", record.InstalledContentHash); err != nil {
 		return err
 	}
+	if err := validateOwnedFiles(record.OwnedFiles); err != nil {
+		return err
+	}
 	owned, err := json.Marshal(record.OwnedFiles)
 	if err != nil {
 		return err
 	}
 	fields["ownedFiles"] = owned
+	if len(record.InstalledPlacements) == 0 {
+		delete(fields, "installedPlacements")
+	} else {
+		if err := validateInstalledPlacements(record.InstalledPlacements); err != nil {
+			return err
+		}
+		encoded, err := json.Marshal(record.InstalledPlacements)
+		if err != nil {
+			return err
+		}
+		fields["installedPlacements"] = encoded
+	}
 	for field, values := range map[string][]string{
 		"agents":    record.Agents,
 		"subagents": record.Subagents,
@@ -504,6 +672,7 @@ func (document *Document) RecordInstallation(name string, record InstallationRec
 		Source: record.Source, SourceURL: record.SourceURL, SourceType: record.SourceType,
 		Ref: record.Ref, SkillPath: record.SkillPath, ComputedHash: record.InstalledContentHash,
 		SkillFolderHash: record.SkillFolderHash, InstalledContentHash: record.InstalledContentHash,
+		OwnedFiles: append([]string(nil), record.OwnedFiles...), InstalledPlacements: cloneInstalledPlacements(record.InstalledPlacements),
 		Agents: record.Agents, Subagents: record.Subagents, raw: fields,
 	}
 	return nil
@@ -575,12 +744,13 @@ func (document *Document) Entry(name string) *LockEntry {
 	return entry
 }
 
-// RetainInstallationPlacements updates native project placement metadata after
-// a partial removal. Older lock entries have no placement metadata, so their
-// unknown shape is retained unchanged rather than inventing ownership claims.
+// RetainInstallationPlacements updates native placement metadata after a
+// partial removal. Older global lock entries may use the same field names for
+// unrelated extensions, so version 3 state is changed only when the native
+// installed-placement manifest proves ownership of those fields.
 func (document *Document) RetainInstallationPlacements(name string, agents, subagents []string) bool {
 	key, entry := document.EntryWithName(name)
-	if entry == nil || document.Version != 1 || len(entry.Agents) == 0 {
+	if entry == nil || len(entry.Agents) == 0 || (document.Version != 1 && len(entry.InstalledPlacements) == 0) {
 		return false
 	}
 	fields := cloneRawMap(entry.raw)
@@ -601,6 +771,27 @@ func (document *Document) RetainInstallationPlacements(name string, agents, suba
 	}
 	entry.Agents = agents
 	entry.Subagents = append([]string(nil), subagents...)
+	if len(entry.InstalledPlacements) > 0 {
+		retained := make(map[string]InstalledPlacement)
+		for id, placement := range entry.InstalledPlacements {
+			keep := id == "canonical"
+			if strings.HasPrefix(id, "agent:") {
+				keep = containsString(agents, strings.TrimPrefix(id, "agent:"))
+			}
+			if strings.HasPrefix(id, "eve:") {
+				keep = containsString(agents, "eve") && containsString(evePlacementIDs(subagents), id)
+			}
+			if keep {
+				retained[id] = placement
+			}
+		}
+		entry.InstalledPlacements = retained
+		encoded, err := json.Marshal(retained)
+		if err != nil {
+			return false
+		}
+		fields["installedPlacements"] = encoded
+	}
 	entry.raw = fields
 	document.Skills[key] = *entry
 	return true

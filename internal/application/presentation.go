@@ -49,6 +49,7 @@ Update Options:
   -g, --global           Update global skills only
   -p, --project          Update project skills only
   -y, --yes              Skip scope prompt (auto-detect: project if in a project, else global)
+  -f, --force            Authorize overwriting locally modified installed content
   --max-file-bytes <n>   Remote per-file limit (default: 10485760)
   --max-total-bytes <n>  Remote total-content limit (default: 104857600)
   --max-files <n>        Remote file-count limit (default: 5000)
@@ -68,6 +69,7 @@ Add Options:
   --skill-path <paths>   Select exact repository-relative skill directories
   -l, --list             List available skills in the repository without installing
   -y, --yes              Skip ordinary confirmation prompts
+  -f, --force            Authorize overwriting locally modified installed content
   --replace              Authorize replacing a skill installed from another source
   --copy                 Copy files instead of symlinking to agent directories
   --subagent <names>     Install to Eve subagents (use 'root' for the root agent)
@@ -105,10 +107,12 @@ Remove Options:
   -a, --agent <agents>   Remove from specific agents (use '*' for all agents)
   -s, --skill <skills>   Specify skills to remove (use '*' for all skills)
   -y, --yes              Skip confirmation prompts
+  -f, --force            Authorize deleting locally modified installed content
   --all                  Shorthand for --skill '*' --agent '*' -y
 ` + "  \n" + `Experimental Sync Options:
   -a, --agent <agents>   Specify agents to install to (use '*' for all agents)
   -y, --yes              Skip ordinary confirmation prompts
+  -f, --force            Reinstall unchanged skills and authorize local-content loss
   --replace              Authorize replacing a skill installed from another source
 
 List Options:
@@ -160,6 +164,7 @@ Options:
   -a, --agent        Remove from specific agents (use '*' for all agents)
   -s, --skill        Specify skills to remove (use '*' for all skills)
   -y, --yes          Skip confirmation prompts
+  -f, --force        Authorize deleting locally modified installed content
   --all              Shorthand for --skill '*' --agent '*' -y
 
 Examples:
