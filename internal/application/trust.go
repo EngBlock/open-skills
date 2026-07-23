@@ -43,6 +43,9 @@ func runTrustList(invocation Invocation, store *truststore.Store, arguments []st
 		return 1
 	}
 	approvals := store.Approvals()
+	for index := range approvals {
+		approvals[index].Source = credentialFreeSource(approvals[index].Source)
+	}
 	if jsonOutput {
 		output := struct {
 			Version   int                   `json:"version"`
@@ -97,12 +100,13 @@ func runTrustRevoke(invocation Invocation, store *truststore.Store, arguments []
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
 	}
+	displayIdentity := credentialFreeSource(identity)
 	if !commitProvided && !yes {
 		if !invocation.Interactive {
 			_, _ = fmt.Fprintln(invocation.Stderr, "Broad trust revocation requires confirmation; re-run with --yes.")
 			return 1
 		}
-		confirmed, confirmErr := confirmBroadTrust(invocation, fmt.Sprintf("Revoke every trusted commit for %s? [y/N] ", identity))
+		confirmed, confirmErr := confirmBroadTrust(invocation, fmt.Sprintf("Revoke every trusted commit for %s? [y/N] ", displayIdentity))
 		if confirmErr != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Read trust confirmation: %v\n", confirmErr)
 			return 1
@@ -120,9 +124,9 @@ func runTrustRevoke(invocation Invocation, store *truststore.Store, arguments []
 	if removed == 0 {
 		_, _ = fmt.Fprintln(invocation.Stdout, "No matching trust approval.")
 	} else if !commitProvided {
-		_, _ = fmt.Fprintf(invocation.Stdout, "Revoked %d trust approval(s) for %s.\n", removed, identity)
+		_, _ = fmt.Fprintf(invocation.Stdout, "Revoked %d trust approval(s) for %s.\n", removed, displayIdentity)
 	} else {
-		_, _ = fmt.Fprintf(invocation.Stdout, "Revoked trust for %s at %s.\n", identity, commit)
+		_, _ = fmt.Fprintf(invocation.Stdout, "Revoked trust for %s at %s.\n", displayIdentity, commit)
 	}
 	return 0
 }

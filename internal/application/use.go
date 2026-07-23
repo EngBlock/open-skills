@@ -24,6 +24,7 @@ type useOptions struct {
 	FullDepth                      bool
 	Trust                          bool
 	DangerouslyAcceptOpenClawRisks bool
+	AllowInsecureTransport         bool
 	Help                           bool
 	Limits                         resourceLimits
 }
@@ -52,7 +53,11 @@ func runUse(invocation Invocation, arguments []string) int {
 		return 1
 	}
 	if len(source) > 1 {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Expected one source, received %d: %s\n", len(source), strings.Join(source, ", "))
+		displaySources := make([]string, 0, len(source))
+		for _, value := range source {
+			displaySources = append(displaySources, credentialFreeSource(value))
+		}
+		_, _ = fmt.Fprintf(invocation.Stderr, "Expected one source, received %d: %s\n", len(source), strings.Join(displaySources, ", "))
 		return 1
 	}
 
@@ -137,7 +142,7 @@ func runUse(invocation Invocation, arguments []string) int {
 			_, _ = fmt.Fprintln(invocation.Stderr, err)
 			return 1
 		}
-		workspace, err := materializeGitSource(git, options.Limits)
+		workspace, err := materializeGitSourceWithPolicy(git, options.Limits, gitAcquisitionPolicy{AllowInsecureTransport: options.AllowInsecureTransport, Notice: invocation.Stderr})
 		if err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Acquire Git source: %v\n", err)
 			return 1
@@ -174,16 +179,15 @@ func runUse(invocation Invocation, arguments []string) int {
 	}
 	if isRemote {
 		selected.content, err = prepareSkillContentWithBudget(selected.Path, newResourceBudget(options.Limits))
+		if err == nil && isRemoteGit {
+			err = selected.content.rejectLFSPointers()
+		}
 		if err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Use %s: %v\n", selected.Name, err)
 			return 1
 		}
 	}
 	if isRemoteGit {
-		if err := rejectLFSPointers(selected.Path); err != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Use %s: %v\n", selected.Name, err)
-			return 1
-		}
 		relative, err := filepath.Rel(remoteGitRoot, filepath.Join(selected.Path, "SKILL.md"))
 		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 			_, _ = fmt.Fprintln(invocation.Stderr, "Selected Git skill path escapes the acquired source.")
@@ -235,6 +239,8 @@ func parseUseOptions(arguments []string) ([]string, useOptions, []string) {
 			options.FullDepth = true
 		case "--trust":
 			options.Trust = true
+		case "--allow-insecure-transport":
+			options.AllowInsecureTransport = true
 		case "--yes", "-y":
 			errors = append(errors, argument+" does not authorize remote agent trust; use --trust")
 		case "--dangerously-accept-openclaw-risks":
@@ -638,6 +644,8 @@ Options:
   --max-total-bytes <n> Remote total-content limit (default: 104857600)
   --max-files <n>       Remote file-count limit (default: 5000)
   --max-depth <n>       Full-depth traversal ceiling (default: 20)
+  --allow-insecure-transport
+                        Allow plaintext HTTP/Git sources with a warning
   --trust               Approve this exact remote source commit for agent use
   --dangerously-accept-openclaw-risks
                          Allow unverified OpenClaw community skills

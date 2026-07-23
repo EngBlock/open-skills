@@ -16,22 +16,31 @@ Process-level regressions for these rules are labeled `D01` and `D02` in `intern
 
 ## D03-D06: Git-source acquisition
 
-`open-skills add` accepts GitHub/GitLab shorthands and URLs plus generic `file`,
-SSH, and HTTPS Git sources. Plaintext HTTP and `git` transports are rejected;
-HTTP user credentials are never accepted and SSH userinfo is excluded from lock
-metadata.
+`open-skills add`, `use`, `check`, and `update` accept GitHub/GitLab shorthands
+and URLs plus generic `file`, SSH, and HTTPS Git sources. Plaintext HTTP and
+`git` transports are rejected unless the dedicated `--allow-insecure-transport`
+flag is present; authorized plaintext acquisition always prints a warning and
+`--yes` never implies that authorization. HTTP user credentials are never
+accepted and SSH userinfo is excluded from lock metadata.
 
 The native command clones without checkout, resolves one exact commit, and
 extracts that commit with `git archive`. It does not run repository hooks,
-submodules, filters, or scripts. Git LFS pointer content is rejected before
-installation. Acquisition uses a temporary workspace that is removed on both
-success and failure; it keeps no repository cache. Archive extraction accepts
-only regular files, directories, and confined repository links. Remote processing
+submodules, filters, or scripts. Option-like/invalid refs and command-capable
+Git transports are rejected before subprocess launch, and every subprocess uses
+an argument vector without a shell. Git LFS pointer content is rejected before
+installation or update mutation. Acquisition uses a temporary workspace that
+is removed on both success and failure; it keeps no repository cache. Archive
+extraction accepts only regular files, directories, and confined repository links.
+Remote processing
 defaults to 10 MiB per file, 100 MiB of total content, 5,000 files, and 20
 directory levels. `--max-file-bytes`,
 `--max-total-bytes`, `--max-files`, and `--max-depth` accept positive decimal
 values as deliberate finite overrides. The same limits cover well-known HTTPS
-content, remote `use`, and checked updates. Selected add content is validated
+content, remote `use`, and checked updates. System Git first uses the user's
+normal credential helpers, askpass, SSH, proxy, and authentication configuration.
+After an authentication-class failure for GitHub HTTPS only, the executable
+announces and attempts an optional `gh repo clone` fallback; no token or raw
+subprocess output is persisted or printed. Selected add content is validated
 as one aggregate before any installation or lock mutation; each update source
 is likewise preflighted before that source is changed. Local file/byte/count
 behavior stays compatible, while full-depth traversal always retains its finite

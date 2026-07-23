@@ -52,8 +52,8 @@ func TestUpdateInstallsExactlyCheckedCommitWhenBranchMoves(t *testing.T) {
 
 	original := materializeUpdateSource
 	t.Cleanup(func() { materializeUpdateSource = original })
-	materializeUpdateSource = func(source gitSource, limits resourceLimits) (gitWorkspace, error) {
-		workspace, err := materializeGitSource(source, limits)
+	materializeUpdateSource = func(source gitSource, limits resourceLimits, policy gitAcquisitionPolicy) (gitWorkspace, error) {
+		workspace, err := materializeGitSourceWithPolicy(source, limits, policy)
 		if err != nil {
 			return workspace, err
 		}

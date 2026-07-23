@@ -96,10 +96,12 @@ func runList(invocation Invocation, arguments []string) int {
 			item := listJSONSkill{Name: skill.Name, Path: skill.CanonicalPath, Scope: skill.Scope, Agents: displayAgentNames(skill.Agents)}
 			if skill.Lock != nil {
 				if skill.Lock.Source != "" {
-					item.Source = &skill.Lock.Source
+					source := credentialFreeSource(skill.Lock.Source)
+					item.Source = &source
 				}
 				if skill.Lock.SourceURL != "" {
-					item.SourceURL = &skill.Lock.SourceURL
+					sourceURL := credentialFreeSource(skill.Lock.SourceURL)
+					item.SourceURL = &sourceURL
 				}
 				if skill.Lock.SourceType != "" {
 					item.SourceType = &skill.Lock.SourceType
@@ -182,7 +184,7 @@ func writeHumanSkill(invocation Invocation, skill state.InstalledSkill, scope st
 	}
 	source := "local"
 	if skill.Lock != nil && skill.Lock.Source != "" {
-		source = sanitizeHuman(skill.Lock.Source)
+		source = credentialFreeSource(skill.Lock.Source)
 	}
 	agents := displayAgentNames(skill.Agents)
 	agentText := "not linked"

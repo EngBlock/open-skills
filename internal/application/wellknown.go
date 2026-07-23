@@ -74,14 +74,14 @@ func parseWellKnownSource(raw string) (wellKnownSource, bool, error) {
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return wellKnownSource{}, false, nil
 	}
+	if parsed.Hostname() == "github.com" || parsed.Hostname() == "gitlab.com" || strings.HasSuffix(strings.ToLower(parsed.Path), ".git") {
+		return wellKnownSource{}, false, nil
+	}
 	if parsed.User != nil {
 		return wellKnownSource{}, true, errors.New("well-known source URLs must not contain user credentials")
 	}
 	if parsed.Scheme == "http" && !isLoopbackHost(parsed.Hostname()) {
 		return wellKnownSource{}, true, errors.New("well-known sources must use HTTPS")
-	}
-	if parsed.Hostname() == "github.com" || parsed.Hostname() == "gitlab.com" || strings.HasSuffix(strings.ToLower(parsed.Path), ".git") {
-		return wellKnownSource{}, false, nil
 	}
 
 	parsed.RawQuery = ""

@@ -19,17 +19,18 @@ import (
 )
 
 type addOptions struct {
-	Global     bool
-	Agents     []string
-	Skills     []string
-	SkillPaths []string
-	List       bool
-	Yes        bool
-	All        bool
-	FullDepth  bool
-	Copy       bool
-	Subagents  []string
-	Limits     resourceLimits
+	Global                 bool
+	Agents                 []string
+	Skills                 []string
+	SkillPaths             []string
+	List                   bool
+	Yes                    bool
+	All                    bool
+	FullDepth              bool
+	Copy                   bool
+	Subagents              []string
+	AllowInsecureTransport bool
+	Limits                 resourceLimits
 }
 
 type localSkill struct {
@@ -145,7 +146,7 @@ func runAdd(invocation Invocation, arguments []string) int {
 			_, _ = fmt.Fprintln(invocation.Stderr, parseErr)
 			return 1
 		}
-		workspace, err = materializeGitSource(git, options.Limits)
+		workspace, err = materializeGitSourceWithPolicy(git, options.Limits, gitAcquisitionPolicy{AllowInsecureTransport: options.AllowInsecureTransport, Notice: invocation.Stderr})
 		if err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Acquire Git source: %v\n", err)
 			return 1
@@ -211,12 +212,6 @@ func runAdd(invocation Invocation, arguments []string) int {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Install repository links: %v\n", err)
 			return 1
 		}
-		for _, skill := range selected {
-			if err := rejectLFSPointers(skill.Path); err != nil {
-				_, _ = fmt.Fprintf(invocation.Stderr, "Install %s: %v\n", skill.Name, err)
-				return 1
-			}
-		}
 	}
 	// Validate every selected tree before mutating any installation. This makes
 	// an unsafe link in one selection fail the whole command without installing
@@ -228,6 +223,9 @@ func runAdd(invocation Invocation, arguments []string) int {
 	budget := newResourceBudget(contentLimits)
 	for index := range selected {
 		selected[index].content, err = prepareSkillContentWithBudget(selected[index].Path, budget)
+		if err == nil && isGit {
+			err = selected[index].content.rejectLFSPointers()
+		}
 		if err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Install %s: %v\n", selected[index].Name, err)
 			return 1
@@ -296,6 +294,8 @@ func parseAddOptions(arguments []string) (string, addOptions, error) {
 			options.FullDepth = true
 		case "--copy":
 			options.Copy = true
+		case "--allow-insecure-transport":
+			options.AllowInsecureTransport = true
 		case "--subagent":
 			values, next := optionValues(arguments, index)
 			if len(values) == 0 {
@@ -793,6 +793,10 @@ type installationProvenance struct {
 }
 
 func installLocalSkill(skill localSkill, provenance installationProvenance, scope state.Scope, base, project, home string, agents []string, copyMode bool, subagents []string) error {
+	if provenance.Type != "local" {
+		provenance.Identity = credentialFreeSource(provenance.Identity)
+		provenance.URL = credentialFreeSource(provenance.URL)
+	}
 	content := skill.content
 	if content == nil {
 		if err := materializeGitLinkFallbacksForSkills(provenance.Workspace, []localSkill{skill}); err != nil {

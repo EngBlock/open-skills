@@ -53,6 +53,8 @@ Update Options:
   --max-total-bytes <n>  Remote total-content limit (default: 104857600)
   --max-files <n>        Remote file-count limit (default: 5000)
   --max-depth <n>        Full-depth traversal ceiling (default: 20)
+  --allow-insecure-transport
+                         Allow plaintext HTTP/Git sources with a warning
 
 Project:
   experimental_install Restore skills from skills-lock.json
@@ -74,6 +76,8 @@ Add Options:
   --max-total-bytes <n>  Remote total-content limit (default: 104857600)
   --max-files <n>        Remote file-count limit (default: 5000)
   --max-depth <n>        Full-depth traversal ceiling (default: 20)
+  --allow-insecure-transport
+                         Allow plaintext HTTP/Git sources with a warning
 
 Use Options:
   -s, --skill <skill>    Specify the skill to use
@@ -84,6 +88,8 @@ Use Options:
   --max-total-bytes <n>  Remote total-content limit (default: 104857600)
   --max-files <n>        Remote file-count limit (default: 5000)
   --max-depth <n>        Full-depth traversal ceiling (default: 20)
+  --allow-insecure-transport
+                         Allow plaintext HTTP/Git sources with a warning
   --trust                Approve one exact remote source commit for agent use
   --dangerously-accept-openclaw-risks
                          Allow unverified OpenClaw community skills

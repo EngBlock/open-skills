@@ -1,6 +1,7 @@
 package application
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -25,6 +26,15 @@ type skillContentFile struct {
 	relative string
 	data     []byte
 	mode     fs.FileMode
+}
+
+func (content *skillContent) rejectLFSPointers() error {
+	for _, file := range content.files {
+		if bytes.HasPrefix(file.data, []byte("version https://git-lfs.github.com/spec/v1\n")) {
+			return fmt.Errorf("Git LFS pointer content is not allowed: %s", filepath.ToSlash(file.relative))
+		}
+	}
+	return nil
 }
 
 func prepareSkillContent(source string) (*skillContent, error) {

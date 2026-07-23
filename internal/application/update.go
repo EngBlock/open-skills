@@ -21,12 +21,13 @@ const (
 )
 
 type updateOptions struct {
-	Global     bool
-	Project    bool
-	Yes        bool
-	Skills     []string
-	Limits     resourceLimits
-	ParseError error
+	Global                 bool
+	Project                bool
+	Yes                    bool
+	Skills                 []string
+	AllowInsecureTransport bool
+	Limits                 resourceLimits
+	ParseError             error
 }
 
 type updateResult struct {
@@ -38,7 +39,7 @@ type updateResult struct {
 // materializeUpdateSource is a seam for controlled branch-movement tests. A
 // workspace contains an archived, resolved commit, so all installation after a
 // check must use it rather than reacquiring the moving source.
-var materializeUpdateSource = materializeGitSource
+var materializeUpdateSource = materializeGitSourceWithPolicy
 
 func runCheck(invocation Invocation, arguments []string) int {
 	return runUpdate(invocation, arguments, false)
@@ -125,6 +126,8 @@ func parseUpdateOptions(arguments []string) updateOptions {
 			options.Project = true
 		case "-y", "--yes":
 			options.Yes = true
+		case "--allow-insecure-transport":
+			options.AllowInsecureTransport = true
 		default:
 			matched, next, err := parseResourceLimitOption(arguments, index, &options.Limits)
 			if err != nil {
@@ -135,9 +138,11 @@ func parseUpdateOptions(arguments []string) updateOptions {
 				index = next
 				continue
 			}
-			if !strings.HasPrefix(argument, "-") {
-				options.Skills = append(options.Skills, argument)
+			if strings.HasPrefix(argument, "-") {
+				options.ParseError = fmt.Errorf("Unknown option: %s", argument)
+				return options
 			}
+			options.Skills = append(options.Skills, argument)
 		}
 	}
 	return options
@@ -294,21 +299,22 @@ func updateableSource(sourceType string) bool {
 }
 
 func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []string, source string, options updateOptions, apply bool, scope state.Scope, project, home string) updateResult {
+	displaySource := credentialFreeSource(source)
 	git, err := parseGitSource(updateGitSourceInput(snapshot.Lock.Skills[names[0]], source))
 	if err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", source, err)
+		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", displaySource, err)
 		return updateResult{checked: len(names), failed: len(names)}
 	}
-	workspace, err := materializeUpdateSource(git, options.Limits)
+	workspace, err := materializeUpdateSource(git, options.Limits, gitAcquisitionPolicy{AllowInsecureTransport: options.AllowInsecureTransport, Notice: invocation.Stderr})
 	if err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", source, err)
+		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", displaySource, err)
 		return updateResult{checked: len(names), failed: len(names)}
 	}
 	defer func() { _ = workspace.remove() }()
 
 	discovered, err := discoverLocalSkillsWithLimits(workspace.Root, true, options.Limits)
 	if err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Discover skills from %s: %v\n", source, err)
+		_, _ = fmt.Fprintf(invocation.Stderr, "Discover skills from %s: %v\n", displaySource, err)
 		return updateResult{checked: len(names), failed: len(names)}
 	}
 	byPath := make(map[string]localSkill, len(discovered))
@@ -325,12 +331,15 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 		}
 	}
 	if err := ensureNoSelectedCollisions(selected); err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", source, err)
+		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", displaySource, err)
 		return updateResult{checked: len(names), failed: len(names)}
 	}
 	budget := newResourceBudget(options.Limits)
 	for _, skill := range selected {
 		content, contentErr := prepareSkillContentWithBudget(skill.Path, budget)
+		if contentErr == nil {
+			contentErr = content.rejectLFSPointers()
+		}
 		if contentErr != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", skill.Name, contentErr)
 			return updateResult{checked: len(names), failed: len(names)}
@@ -344,7 +353,7 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 		entry := snapshot.Lock.Skills[name]
 		skill, found := byPath[entry.SkillPath]
 		if !found {
-			if apply && !options.Yes && promptDeleteMissing(invocation, name, source) {
+			if apply && !options.Yes && promptDeleteMissing(invocation, name, displaySource) {
 				if err := removeInstalledSkill(name, snapshot.Lock, scope, project, home); err != nil {
 					_, _ = fmt.Fprintf(invocation.Stderr, "Remove missing %s: %v\n", name, err)
 					result.failed++
@@ -367,7 +376,7 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 		if !apply {
 			continue
 		}
-		if err := refreshCheckedSkill(skill, entry, workspace, snapshot, scope, project, home); err != nil {
+		if err := refreshCheckedSkill(skill, entry, git, workspace, snapshot, scope, project, home); err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Update %s: %v\n", name, err)
 			result.failed++
 			continue
@@ -411,18 +420,19 @@ func checkedSkillChanged(entry state.LockEntry, scope state.Scope, workspace git
 	return contentHash != entry.SkillFolderHash, nil
 }
 
-func refreshCheckedSkill(skill localSkill, entry state.LockEntry, workspace gitWorkspace, snapshot state.Snapshot, scope state.Scope, project, home string) error {
+func refreshCheckedSkill(skill localSkill, entry state.LockEntry, source gitSource, workspace gitWorkspace, snapshot state.Snapshot, scope state.Scope, project, home string) error {
 	agents := append([]string(nil), entry.Agents...)
 	if len(agents) == 0 {
 		agents = installedAgents(snapshot, skill.Name)
 	}
+	provenance := installationProvenance{Identity: source.Identity, URL: source.URL, Type: entry.SourceType, Ref: workspace.Commit, Workspace: &workspace}
 	if len(agents) == 0 {
 		// Older compatible locks did not record placements. Updating canonical
 		// content is still useful and avoids inventing ownership of adapters.
-		return installLocalSkill(skill, installationProvenance{Identity: entry.Source, URL: firstNonempty(entry.SourceURL, entry.Source), Type: entry.SourceType, Ref: workspace.Commit, Workspace: &workspace}, scope, scopeBase(scope, project, home), project, home, nil, false, nil)
+		return installLocalSkill(skill, provenance, scope, scopeBase(scope, project, home), project, home, nil, false, nil)
 	}
 	copyMode := copiedPlacementExists(skill.Name, agents, scope, project, home)
-	return installLocalSkill(skill, installationProvenance{Identity: entry.Source, URL: firstNonempty(entry.SourceURL, entry.Source), Type: entry.SourceType, Ref: workspace.Commit, Workspace: &workspace}, scope, scopeBase(scope, project, home), project, home, agents, copyMode, entry.Subagents)
+	return installLocalSkill(skill, provenance, scope, scopeBase(scope, project, home), project, home, agents, copyMode, entry.Subagents)
 }
 
 func installedAgents(snapshot state.Snapshot, skillName string) []string {
@@ -477,28 +487,29 @@ func removeInstalledSkill(name string, lock *state.Document, scope state.Scope, 
 }
 
 func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names []string, source string, options updateOptions, apply bool, scope state.Scope, project, home string) updateResult {
+	displaySource := credentialFreeSource(source)
 	provider, matches, err := parseWellKnownSource(source)
 	if err != nil || !matches {
 		if err == nil {
 			err = fmt.Errorf("not a well-known source")
 		}
-		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", source, err)
+		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", displaySource, err)
 		return updateResult{checked: len(names), failed: len(names)}
 	}
 	fetched, err := fetchWellKnownSkills(provider, options.Limits, names)
 	if err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", source, err)
+		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", displaySource, err)
 		return updateResult{checked: len(names), failed: len(names)}
 	}
 	root, urls, err := materializeWellKnownSkills(fetched)
 	if err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Materialize %s: %v\n", source, err)
+		_, _ = fmt.Fprintf(invocation.Stderr, "Materialize %s: %v\n", displaySource, err)
 		return updateResult{checked: len(names), failed: len(names)}
 	}
 	defer os.RemoveAll(root)
 	discovered, err := discoverLocalSkillsWithLimits(root, true, options.Limits)
 	if err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Discover skills from %s: %v\n", source, err)
+		_, _ = fmt.Fprintf(invocation.Stderr, "Discover skills from %s: %v\n", displaySource, err)
 		return updateResult{checked: len(names), failed: len(names)}
 	}
 	byName := map[string]localSkill{}
@@ -512,7 +523,7 @@ func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names
 		}
 	}
 	if err := ensureNoSelectedCollisions(selected); err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", source, err)
+		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", displaySource, err)
 		return updateResult{checked: len(names), failed: len(names)}
 	}
 	budget := newResourceBudget(options.Limits)
@@ -553,7 +564,7 @@ func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names
 		if len(agents) == 0 {
 			agents = installedAgents(snapshot, skill.Name)
 		}
-		if err := installLocalSkill(skill, installationProvenance{Identity: entry.Source, URL: urls[name], Type: entry.SourceType}, scope, scopeBase(scope, project, home), project, home, agents, copiedPlacementExists(skill.Name, agents, scope, project, home), entry.Subagents); err != nil {
+		if err := installLocalSkill(skill, installationProvenance{Identity: provider.identity, URL: credentialFreeSource(urls[name]), Type: entry.SourceType}, scope, scopeBase(scope, project, home), project, home, agents, copiedPlacementExists(skill.Name, agents, scope, project, home), entry.Subagents); err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Update %s: %v\n", name, err)
 			result.failed++
 			continue
