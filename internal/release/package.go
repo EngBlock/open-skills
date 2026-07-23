@@ -75,6 +75,9 @@ func PackageAll(ctx context.Context, options PackageOptions) ([]Artifact, error)
 		}
 		artifacts = append(artifacts, artifact)
 	}
+	if err := WriteChecksums(options.Output, artifacts); err != nil {
+		return nil, err
+	}
 	return artifacts, nil
 }
 
@@ -94,7 +97,17 @@ func ReleaseNotes(version string) (string, error) {
 			"| `linux_arm64.tar.gz` | Linux ARM64 | Experimental |\n"+
 			"| `windows_amd64.zip` | Windows x86-64 | Experimental |\n\n"+
 			"Supported targets are maintainer-supported preview platforms. Experimental targets are compile-checked but are not yet represented as fully tested.\n\n"+
-			"Each archive contains only `open-skills` (`open-skills.exe` on Windows). The only runtime dependency is system Git; Node.js and npm are not required.\n",
+			"Each archive contains only `open-skills` (`open-skills.exe` on Windows). The only runtime dependency is system Git; Node.js and npm are not required.\n\n"+
+			"## Verification\n\n"+
+			"`checksums.txt` covers every release archive. Each archive and the checksum file has an adjacent keyless signature bundle named `<file>.sigstore.json`; `provenance.sigstore.json` covers every archive.\n\n"+
+			"After downloading the archive and verification files, verify the checksum, keyless signature, repository, release tag, and producing workflow identity:\n\n"+
+			"```sh\n"+
+			"sha256sum --check checksums.txt\n"+
+			"cosign verify-blob --bundle <archive>.sigstore.json --certificate-identity 'https://github.com/EngBlock/open-skills/.github/workflows/native-preview.yml@refs/tags/v%s' --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' <archive>\n"+
+			"gh attestation verify <archive> --bundle provenance.sigstore.json --repo EngBlock/open-skills --signer-workflow EngBlock/open-skills/.github/workflows/native-preview.yml --cert-identity 'https://github.com/EngBlock/open-skills/.github/workflows/native-preview.yml@refs/tags/v%s'\n"+
+			"```\n",
+		version,
+		version,
 		version,
 	), nil
 }
