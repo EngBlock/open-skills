@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 )
 
 type gitSource struct {
@@ -47,6 +48,9 @@ var gitObjectID = regexp.MustCompile(`^[0-9a-fA-F]{7,64}$`)
 // baseline. It only classifies and normalizes a source; transport policy is
 // enforced immediately before Git is invoked.
 func parseGitSource(raw string) (gitSource, error) {
+	if strings.IndexFunc(raw, unicode.IsControl) >= 0 {
+		return gitSource{}, errors.New("Git source must not contain control characters")
+	}
 	base, fragment, hasFragment := strings.Cut(raw, "#")
 	if hasFragment && fragment == "" {
 		return gitSource{}, errors.New("Git ref fragment must not be empty")
@@ -117,6 +121,9 @@ func parseGitSource(raw string) (gitSource, error) {
 	}
 
 	if parsed, err := url.Parse(base); err == nil && parsed.Scheme != "" {
+		if strings.IndexFunc(parsed.Path, unicode.IsControl) >= 0 {
+			return gitSource{}, errors.New("Git source path must not contain control characters")
+		}
 		if parsed.User != nil {
 			if _, present := parsed.User.Password(); present {
 				return gitSource{}, errors.New("Git source URLs must not contain passwords")
@@ -141,6 +148,8 @@ func parseGitSource(raw string) (gitSource, error) {
 		if parsed.Scheme == "http" || parsed.Scheme == "https" || parsed.Scheme == "ssh" || parsed.Scheme == "git" || parsed.Scheme == "file" {
 			safe := *parsed
 			safe.User = nil
+			safe.RawQuery = ""
+			safe.ForceQuery = false
 			safe.Fragment = ""
 			if (parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.User != nil {
 				return gitSource{}, errors.New("HTTP Git source URLs must not contain user credentials")
@@ -158,7 +167,7 @@ func parseGitSource(raw string) (gitSource, error) {
 		}
 		return gitSource{Identity: identity, URL: identity, CloneURL: base, Type: "git", RequestedRef: ref, SkillFilter: filter}, nil
 	}
-	return gitSource{}, fmt.Errorf("unsupported Git source: %s", raw)
+	return gitSource{}, errors.New("unsupported Git source")
 }
 
 func parseGitLab(path, host, ref, filter string, validateSubpath func(string) (string, error)) (gitSource, error) {
@@ -232,12 +241,12 @@ func materializeGitSource(source gitSource) (gitWorkspace, error) {
 	}
 	arguments = append(arguments, cloneURL, workspace.Repository)
 	if output, err := runGit(arguments...); err != nil {
-		return fail(fmt.Errorf("clone Git source: %w: %s", err, strings.TrimSpace(string(output))))
+		return fail(fmt.Errorf("clone Git source: %w: %s", err, sanitizedGitOutput(output, source)))
 	}
 	resolvedRef := "HEAD^{commit}"
 	if requestedObjectID {
 		if output, err := runGit("-C", workspace.Repository, "fetch", "--depth", "1", "origin", source.RequestedRef); err != nil {
-			return fail(fmt.Errorf("fetch requested Git commit: %w: %s", err, strings.TrimSpace(string(output))))
+			return fail(fmt.Errorf("fetch requested Git commit: %w: %s", err, sanitizedGitOutput(output, source)))
 		}
 		resolvedRef = "FETCH_HEAD^{commit}"
 	}
@@ -253,6 +262,34 @@ func materializeGitSource(source gitSource) (gitWorkspace, error) {
 		return fail(fmt.Errorf("extract resolved Git commit: %w", err))
 	}
 	return workspace, nil
+}
+
+func sanitizedGitOutput(output []byte, source gitSource) string {
+	message := strings.TrimSpace(string(output))
+	cloneURL := source.CloneURL
+	if cloneURL == "" {
+		cloneURL = source.URL
+	}
+	if cloneURL != "" && source.URL != "" && cloneURL != source.URL {
+		message = strings.ReplaceAll(message, cloneURL, source.URL)
+	}
+	parsed, err := url.Parse(cloneURL)
+	if err != nil {
+		return message
+	}
+	if parsed.RawQuery != "" {
+		message = strings.ReplaceAll(message, "?"+parsed.RawQuery, "")
+	}
+	for _, values := range parsed.Query() {
+		for _, value := range values {
+			if value == "" {
+				continue
+			}
+			message = strings.ReplaceAll(message, value, "[REDACTED]")
+			message = strings.ReplaceAll(message, url.QueryEscape(value), "[REDACTED]")
+		}
+	}
+	return message
 }
 
 func runGit(arguments ...string) ([]byte, error) {

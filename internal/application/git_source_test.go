@@ -41,7 +41,7 @@ func TestParseGitSourceSupportsGitHubGitLabAndGenericForms(t *testing.T) {
 }
 
 func TestParseGitSourceRejectsUnsafeCredentialsAndSubpaths(t *testing.T) {
-	for _, source := range []string{"https://user:secret@example.test/repository.git", "https://token@example.test/repository.git", "https://github.com/owner/repository/tree/main/skills/../escape", "owner/repository#"} {
+	for _, source := range []string{"https://user:secret@example.test/repository.git", "https://token@example.test/repository.git", "https://github.com/owner/repository/tree/main/skills/../escape", "https://github.com/owner/repo%1B%5B31m", "owner/repository#", "git@example.test:repository\x1b[31m"} {
 		if _, err := parseGitSource(source); err == nil {
 			t.Errorf("parseGitSource(%q) succeeded", source)
 		}
@@ -52,6 +52,16 @@ func TestParseGitSourceRejectsUnsafeCredentialsAndSubpaths(t *testing.T) {
 	}
 	if strings.Contains(ssh.Identity, "git@") || strings.Contains(ssh.URL, "git@") || !strings.Contains(ssh.CloneURL, "git@") {
 		t.Fatalf("SSH source did not separate persisted identity from clone URL: %#v", ssh)
+	}
+	if _, err := parseGitSource("https://example.test/%zz?access_token=review-secret"); err == nil || strings.Contains(err.Error(), "review-secret") {
+		t.Fatalf("malformed source error was not credential-safe: %v", err)
+	}
+	query, err := parseGitSource("https://example.test/repository.git?access_token=secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(query.Identity, "secret") || strings.Contains(query.URL, "secret") || !strings.Contains(query.CloneURL, "secret") {
+		t.Fatalf("HTTP source did not separate query credentials from sanitized identity: %#v", query)
 	}
 }
 
@@ -142,6 +152,16 @@ func TestD03MaterializeGitSourceRejectsPlaintextTransportBeforeGitRuns(t *testin
 		if _, err := materializeGitSource(source); err == nil {
 			t.Errorf("materializeGitSource(%q) succeeded", source.URL)
 		}
+	}
+}
+
+func TestMaterializeGitSourceRedactsQueryCredentialsFromErrors(t *testing.T) {
+	source, err := parseGitSource("file:///missing/repository.git?access_token=review-secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := materializeGitSource(source); err == nil || strings.Contains(err.Error(), "review-secret") {
+		t.Fatalf("Git acquisition error was not credential-safe: %v", err)
 	}
 }
 

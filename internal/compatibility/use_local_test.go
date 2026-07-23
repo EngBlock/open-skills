@@ -69,18 +69,21 @@ func TestNativeUseLocalSkillWithoutSupportingFilesOmitsTemporaryPath(t *testing.
 	assertOfflineShellObservation(t, observation)
 }
 
-func TestNativeUseRejectsNonlocalSourcesWithoutAcquisition(t *testing.T) {
-	observation, err := (Harness{}).Run(context.Background(), buildShellTarget(t), Scenario{
-		Args:    []string{"use", "owner/repository@skill"},
-		Offline: true,
-	})
-	if err != nil {
-		t.Fatal(err)
+func TestNativeUseBlocksOpenClawRemoteSourceBeforeAcquisition(t *testing.T) {
+	target := buildShellTarget(t)
+	for _, source := range []string{"openclaw/example@demo", "git@github.com:openclaw/repo.git"} {
+		observation, err := (Harness{}).Run(context.Background(), target, Scenario{
+			Args:    []string{"use", source},
+			Offline: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if observation.ExitCode != 1 || observation.Stdout != "" || !strings.Contains(observation.Stderr, "OpenClaw skills are unverified") {
+			t.Fatalf("OpenClaw use = exit %d stdout %q stderr %q", observation.ExitCode, observation.Stdout, observation.Stderr)
+		}
+		assertOfflineShellObservation(t, observation)
 	}
-	if observation.ExitCode != 1 || observation.Stdout != "" || !strings.Contains(observation.Stderr, "Only local paths are supported") {
-		t.Fatalf("nonlocal use = exit %d stdout %q stderr %q", observation.ExitCode, observation.Stdout, observation.Stderr)
-	}
-	assertOfflineShellObservation(t, observation)
 }
 
 func TestNativeUseLocalSkillRequiresSelectorForMultipleSkills(t *testing.T) {

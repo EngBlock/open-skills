@@ -35,6 +35,14 @@ and 20 path components.
 
 Malformed state, unsupported older schemas, and unknown newer schemas stop inspection with recovery guidance. The native executable does not reinterpret them as empty state, rewrite them, or attempt a downgrade. Supported documents retain unknown JSON fields when passed through the native state encoder so later validated mutations can preserve extensions.
 
+## D10: exact remote instruction trust
+
+Native `open-skills use` supports local, Git, and well-known HTTPS sources. Remote prompts identify the credential-free source and immutable Git commit before the selected `SKILL.md`; well-known content uses an exact `sha256:` content revision in the same commit-scoped trust field.
+
+`use --agent` never injects a previously untrusted remote revision implicitly. A terminal user must confirm the first exact source/revision pair, while automation must pass the dedicated `--trust` authorization. `--yes` does not grant instruction trust. An installed skill whose lock entry records the same source and exact revision is already approved; a changed revision requires new consent.
+
+Approvals are stored under the platform user configuration directory at `open-skills/trust.json` (honoring `XDG_CONFIG_HOME`). Each record contains only sanitized source identity, exact commit/content revision, and approval time. `open-skills trust list [--json]`, exact `trust revoke <source> --commit <revision>`, broad source revocation, and `trust clear` are offline. Broad revocation and clearing prompt in a terminal or require `--yes` in automation.
+
 ## D11: versioned list JSON
 
 `open-skills list --json` writes only one JSON document to stdout and sends human diagnostics to stderr. Success uses schema version 1:

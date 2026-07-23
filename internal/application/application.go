@@ -11,10 +11,11 @@ import (
 )
 
 type Invocation struct {
-	Args   []string
-	Stdin  io.Reader
-	Stdout io.Writer
-	Stderr io.Writer
+	Args        []string
+	Stdin       io.Reader
+	Stdout      io.Writer
+	Stderr      io.Writer
+	Interactive bool
 }
 
 // Version is the native preview version. Release builds may replace it with
@@ -79,6 +80,8 @@ func Run(ctx context.Context, invocation Invocation) int {
 		return runAdd(invocation, invocation.Args[1:])
 	case "use":
 		return runUse(invocation, invocation.Args[1:])
+	case "trust":
+		return runTrust(invocation, invocation.Args[1:])
 	default:
 		_, _ = fmt.Fprintf(invocation.Stdout, "Unknown command: %s\nRun open-skills --help for usage.\n", command)
 		return 1

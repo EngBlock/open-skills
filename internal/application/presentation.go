@@ -38,6 +38,7 @@ Manage Skills:
                        Generate a prompt for using one skill without installing it
   remove [skills]      Remove installed skills
   list, ls             List installed skills
+  trust                Audit and revoke remote instruction trust
   find, search, f, s  Show migration guidance for decentralized discovery
 
 Updates:
@@ -69,8 +70,14 @@ Use Options:
   -s, --skill <skill>    Specify the skill to use
   -a, --agent <agent>    Start one supported agent interactively
   --full-depth           Search all subdirectories even when a root SKILL.md exists
+  --trust                Approve one exact remote source commit for agent use
   --dangerously-accept-openclaw-risks
                          Allow unverified OpenClaw community skills
+
+Trust Commands:
+  trust list [--json]
+  trust revoke <source> [--commit <commit>] [--yes]
+  trust clear [--yes]
 
 Remove Options:
   -g, --global           Remove from global scope

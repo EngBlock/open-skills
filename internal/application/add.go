@@ -574,6 +574,12 @@ func installLocalSkill(skill localSkill, provenance installationProvenance, scop
 	if err != nil {
 		return err
 	}
+	if provenance.Type == "well-known" && provenance.Ref == "" {
+		provenance.Ref, err = remoteContentRevision(skill.Path)
+		if err != nil {
+			return err
+		}
+	}
 	lockPath := filepath.Join(project, "skills-lock.json")
 	version := 1
 	if scope == state.Global {

@@ -5,20 +5,25 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/EngBlock/open-skills/internal/state"
+	truststore "github.com/EngBlock/open-skills/internal/trust"
 )
 
 type useOptions struct {
-	Skill     string
-	Agent     []string
-	FullDepth bool
-	Help      bool
+	Skill                          string
+	Agent                          []string
+	FullDepth                      bool
+	Trust                          bool
+	DangerouslyAcceptOpenClawRisks bool
+	Help                           bool
 }
 
 type useAgentConfig struct {
@@ -58,19 +63,84 @@ func runUse(invocation Invocation, arguments []string) int {
 		}
 	}
 
-	if !isClearlyLocalPath(source[0]) {
-		_, _ = fmt.Fprintln(invocation.Stderr, "Only local paths are supported by this build of open-skills use.")
-		return 1
-	}
-	root, err := filepath.Abs(source[0])
-	if err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Invalid local path: %v\n", err)
-		return 1
-	}
-	info, err := os.Stat(root)
-	if err != nil || !info.IsDir() {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Local path does not exist: %s\n", root)
-		return 1
+	rawSource := source[0]
+	displaySource := rawSource
+	root := ""
+	selector := options.Skill
+	var remote *remoteUseProvenance
+	remoteIdentity := ""
+	remoteGitRoot := ""
+	isRemoteGit := false
+	if isClearlyLocalPath(rawSource) {
+		var err error
+		root, err = filepath.Abs(rawSource)
+		if err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Invalid local path: %v\n", err)
+			return 1
+		}
+		info, err := os.Stat(root)
+		if err != nil || !info.IsDir() {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Local path does not exist: %s\n", root)
+			return 1
+		}
+	} else if wellKnown, matches, parseErr := parseWellKnownSource(rawSource); matches {
+		if parseErr != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, parseErr)
+			return 1
+		}
+		var err error
+		selector, err = resolveUseSelector(wellKnown.directName, selector)
+		if err != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, err)
+			return 1
+		}
+		fetched, err := fetchWellKnownSkills(wellKnown)
+		if err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Discover well-known skills: %v\n", err)
+			return 1
+		}
+		root, _, err = materializeWellKnownSkills(fetched)
+		if err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Materialize well-known skills: %v\n", err)
+			return 1
+		}
+		defer os.RemoveAll(root)
+		remoteIdentity = wellKnown.identity
+		displaySource = wellKnown.identity
+	} else {
+		git, err := parseGitSource(rawSource)
+		if err != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, err)
+			return 1
+		}
+		displaySource = git.Identity
+		if isOpenClawGitSource(git) && !options.DangerouslyAcceptOpenClawRisks {
+			_, _ = fmt.Fprintf(invocation.Stderr, "OpenClaw skills are unverified community submissions.\nSkills run with full agent permissions and could be malicious.\nIf you understand the risks, re-run with: open-skills use %s --dangerously-accept-openclaw-risks\n", displaySource)
+			return 1
+		}
+		selector, err = resolveUseSelector(git.SkillFilter, selector)
+		if err != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, err)
+			return 1
+		}
+		workspace, err := materializeGitSource(git)
+		if err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Acquire Git source: %v\n", err)
+			return 1
+		}
+		defer workspace.remove()
+		root = workspace.Root
+		if git.Subpath != "" {
+			root = filepath.Join(root, filepath.FromSlash(git.Subpath))
+			info, statErr := os.Stat(root)
+			if statErr != nil || !info.IsDir() {
+				_, _ = fmt.Fprintf(invocation.Stderr, "Git source subpath does not exist or is not a directory: %s\n", git.Subpath)
+				return 1
+			}
+		}
+		remote = &remoteUseProvenance{source: git.Identity, commit: workspace.Commit}
+		remoteGitRoot = workspace.Root
+		isRemoteGit = true
 	}
 
 	skills, err := discoverLocalSkills(root, options.FullDepth)
@@ -78,10 +148,30 @@ func runUse(invocation Invocation, arguments []string) int {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Discover skills: %v\n", err)
 		return 1
 	}
-	selected, err := selectUseSkill(skills, options.Skill, source[0])
+	selected, err := selectUseSkill(skills, selector, displaySource)
 	if err != nil {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
+	}
+	if isRemoteGit {
+		if err := rejectLFSPointers(selected.Path); err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Use %s: %v\n", selected.Name, err)
+			return 1
+		}
+		relative, err := filepath.Rel(remoteGitRoot, filepath.Join(selected.Path, "SKILL.md"))
+		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			_, _ = fmt.Fprintln(invocation.Stderr, "Selected Git skill path escapes the acquired source.")
+			return 1
+		}
+		remote.skillPath = filepath.ToSlash(relative)
+	}
+	if remote == nil && remoteIdentity != "" {
+		revision, err := remoteContentRevision(selected.Path)
+		if err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Identify remote skill content: %v\n", err)
+			return 1
+		}
+		remote = &remoteUseProvenance{source: remoteIdentity, commit: revision}
 	}
 
 	materialized, err := materializeUseSkill(selected)
@@ -90,9 +180,18 @@ func runUse(invocation Invocation, arguments []string) int {
 		return 1
 	}
 	prompt := buildUsePrompt(materialized.skillMD, materialized.directory, materialized.hasSupportingFiles)
+	if remote != nil {
+		prompt = buildRemoteUsePrompt(*remote, prompt)
+	}
 	if agent == "" {
 		_, _ = io.WriteString(invocation.Stdout, prompt)
 		return 0
+	}
+	if remote != nil {
+		if err := authorizeRemoteAgentUse(invocation, options, *remote, selected); err != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, err)
+			return 1
+		}
 	}
 	return launchUseAgent(invocation, agent, prompt)
 }
@@ -108,9 +207,12 @@ func parseUseOptions(arguments []string) ([]string, useOptions, []string) {
 			options.Help = true
 		case "--full-depth":
 			options.FullDepth = true
+		case "--trust":
+			options.Trust = true
+		case "--yes", "-y":
+			errors = append(errors, argument+" does not authorize remote agent trust; use --trust")
 		case "--dangerously-accept-openclaw-risks":
-			// This is only meaningful for remote OpenClaw sources. Retain the
-			// accepted option so local invocation syntax stays compatible.
+			options.DangerouslyAcceptOpenClawRisks = true
 		case "--skill", "-s":
 			if index+1 >= len(arguments) || strings.HasPrefix(arguments[index+1], "-") {
 				errors = append(errors, argument+" requires a skill name")
@@ -161,6 +263,19 @@ func parseUseOptions(arguments []string) ([]string, useOptions, []string) {
 	return source, options, errors
 }
 
+func isOpenClawGitSource(source gitSource) bool {
+	identity := source.Identity
+	if strings.Contains(identity, "://") {
+		if parsed, err := url.Parse(identity); err == nil {
+			identity = strings.Trim(parsed.Path, "/")
+		}
+	} else if host, path, found := strings.Cut(identity, ":"); found && strings.Contains(host, ".") {
+		identity = strings.Trim(path, "/")
+	}
+	owner, _, _ := strings.Cut(identity, "/")
+	return strings.EqualFold(owner, "openclaw")
+}
+
 func selectUseSkill(skills []localSkill, selector, source string) (localSkill, error) {
 	if len(skills) == 0 {
 		return localSkill{}, errors.New("No valid skills found. Skills require a SKILL.md with name and description.")
@@ -203,6 +318,12 @@ func listSkillNames(names []string) string {
 		items = append(items, "  - "+name)
 	}
 	return strings.Join(items, "\n")
+}
+
+type remoteUseProvenance struct {
+	source    string
+	commit    string
+	skillPath string
 }
 
 type materializedUseSkill struct {
@@ -292,6 +413,20 @@ func useSkillHasSupportingFiles(root string) (bool, error) {
 	return hasFiles, err
 }
 
+func resolveUseSelector(sourceSelector, optionSelector string) (string, error) {
+	if sourceSelector != "" && optionSelector != "" && !strings.EqualFold(sourceSelector, optionSelector) {
+		return "", fmt.Errorf("Conflicting skill selectors: source selects %q but --skill selects %q. Provide one selector.", sourceSelector, optionSelector)
+	}
+	if optionSelector != "" {
+		return optionSelector, nil
+	}
+	return sourceSelector, nil
+}
+
+func buildRemoteUsePrompt(provenance remoteUseProvenance, prompt string) string {
+	return fmt.Sprintf("Remote skill source: %s\nRemote skill commit: %s\n\n%s", provenance.source, provenance.commit, prompt)
+}
+
 func buildUsePrompt(skillMD, supportDirectory string, hasSupportingFiles bool) string {
 	prompt := "You are being given a Skill to execute for the user's next request.\n\n" +
 		"Use the following SKILL.md as your instructions:\n\n" +
@@ -301,6 +436,80 @@ func buildUsePrompt(skillMD, supportDirectory string, hasSupportingFiles bool) s
 			"\n\nWhen the SKILL.md references relative paths, read them from that directory."
 	}
 	return prompt + "\n"
+}
+
+func authorizeRemoteAgentUse(invocation Invocation, options useOptions, provenance remoteUseProvenance, skill localSkill) error {
+	_, _ = fmt.Fprintf(invocation.Stderr, "Remote skill source: %s\nRemote skill commit: %s\n", provenance.source, provenance.commit)
+	store, err := truststore.Open()
+	if err != nil {
+		return fmt.Errorf("read trust approvals: %w", err)
+	}
+	if store.Contains(provenance.source, provenance.commit) || installedCommitApproved(skill.Name, provenance) {
+		return nil
+	}
+	if options.Trust {
+		if err := store.Approve(provenance.source, provenance.commit, time.Now()); err != nil {
+			return fmt.Errorf("record trust approval: %w", err)
+		}
+		return nil
+	}
+	if !invocation.Interactive {
+		return errors.New("remote agent use is not trusted; automation must re-run with --trust (not --yes) to approve this exact source commit")
+	}
+	_, _ = fmt.Fprint(invocation.Stderr, "Trust this exact source commit and launch the agent? [y/N] ")
+	answer, err := readInputLine(invocation.Stdin)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return fmt.Errorf("read trust confirmation: %w", err)
+	}
+	answer = strings.ToLower(strings.TrimSpace(answer))
+	if answer != "y" && answer != "yes" {
+		return errors.New("remote agent use cancelled")
+	}
+	if err := store.Approve(provenance.source, provenance.commit, time.Now()); err != nil {
+		return fmt.Errorf("record trust approval: %w", err)
+	}
+	return nil
+}
+
+func installedCommitApproved(skillName string, provenance remoteUseProvenance) bool {
+	project, projectErr := os.Getwd()
+	home, homeErr := os.UserHomeDir()
+	if projectErr != nil || homeErr != nil {
+		return false
+	}
+	base := state.InspectOptions{
+		Project: project, Home: home,
+		XDGStateHome: os.Getenv("XDG_STATE_HOME"), XDGConfigHome: os.Getenv("XDG_CONFIG_HOME"),
+	}
+	for _, scope := range []state.Scope{state.Project, state.Global} {
+		options := base
+		options.Scope = scope
+		snapshot, err := state.Inspect(options)
+		if err != nil {
+			continue
+		}
+		for _, installed := range snapshot.Skills {
+			if installed.Name != skillName || installed.Lock == nil {
+				continue
+			}
+			entry := installed.Lock
+			if entry.Ref != provenance.commit || entry.SkillPath != provenance.skillPath || (entry.Source != provenance.source && entry.SourceURL != provenance.source) {
+				continue
+			}
+			expectedHash := entry.InstalledContentHash
+			if expectedHash == "" && scope == state.Project {
+				expectedHash = entry.ComputedHash
+			}
+			if expectedHash == "" {
+				continue
+			}
+			actualHash, _, err := contentIdentity(installed.CanonicalPath)
+			if err == nil && actualHash == expectedHash {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func launchUseAgent(invocation Invocation, agent, prompt string) int {
@@ -336,6 +545,7 @@ Options:
   -s, --skill <skill>   Select the skill to use
   -a, --agent <agent>   Start one supported agent interactively (claude-code, codex)
   --full-depth          Search nested directories like open-skills add --full-depth
+  --trust               Approve this exact remote source commit for agent use
   --dangerously-accept-openclaw-risks
                          Allow unverified OpenClaw community skills
   -h, --help            Show this help message

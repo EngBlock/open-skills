@@ -73,13 +73,14 @@ func TestWellKnownCurrentIndexListsSelectsInstallsAndRecordsMultifileSkill(t *te
 			Source     string `json:"source"`
 			SourceURL  string `json:"sourceUrl"`
 			SourceType string `json:"sourceType"`
+			Ref        string `json:"ref"`
 		} `json:"skills"`
 	}
 	if err := json.Unmarshal(data, &lock); err != nil {
 		t.Fatal(err)
 	}
 	entry := lock.Skills["multi-file"]
-	if entry.Source != "127.0.0.1" || entry.SourceType != "well-known" || entry.SourceURL != server.URL+"/.well-known/agent-skills/multi-file/SKILL.md" {
+	if entry.Source != "127.0.0.1" || entry.SourceType != "well-known" || entry.SourceURL != server.URL+"/.well-known/agent-skills/multi-file/SKILL.md" || !strings.HasPrefix(entry.Ref, "sha256:") {
 		t.Fatalf("unsafe or incomplete well-known provenance: %#v", entry)
 	}
 	assertOnlyFixtureRequests(t, server, requests)
