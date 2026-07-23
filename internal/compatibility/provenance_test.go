@@ -3,6 +3,7 @@ package compatibility
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -110,8 +111,16 @@ func TestNativeAddAllowsExplicitCrossSourceReplacement(t *testing.T) {
 	if !ok || !strings.Contains(string(installed.Data), "# replacement") {
 		t.Fatalf("replacement content was not installed: %#v", installed)
 	}
-	if !strings.Contains(string(observation.Locks[ProjectLock]), filepath.ToSlash(filepath.Join(observation.Paths.Temp, "replacement"))) {
-		t.Fatalf("replacement provenance was not recorded: %s", observation.Locks[ProjectLock])
+	var lock struct {
+		Skills map[string]struct {
+			Source string `json:"source"`
+		} `json:"skills"`
+	}
+	if err := json.Unmarshal(observation.Locks[ProjectLock], &lock); err != nil {
+		t.Fatalf("decode replacement provenance: %v", err)
+	}
+	if source := lock.Skills["provenance-skill"].Source; filepath.Clean(source) != filepath.Join(observation.Paths.Temp, "replacement") {
+		t.Fatalf("replacement provenance source = %q; lock: %s", source, observation.Locks[ProjectLock])
 	}
 }
 

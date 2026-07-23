@@ -576,6 +576,11 @@ func createGitFixture(t *testing.T) (string, string, string) {
 
 func runFixtureGit(t *testing.T, directory string, arguments ...string) string {
 	t.Helper()
+	if len(arguments) > 0 && arguments[0] == "add" {
+		if err := os.WriteFile(filepath.Join(directory, ".gitattributes"), []byte("* -text\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	arguments = append([]string{"-c", "core.autocrlf=false"}, arguments...)
 	command := exec.Command("git", arguments...)
 	command.Dir = directory

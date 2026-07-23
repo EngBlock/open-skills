@@ -30,7 +30,9 @@ type skillContentFile struct {
 
 func (content *skillContent) rejectLFSPointers() error {
 	for _, file := range content.files {
-		if bytes.HasPrefix(file.data, []byte("version https://git-lfs.github.com/spec/v1\n")) {
+		firstLine, _, _ := bytes.Cut(file.data, []byte("\n"))
+		firstLine = bytes.TrimSuffix(firstLine, []byte("\r"))
+		if bytes.Equal(firstLine, []byte("version https://git-lfs.github.com/spec/v1")) {
 			return fmt.Errorf("Git LFS pointer content is not allowed: %s", filepath.ToSlash(file.relative))
 		}
 	}

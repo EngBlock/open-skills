@@ -330,7 +330,8 @@ func createFixtureJunction(path, target string) error {
 	if runtime.GOOS != "windows" {
 		return os.Symlink(target, path)
 	}
-	command := exec.Command("cmd.exe", "/c", "mklink", "/J", path, target)
+	commandLine := fmt.Sprintf(`mklink /J "%s" "%s"`, strings.ReplaceAll(path, `"`, `""`), strings.ReplaceAll(target, `"`, `""`))
+	command := exec.Command("cmd.exe", "/d", "/s", "/c", commandLine)
 	if output, err := command.CombinedOutput(); err != nil {
 		return fmt.Errorf("create fixture junction: %w: %s", err, output)
 	}
