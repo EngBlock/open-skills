@@ -1,0 +1,25 @@
+{
+  "stdout": "\n███████╗██╗  ██╗██╗██╗     ██╗     ███████╗\n██╔════╝██║ ██╔╝██║██║     ██║     ██╔════╝\n███████╗█████╔╝ ██║██║     ██║     ███████╗\n╚════██║██╔═██╗ ██║██║     ██║     ╚════██║\n███████║██║  ██╗██║███████╗███████╗███████║\n╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚══════╝\n\nThe open agent skills ecosystem\n\n  $ open-skills add \u003cpackage\u003e        Add a new skill\n  $ open-skills use \u003cpackage\u003e@\u003cskill\u003e Use a skill without installing\n  $ open-skills remove               Remove installed skills\n  $ open-skills list                 List installed skills\n\n  $ open-skills update               Update installed skills\n\n  $ open-skills experimental_install Restore from skills-lock.json\n  $ open-skills init [name]          Create a new skill\n  $ open-skills experimental_sync    Sync skills from node_modules\n\ntry: open-skills add EngBlock/open-skills@find-skills\n\n",
+  "stderr": "",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    }
+  },
+  "locks": {},
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

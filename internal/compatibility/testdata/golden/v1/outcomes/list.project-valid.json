@@ -1,0 +1,58 @@
+{
+  "stdout": "Project Skills\n\nproject-alpha ./.agents/skills/project-alpha\n Agents: not linked Source: EngBlock/project-skills\nproject-zeta ./.agents/skills/project-zeta\n Agents: not linked Source: EngBlock/project-skills\n\n",
+  "stderr": "",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/project-alpha": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/project-alpha/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: project-alpha\ndescription: project-alpha golden fixture\n---\n\n# project-alpha\n"
+    },
+    "project/.agents/skills/project-zeta": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/project-zeta/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: project-zeta\ndescription: project-zeta golden fixture\n---\n\n# project-zeta\n"
+    },
+    "project/skills-lock.json": {
+      "kind": "file",
+      "mode": 420,
+      "text": "{\n  \"version\": 1,\n  \"skills\": {\n    \"project-zeta\": {\n      \"source\": \"EngBlock/project-skills\",\n      \"sourceType\": \"github\",\n      \"computedHash\": \"project-zeta-hash\"\n    },\n    \"project-alpha\": {\n      \"source\": \"EngBlock/project-skills\",\n      \"sourceUrl\": \"https://github.com/EngBlock/project-skills\",\n      \"sourceType\": \"github\",\n      \"skillPath\": \"skills/project-alpha/SKILL.md\",\n      \"computedHash\": \"project-alpha-hash\"\n    }\n  }\n}\n"
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    }
+  },
+  "locks": {
+    "project": "{\n  \"version\": 1,\n  \"skills\": {\n    \"project-zeta\": {\n      \"source\": \"EngBlock/project-skills\",\n      \"sourceType\": \"github\",\n      \"computedHash\": \"project-zeta-hash\"\n    },\n    \"project-alpha\": {\n      \"source\": \"EngBlock/project-skills\",\n      \"sourceUrl\": \"https://github.com/EngBlock/project-skills\",\n      \"sourceType\": \"github\",\n      \"skillPath\": \"skills/project-alpha/SKILL.md\",\n      \"computedHash\": \"project-alpha-hash\"\n    }\n  }\n}\n"
+  },
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

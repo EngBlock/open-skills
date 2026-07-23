@@ -1,0 +1,44 @@
+{
+  "stdout": "{\n  \"schemaVersion\": 1,\n  \"error\": {\n    \"code\": \"state_version_older\",\n    \"message\": \"Failed to inspect skill state: \u003chome\u003e/.local/state/skills/.skill-lock.json uses schema version 2; this executable supports version 3\",\n    \"path\": \"\u003chome\u003e/.local/state/skills/.skill-lock.json\"\n  }\n}\n",
+  "stderr": "Failed to inspect skill state: \u003chome\u003e/.local/state/skills/.skill-lock.json uses schema version 2; this executable supports version 3\nThe state file was not changed.\nPlease back up \u003chome\u003e/.local/state/skills/.skill-lock.json and migrate it with a compatible Open Skills release before retrying.\n",
+  "exitCode": 1,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local/state": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local/state/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local/state/skills/.skill-lock.json": {
+      "kind": "file",
+      "mode": 420,
+      "text": "{\"version\":2,\"skills\":{}}\n"
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    }
+  },
+  "locks": {
+    "global-xdg": "{\"version\":2,\"skills\":{}}\n"
+  },
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

@@ -1,0 +1,25 @@
+{
+  "stdout": "",
+  "stderr": "Clearing all trust approvals requires confirmation; re-run with --yes.\n",
+  "exitCode": 1,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    }
+  },
+  "locks": {},
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

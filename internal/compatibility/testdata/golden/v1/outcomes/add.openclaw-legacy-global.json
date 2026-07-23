@@ -1,0 +1,95 @@
+{
+  "stdout": "Installed topology-skill\n",
+  "stderr": "",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.agents": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.agents/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.agents/skills/topology-skill": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.agents/skills/topology-skill/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: topology-skill\ndescription: topology-skill golden fixture\n---\n\n# topology\n"
+    },
+    "home/.clawdbot": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.clawdbot/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.clawdbot/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.local": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions/\u003ctransaction\u003e": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local/state/skills/.skill-lock.json": {
+      "kind": "file",
+      "mode": 384,
+      "text": "{\n  \"skills\": {\n    \"topology-skill\": {\n      \"agents\": [\n        \"openclaw\"\n      ],\n      \"installedAt\": \"\u003ctimestamp\u003e\",\n      \"installedContentHash\": \"501cab78e7f7ea06baadc6c36181c5d877223cf472a46a50259dbd26327f829a\",\n      \"installedPlacements\": {\n        \"agent:openclaw\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"d4fdd99668f2b2497871bc0c0e6780a1f30d89a7a5457106876fc691829ed9ee\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"skillFolderHash\": \"501cab78e7f7ea06baadc6c36181c5d877223cf472a46a50259dbd26327f829a\",\n      \"source\": \"\u003ctmp\u003e/source\",\n      \"sourceType\": \"local\",\n      \"sourceUrl\": \"\u003ctmp\u003e/source\",\n      \"updatedAt\": \"\u003ctimestamp\u003e\"\n    }\n  },\n  \"version\": 3\n}\n"
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/source": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/source/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: topology-skill\ndescription: topology-skill golden fixture\n---\n\n# topology\n"
+    }
+  },
+  "locks": {
+    "global-xdg": "{\n  \"skills\": {\n    \"topology-skill\": {\n      \"agents\": [\n        \"openclaw\"\n      ],\n      \"installedAt\": \"\u003ctimestamp\u003e\",\n      \"installedContentHash\": \"501cab78e7f7ea06baadc6c36181c5d877223cf472a46a50259dbd26327f829a\",\n      \"installedPlacements\": {\n        \"agent:openclaw\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"d4fdd99668f2b2497871bc0c0e6780a1f30d89a7a5457106876fc691829ed9ee\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"skillFolderHash\": \"501cab78e7f7ea06baadc6c36181c5d877223cf472a46a50259dbd26327f829a\",\n      \"source\": \"\u003ctmp\u003e/source\",\n      \"sourceType\": \"local\",\n      \"sourceUrl\": \"\u003ctmp\u003e/source\",\n      \"updatedAt\": \"\u003ctimestamp\u003e\"\n    }\n  },\n  \"version\": 3\n}\n"
+  },
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

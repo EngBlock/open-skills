@@ -1,0 +1,1835 @@
+{
+  "schemaVersion": 1,
+  "baseline": "@engblock/open-skills@0.1.2",
+  "oracleManifestSha256": "cab36aa81db45f57c2405cd8940546b3610cd7e46c9e8460d55345d0c0ffbe9a",
+  "normalizerVersion": 1,
+  "normalization": [
+    "ansi:presentation-streams",
+    "crlf:presentation-and-lock-text",
+    "filesystem:file-kind-and-portable-permissions",
+    "network:fixture-host-and-port",
+    "path:generated-workspace-and-transaction-identifiers",
+    "path:platform-separators-in-path-fields",
+    "path:sandbox-home-project-temp-and-fixture-url",
+    "symlink:path-kind-and-resolved-sandbox-target",
+    "terminal-layout:repeated-horizontal-spacing",
+    "timestamp:installedAt-updatedAt-approvedAt-json-fields"
+  ],
+  "scenarios": [
+    {
+      "id": "shell.banner",
+      "title": "Banner outside an agent environment",
+      "expectation": "npm-0.1.2",
+      "covers": [
+        "command:root"
+      ],
+      "input": {
+        "offline": true
+      }
+    },
+    {
+      "id": "shell.agent-banner-suppression",
+      "title": "Agent environments suppress the startup banner",
+      "expectation": "npm-0.1.2",
+      "covers": [
+        "shell:agent-banner-suppression"
+      ],
+      "input": {
+        "offline": true,
+        "env": {
+          "AI_AGENT": "test"
+        }
+      }
+    },
+    {
+      "id": "shell.help",
+      "title": "Canonical long help",
+      "expectation": "native-divergence",
+      "covers": [
+        "command:root"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "--help"
+        ]
+      },
+      "divergences": [
+        "D03",
+        "D06",
+        "D07",
+        "D10",
+        "D11",
+        "D12"
+      ]
+    },
+    {
+      "id": "shell.short-help",
+      "title": "Short help alias",
+      "expectation": "native-divergence",
+      "covers": [
+        "alias:-h"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "-h"
+        ]
+      },
+      "divergences": [
+        "D03",
+        "D06",
+        "D07",
+        "D10",
+        "D11",
+        "D12"
+      ]
+    },
+    {
+      "id": "shell.remove-subcommand-help",
+      "title": "Subcommand help short-circuits before remove dispatch",
+      "expectation": "native-divergence",
+      "covers": [
+        "shell:subcommand-help"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "remove",
+          "-h"
+        ]
+      },
+      "divergences": [
+        "D07",
+        "D11"
+      ]
+    },
+    {
+      "id": "shell.version",
+      "title": "Canonical version",
+      "expectation": "npm-0.1.2",
+      "covers": [
+        "command:root"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "--version"
+        ]
+      }
+    },
+    {
+      "id": "shell.short-version",
+      "title": "Short version alias",
+      "expectation": "npm-0.1.2",
+      "covers": [
+        "alias:-v"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "-v"
+        ]
+      }
+    },
+    {
+      "id": "shell.unknown-command",
+      "title": "Unknown command failure",
+      "expectation": "npm-0.1.2",
+      "covers": [
+        "command:root"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "unknown-command"
+        ]
+      }
+    },
+    {
+      "id": "find.command",
+      "title": "find decentralized discovery guidance",
+      "expectation": "npm-0.1.2",
+      "covers": [
+        "command:find"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "find",
+          "react"
+        ]
+      }
+    },
+    {
+      "id": "find.search",
+      "title": "search decentralized discovery guidance",
+      "expectation": "npm-0.1.2",
+      "covers": [
+        "alias:search"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "search",
+          "react"
+        ]
+      }
+    },
+    {
+      "id": "find.f",
+      "title": "f decentralized discovery guidance",
+      "expectation": "npm-0.1.2",
+      "covers": [
+        "alias:f"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "f",
+          "react"
+        ]
+      }
+    },
+    {
+      "id": "find.s",
+      "title": "s decentralized discovery guidance",
+      "expectation": "npm-0.1.2",
+      "covers": [
+        "alias:s"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "s",
+          "react"
+        ]
+      }
+    },
+    {
+      "id": "init.create",
+      "title": "Initialize a skill template",
+      "expectation": "npm-0.1.2",
+      "covers": [
+        "command:init"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "init",
+          "golden-skill"
+        ]
+      }
+    },
+    {
+      "id": "add.project-symlink",
+      "title": "Project local install with canonical symlink topology",
+      "expectation": "native-divergence",
+      "covers": [
+        "command:add",
+        "source:local",
+        "scope:project",
+        "topology:canonical-symlink",
+        "decision:yes"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "tmp",
+            "path": "source/SKILL.md",
+            "text": "---\nname: topology-skill\ndescription: topology-skill golden fixture\n---\n\n# topology\n"
+          },
+          {
+            "root": "project",
+            "path": ".claude",
+            "directory": true
+          }
+        ],
+        "args": [
+          "add",
+          "{{temp}}/source",
+          "--agent",
+          "claude-code",
+          "--yes"
+        ]
+      },
+      "divergences": [
+        "D08",
+        "D09"
+      ]
+    },
+    {
+      "id": "add.alias-global-copy",
+      "title": "Global local install through a with copy topology",
+      "expectation": "native-divergence",
+      "covers": [
+        "alias:a",
+        "source:local",
+        "scope:global",
+        "topology:copy",
+        "decision:yes"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "tmp",
+            "path": "source/SKILL.md",
+            "text": "---\nname: topology-skill\ndescription: topology-skill golden fixture\n---\n\n# topology\n"
+          }
+        ],
+        "args": [
+          "a",
+          "{{temp}}/source",
+          "--global",
+          "--agent",
+          "claude-code",
+          "--copy",
+          "--yes"
+        ]
+      },
+      "divergences": [
+        "D08",
+        "D09"
+      ]
+    },
+    {
+      "id": "add.install-alias",
+      "title": "install with a source routes to add",
+      "expectation": "native-divergence",
+      "covers": [
+        "alias:install-add",
+        "source:local"
+      ],
+      "divergences": [
+        "D08",
+        "D09"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "install",
+          "{{temp}}/source",
+          "--agent",
+          "universal",
+          "--yes"
+        ],
+        "files": [
+          {
+            "root": "tmp",
+            "path": "source/SKILL.md",
+            "text": "---\nname: alias-add\ndescription: alias-add golden fixture\n---\n\n# Alias add\n"
+          }
+        ]
+      }
+    },
+    {
+      "id": "add.i-alias",
+      "title": "i with a source routes to add",
+      "expectation": "native-divergence",
+      "covers": [
+        "alias:i-add",
+        "source:local"
+      ],
+      "divergences": [
+        "D08",
+        "D09"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "i",
+          "{{temp}}/source",
+          "--agent",
+          "universal",
+          "--yes"
+        ],
+        "files": [
+          {
+            "root": "tmp",
+            "path": "source/SKILL.md",
+            "text": "---\nname: alias-add\ndescription: alias-add golden fixture\n---\n\n# Alias add\n"
+          }
+        ]
+      }
+    },
+    {
+      "id": "add.all-global-adapters",
+      "title": "Install every retained global agent adapter",
+      "expectation": "native-divergence",
+      "covers": [
+        "command:add",
+        "scope:global",
+        "topology:all-retained-global-adapters"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "tmp",
+            "path": "source/SKILL.md",
+            "text": "---\nname: topology-skill\ndescription: topology-skill golden fixture\n---\n\n# topology\n"
+          }
+        ],
+        "args": [
+          "add",
+          "{{temp}}/source",
+          "--all",
+          "--global"
+        ]
+      },
+      "divergences": [
+        "D08",
+        "D09"
+      ]
+    },
+    {
+      "id": "add.eve-subagents",
+      "title": "Install Eve root and explicit subagents",
+      "expectation": "native-divergence",
+      "covers": [
+        "command:add",
+        "scope:project",
+        "topology:eve-root-and-subagents"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "tmp",
+            "path": "source/SKILL.md",
+            "text": "---\nname: topology-skill\ndescription: topology fixture\nlicense: MIT\nmetadata:\n  owner: EngBlock\n---\n# topology\n"
+          },
+          {
+            "root": "project",
+            "path": "agent",
+            "directory": true
+          },
+          {
+            "root": "project",
+            "path": "agent/subagents/research",
+            "directory": true
+          },
+          {
+            "root": "project",
+            "path": "agent/subagents/writer",
+            "directory": true
+          }
+        ],
+        "args": [
+          "add",
+          "{{temp}}/source",
+          "--subagent",
+          "root",
+          "research",
+          "writer",
+          "--yes"
+        ]
+      },
+      "divergences": [
+        "D08",
+        "D09"
+      ]
+    },
+    {
+      "id": "add.openclaw-legacy-global",
+      "title": "Keep the explicit OpenClaw legacy global placement",
+      "expectation": "native-divergence",
+      "covers": [
+        "command:add",
+        "scope:global",
+        "topology:openclaw-legacy-global"
+      ],
+      "divergences": [
+        "D08",
+        "D09"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "add",
+          "{{temp}}/source",
+          "--agent",
+          "openclaw",
+          "--global",
+          "--yes"
+        ],
+        "files": [
+          {
+            "root": "tmp",
+            "path": "source/SKILL.md",
+            "text": "---\nname: topology-skill\ndescription: topology-skill golden fixture\n---\n\n# topology\n"
+          },
+          {
+            "root": "home",
+            "path": ".clawdbot",
+            "directory": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "add.github-source",
+      "title": "GitHub shorthand reaches Git through direct argv",
+      "expectation": "native-divergence",
+      "covers": [
+        "source:github"
+      ],
+      "input": {
+        "commands": [
+          {
+            "name": "git",
+            "stderr": "fixture clone failed\n",
+            "exitCode": 9
+          }
+        ],
+        "args": [
+          "add",
+          "EngBlock/golden-fixture",
+          "--agent",
+          "universal",
+          "--yes"
+        ]
+      },
+      "divergences": [
+        "D03",
+        "D04",
+        "D05"
+      ]
+    },
+    {
+      "id": "add.gitlab-source",
+      "title": "GitLab shorthand reaches Git through direct argv",
+      "expectation": "native-divergence",
+      "covers": [
+        "source:gitlab"
+      ],
+      "input": {
+        "commands": [
+          {
+            "name": "git",
+            "stderr": "fixture clone failed\n",
+            "exitCode": 9
+          }
+        ],
+        "args": [
+          "add",
+          "gitlab:EngBlock/golden-fixture",
+          "--agent",
+          "universal",
+          "--yes"
+        ]
+      },
+      "divergences": [
+        "D03",
+        "D04",
+        "D05"
+      ]
+    },
+    {
+      "id": "add.generic-git-source",
+      "title": "Generic file Git source installs an immutable local repository",
+      "expectation": "native-divergence",
+      "covers": [
+        "source:generic-git"
+      ],
+      "input": {
+        "repositories": [
+          {
+            "name": "generic",
+            "files": {
+              "golden/SKILL.md": "---\nname: generic-git\ndescription: generic-git golden fixture\n---\n\n# generic-git\n"
+            }
+          }
+        ],
+        "commands": [
+          {
+            "name": "git",
+            "passthrough": true
+          }
+        ],
+        "args": [
+          "add",
+          "{{repo:generic:url}}",
+          "--agent",
+          "universal",
+          "--yes"
+        ]
+      },
+      "divergences": [
+        "D04",
+        "D05",
+        "D08",
+        "D09"
+      ]
+    },
+    {
+      "id": "add.well-known-source",
+      "title": "Controlled well-known source with explicit insecure authorization",
+      "expectation": "native-divergence",
+      "covers": [
+        "source:well-known",
+        "decision:allow-insecure-transport"
+      ],
+      "input": {
+        "httpRoutes": [
+          {
+            "method": "GET",
+            "path": "/.well-known/agent-skills/index.json",
+            "body": "{\"skills\":[{\"name\":\"well-known\",\"description\":\"well known golden fixture\",\"files\":[\"SKILL.md\"]}]}"
+          },
+          {
+            "method": "GET",
+            "path": "/.well-known/agent-skills/well-known/SKILL.md",
+            "body": "---\nname: well-known\ndescription: well-known golden fixture\n---\n\n# well-known\n"
+          }
+        ],
+        "args": [
+          "add",
+          "{{http:url}}",
+          "--agent",
+          "universal",
+          "--yes",
+          "--allow-insecure-transport"
+        ]
+      },
+      "divergences": [
+        "D03",
+        "D08",
+        "D09"
+      ]
+    },
+    {
+      "id": "add.insecure-denied",
+      "title": "Plain HTTP is denied before acquisition without its exact flag",
+      "expectation": "native-divergence",
+      "covers": [
+        "decision:allow-insecure-transport"
+      ],
+      "input": {
+        "httpRoutes": [
+          {
+            "method": "GET",
+            "path": "/.well-known/agent-skills/index.json",
+            "body": "{\"skills\":[{\"name\":\"well-known\",\"description\":\"well known golden fixture\",\"files\":[\"SKILL.md\"]}]}"
+          },
+          {
+            "method": "GET",
+            "path": "/.well-known/agent-skills/well-known/SKILL.md",
+            "body": "---\nname: well-known\ndescription: well-known golden fixture\n---\n\n# well-known\n"
+          }
+        ],
+        "args": [
+          "add",
+          "{{http:url}}",
+          "--agent",
+          "universal",
+          "--yes"
+        ]
+      },
+      "divergences": [
+        "D03"
+      ]
+    },
+    {
+      "id": "add.selection-required",
+      "title": "Non-interactive JSON add refuses ambiguous selection",
+      "expectation": "native-divergence",
+      "covers": [
+        "decision:selection"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "tmp",
+            "path": "source/alpha/SKILL.md",
+            "text": "---\nname: alpha\ndescription: alpha golden fixture\n---\n\n# alpha\n"
+          },
+          {
+            "root": "tmp",
+            "path": "source/beta/SKILL.md",
+            "text": "---\nname: beta\ndescription: beta golden fixture\n---\n\n# beta\n"
+          }
+        ],
+        "args": [
+          "add",
+          "{{temp}}/source",
+          "--json"
+        ]
+      },
+      "divergences": [
+        "D06",
+        "D11"
+      ]
+    },
+    {
+      "id": "add.replace-required",
+      "title": "Yes does not authorize cross-source replacement",
+      "expectation": "native-divergence",
+      "covers": [
+        "decision:replace"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "tmp",
+            "path": "replacement/SKILL.md",
+            "text": "---\nname: provenance-skill\ndescription: replacement source\n---\n# replacement\n"
+          },
+          {
+            "root": "project",
+            "path": ".agents/skills/provenance-skill/SKILL.md",
+            "text": "---\nname: provenance-skill\ndescription: prior source\n---\n# prior\n"
+          },
+          {
+            "root": "project",
+            "path": "skills-lock.json",
+            "text": "{\"version\":1,\"skills\":{\"provenance-skill\":{\"source\":\"{{temp:json}}/prior\",\"sourceType\":\"local\",\"computedHash\":\"c366f6b83983f26174df4490dd23a8adee4487a2d1021edbaf8f4f2f73e9a97e\",\"installedContentHash\":\"c366f6b83983f26174df4490dd23a8adee4487a2d1021edbaf8f4f2f73e9a97e\",\"ownedFiles\":[\"SKILL.md\"],\"agents\":[\"universal\"],\"installedPlacements\":{\"canonical\":{\"kind\":\"canonical\",\"paths\":{\"SKILL.md\":{\"kind\":\"file\",\"hash\":\"7391f3d1e3eef04c5d23fb3431044f18d44ab9a6eb0e5d069531f6736b06168b\"}}}}}}}"
+          }
+        ],
+        "args": [
+          "add",
+          "{{temp}}/replacement",
+          "--agent",
+          "universal",
+          "--yes"
+        ]
+      },
+      "divergences": [
+        "D07"
+      ]
+    },
+    {
+      "id": "add.force-required",
+      "title": "Yes does not authorize loss of local changes",
+      "expectation": "native-divergence",
+      "covers": [
+        "decision:force"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "tmp",
+            "path": "replacement/SKILL.md",
+            "text": "---\nname: provenance-skill\ndescription: replacement source\n---\n# replacement\n"
+          },
+          {
+            "root": "project",
+            "path": ".agents/skills/provenance-skill/SKILL.md",
+            "text": "---\nname: provenance-skill\ndescription: locally modified\n---\n# local edit\n"
+          },
+          {
+            "root": "project",
+            "path": "skills-lock.json",
+            "text": "{\"version\":1,\"skills\":{\"provenance-skill\":{\"source\":\"{{temp:json}}/replacement\",\"sourceType\":\"local\",\"computedHash\":\"c366f6b83983f26174df4490dd23a8adee4487a2d1021edbaf8f4f2f73e9a97e\",\"installedContentHash\":\"c366f6b83983f26174df4490dd23a8adee4487a2d1021edbaf8f4f2f73e9a97e\",\"ownedFiles\":[\"SKILL.md\"],\"agents\":[\"universal\"],\"installedPlacements\":{\"canonical\":{\"kind\":\"canonical\",\"paths\":{\"SKILL.md\":{\"kind\":\"file\",\"hash\":\"7391f3d1e3eef04c5d23fb3431044f18d44ab9a6eb0e5d069531f6736b06168b\"}}}}}}}"
+          }
+        ],
+        "args": [
+          "add",
+          "{{temp}}/replacement",
+          "--agent",
+          "universal",
+          "--yes"
+        ]
+      },
+      "divergences": [
+        "D07"
+      ]
+    },
+    {
+      "id": "restore.experimental-install",
+      "title": "Restore recorded node_modules skills",
+      "expectation": "native-divergence",
+      "covers": [
+        "command:experimental_install"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "project",
+            "path": "skills-lock.json",
+            "text": "{\"version\":1,\"skills\":{\"restore-me\":{\"source\":\"package-a\",\"sourceType\":\"node_modules\",\"computedHash\":\"old\",\"agents\":[\"claude-code\"]}}}"
+          },
+          {
+            "root": "project",
+            "path": "node_modules/package-a/SKILL.md",
+            "text": "---\nname: restore-me\ndescription: restore-me golden fixture\n---\n\n# restore-me\n"
+          }
+        ],
+        "args": [
+          "experimental_install"
+        ]
+      },
+      "divergences": [
+        "D08",
+        "D09"
+      ]
+    },
+    {
+      "id": "restore.install-alias",
+      "title": "install restore alias",
+      "expectation": "native-divergence",
+      "covers": [
+        "alias:install"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "project",
+            "path": "skills-lock.json",
+            "text": "{\"version\":1,\"skills\":{\"restore-me\":{\"source\":\"package-a\",\"sourceType\":\"node_modules\",\"computedHash\":\"old\",\"agents\":[\"claude-code\"]}}}"
+          },
+          {
+            "root": "project",
+            "path": "node_modules/package-a/SKILL.md",
+            "text": "---\nname: restore-me\ndescription: restore-me golden fixture\n---\n\n# restore-me\n"
+          }
+        ],
+        "args": [
+          "install"
+        ]
+      },
+      "divergences": [
+        "D08",
+        "D09"
+      ]
+    },
+    {
+      "id": "restore.i-alias",
+      "title": "i restore alias",
+      "expectation": "native-divergence",
+      "covers": [
+        "alias:i"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "project",
+            "path": "skills-lock.json",
+            "text": "{\"version\":1,\"skills\":{\"restore-me\":{\"source\":\"package-a\",\"sourceType\":\"node_modules\",\"computedHash\":\"old\",\"agents\":[\"claude-code\"]}}}"
+          },
+          {
+            "root": "project",
+            "path": "node_modules/package-a/SKILL.md",
+            "text": "---\nname: restore-me\ndescription: restore-me golden fixture\n---\n\n# restore-me\n"
+          }
+        ],
+        "args": [
+          "i"
+        ]
+      },
+      "divergences": [
+        "D08",
+        "D09"
+      ]
+    },
+    {
+      "id": "sync.node-modules",
+      "title": "Discover and sync node_modules skills",
+      "expectation": "native-divergence",
+      "covers": [
+        "command:experimental_sync"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "project",
+            "path": "node_modules/catalog/skills/synced/SKILL.md",
+            "text": "---\nname: synced\ndescription: synced golden fixture\n---\n\n# synced\n"
+          }
+        ],
+        "args": [
+          "experimental_sync",
+          "--agent",
+          "claude-code",
+          "--yes"
+        ]
+      },
+      "divergences": [
+        "D08",
+        "D09"
+      ]
+    },
+    {
+      "id": "list.project-valid",
+      "title": "Read valid npm project state without rewriting",
+      "expectation": "npm-0.1.2",
+      "covers": [
+        "command:list",
+        "scope:project",
+        "lock:project-valid"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "project",
+            "path": "skills-lock.json",
+            "fixture": "locks/project/valid.json"
+          },
+          {
+            "root": "project",
+            "path": ".agents/skills/project-alpha/SKILL.md",
+            "text": "---\nname: project-alpha\ndescription: project-alpha golden fixture\n---\n\n# project-alpha\n"
+          },
+          {
+            "root": "project",
+            "path": ".agents/skills/project-zeta/SKILL.md",
+            "text": "---\nname: project-zeta\ndescription: project-zeta golden fixture\n---\n\n# project-zeta\n"
+          }
+        ],
+        "args": [
+          "list"
+        ]
+      },
+      "normalization": [
+        "terminal-layout:repeated-horizontal-spacing"
+      ]
+    },
+    {
+      "id": "list.global-valid",
+      "title": "Read valid npm global state through ls",
+      "expectation": "npm-0.1.2",
+      "covers": [
+        "alias:ls",
+        "scope:global",
+        "lock:global-valid"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "home",
+            "path": ".local/state/skills/.skill-lock.json",
+            "fixture": "locks/global/valid.json"
+          },
+          {
+            "root": "home",
+            "path": ".agents/skills/npm-global-beta/SKILL.md",
+            "text": "---\nname: npm-global-beta\ndescription: npm-global-beta golden fixture\n---\n\n# npm-global-beta\n"
+          }
+        ],
+        "args": [
+          "ls",
+          "--global"
+        ]
+      },
+      "normalization": [
+        "terminal-layout:repeated-horizontal-spacing"
+      ]
+    },
+    {
+      "id": "list.project-malformed",
+      "title": "Reject and preserve malformed project state",
+      "expectation": "native-divergence",
+      "covers": [
+        "lock:project-malformed"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "project",
+            "path": "skills-lock.json",
+            "fixture": "locks/project/malformed.json"
+          }
+        ],
+        "args": [
+          "list",
+          "--json"
+        ]
+      },
+      "divergences": [
+        "D09"
+      ]
+    },
+    {
+      "id": "list.project-older",
+      "title": "Reject and preserve older project state",
+      "expectation": "native-divergence",
+      "covers": [
+        "lock:project-older"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "project",
+            "path": "skills-lock.json",
+            "fixture": "locks/project/older.json"
+          }
+        ],
+        "args": [
+          "list",
+          "--json"
+        ]
+      },
+      "divergences": [
+        "D09"
+      ]
+    },
+    {
+      "id": "list.project-newer",
+      "title": "Reject and preserve newer project state",
+      "expectation": "native-divergence",
+      "covers": [
+        "lock:project-newer"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "project",
+            "path": "skills-lock.json",
+            "fixture": "locks/project/newer.json"
+          }
+        ],
+        "args": [
+          "list",
+          "--json"
+        ]
+      },
+      "divergences": [
+        "D09"
+      ]
+    },
+    {
+      "id": "list.project-unknown-fields",
+      "title": "Preserve project extensions through a validated mutation",
+      "expectation": "native-divergence",
+      "covers": [
+        "lock:project-unknown-fields"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "project",
+            "path": "skills-lock.json",
+            "fixture": "locks/project/unknown-fields.json"
+          },
+          {
+            "root": "project",
+            "path": ".agents/skills/existing/SKILL.md",
+            "text": "---\nname: existing\ndescription: existing golden fixture\n---\n\n# existing\n"
+          },
+          {
+            "root": "tmp",
+            "path": "new/SKILL.md",
+            "text": "---\nname: new-project\ndescription: new-project golden fixture\n---\n\n# new-project\n"
+          }
+        ],
+        "args": [
+          "add",
+          "{{temp}}/new",
+          "--agent",
+          "universal",
+          "--yes"
+        ]
+      },
+      "divergences": [
+        "D09"
+      ]
+    },
+    {
+      "id": "list.global-malformed",
+      "title": "Reject and preserve malformed global state",
+      "expectation": "native-divergence",
+      "covers": [
+        "lock:global-malformed"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "home",
+            "path": ".local/state/skills/.skill-lock.json",
+            "fixture": "locks/global/malformed.json"
+          }
+        ],
+        "args": [
+          "list",
+          "--global",
+          "--json"
+        ]
+      },
+      "divergences": [
+        "D09"
+      ]
+    },
+    {
+      "id": "list.global-older",
+      "title": "Reject and preserve older global state",
+      "expectation": "native-divergence",
+      "covers": [
+        "lock:global-older"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "home",
+            "path": ".local/state/skills/.skill-lock.json",
+            "fixture": "locks/global/older.json"
+          }
+        ],
+        "args": [
+          "list",
+          "--global",
+          "--json"
+        ]
+      },
+      "divergences": [
+        "D09"
+      ]
+    },
+    {
+      "id": "list.global-newer",
+      "title": "Reject and preserve newer global state",
+      "expectation": "native-divergence",
+      "covers": [
+        "lock:global-newer"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "home",
+            "path": ".local/state/skills/.skill-lock.json",
+            "fixture": "locks/global/newer.json"
+          }
+        ],
+        "args": [
+          "list",
+          "--global",
+          "--json"
+        ]
+      },
+      "divergences": [
+        "D09"
+      ]
+    },
+    {
+      "id": "list.global-unknown-fields",
+      "title": "Preserve global extensions through a validated mutation",
+      "expectation": "native-divergence",
+      "covers": [
+        "lock:global-unknown-fields"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "home",
+            "path": ".local/state/skills/.skill-lock.json",
+            "fixture": "locks/global/unknown-fields.json"
+          },
+          {
+            "root": "home",
+            "path": ".agents/skills/existing/SKILL.md",
+            "text": "---\nname: existing\ndescription: existing golden fixture\n---\n\n# existing\n"
+          },
+          {
+            "root": "tmp",
+            "path": "new/SKILL.md",
+            "text": "---\nname: new-global\ndescription: new-global golden fixture\n---\n\n# new-global\n"
+          }
+        ],
+        "args": [
+          "add",
+          "{{temp}}/new",
+          "--global",
+          "--agent",
+          "universal",
+          "--yes"
+        ]
+      },
+      "divergences": [
+        "D09"
+      ]
+    },
+    {
+      "id": "remove.command",
+      "title": "Remove a project skill non-interactively",
+      "expectation": "native-divergence",
+      "covers": [
+        "command:remove",
+        "scope:project",
+        "decision:yes"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "project",
+            "path": ".agents/skills/owned-skill/SKILL.md",
+            "text": "---\nname: owned-skill\ndescription: owned-skill golden fixture\n---\n\n# owned\n"
+          },
+          {
+            "root": "project",
+            "path": "skills-lock.json",
+            "text": "{\"version\":1,\"skills\":{\"owned-skill\":{\"source\":\"fixture\",\"sourceType\":\"local\",\"computedHash\":\"3a7b1f04d398d3b267632247ae9a132eb06787dd2e724157ec7f1679006ef46b\",\"installedContentHash\":\"3a7b1f04d398d3b267632247ae9a132eb06787dd2e724157ec7f1679006ef46b\",\"ownedFiles\":[\"SKILL.md\"],\"agents\":[\"universal\"],\"installedPlacements\":{\"canonical\":{\"kind\":\"canonical\",\"paths\":{\"SKILL.md\":{\"kind\":\"file\",\"hash\":\"d07d93f781a1342ff50d455a31ff6a8e24a7827920132b8ef94aec0b1c9d434a\"}}}}}}}"
+          }
+        ],
+        "args": [
+          "remove",
+          "owned-skill",
+          "--yes"
+        ]
+      },
+      "divergences": [
+        "D07",
+        "D08",
+        "D09"
+      ]
+    },
+    {
+      "id": "remove.rm-alias",
+      "title": "Remove through rm alias",
+      "expectation": "native-divergence",
+      "covers": [
+        "alias:rm"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "project",
+            "path": ".agents/skills/owned-skill/SKILL.md",
+            "text": "---\nname: owned-skill\ndescription: owned-skill golden fixture\n---\n\n# owned\n"
+          },
+          {
+            "root": "project",
+            "path": "skills-lock.json",
+            "text": "{\"version\":1,\"skills\":{\"owned-skill\":{\"source\":\"fixture\",\"sourceType\":\"local\",\"computedHash\":\"3a7b1f04d398d3b267632247ae9a132eb06787dd2e724157ec7f1679006ef46b\",\"installedContentHash\":\"3a7b1f04d398d3b267632247ae9a132eb06787dd2e724157ec7f1679006ef46b\",\"ownedFiles\":[\"SKILL.md\"],\"agents\":[\"universal\"],\"installedPlacements\":{\"canonical\":{\"kind\":\"canonical\",\"paths\":{\"SKILL.md\":{\"kind\":\"file\",\"hash\":\"d07d93f781a1342ff50d455a31ff6a8e24a7827920132b8ef94aec0b1c9d434a\"}}}}}}}"
+          }
+        ],
+        "args": [
+          "rm",
+          "owned-skill",
+          "--yes"
+        ]
+      },
+      "divergences": [
+        "D07",
+        "D08",
+        "D09"
+      ]
+    },
+    {
+      "id": "remove.r-alias",
+      "title": "Remove through r alias",
+      "expectation": "native-divergence",
+      "covers": [
+        "alias:r"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "project",
+            "path": ".agents/skills/owned-skill/SKILL.md",
+            "text": "---\nname: owned-skill\ndescription: owned-skill golden fixture\n---\n\n# owned\n"
+          },
+          {
+            "root": "project",
+            "path": "skills-lock.json",
+            "text": "{\"version\":1,\"skills\":{\"owned-skill\":{\"source\":\"fixture\",\"sourceType\":\"local\",\"computedHash\":\"3a7b1f04d398d3b267632247ae9a132eb06787dd2e724157ec7f1679006ef46b\",\"installedContentHash\":\"3a7b1f04d398d3b267632247ae9a132eb06787dd2e724157ec7f1679006ef46b\",\"ownedFiles\":[\"SKILL.md\"],\"agents\":[\"universal\"],\"installedPlacements\":{\"canonical\":{\"kind\":\"canonical\",\"paths\":{\"SKILL.md\":{\"kind\":\"file\",\"hash\":\"d07d93f781a1342ff50d455a31ff6a8e24a7827920132b8ef94aec0b1c9d434a\"}}}}}}}"
+          }
+        ],
+        "args": [
+          "r",
+          "owned-skill",
+          "--yes"
+        ]
+      },
+      "divergences": [
+        "D07",
+        "D08",
+        "D09"
+      ]
+    },
+    {
+      "id": "check.empty-project",
+      "title": "Check an empty project deterministically",
+      "expectation": "native-divergence",
+      "covers": [
+        "command:check"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "project",
+            "path": "skills-lock.json",
+            "text": "{\"version\":1,\"skills\":{}}\n"
+          }
+        ],
+        "args": [
+          "check",
+          "--project",
+          "--json"
+        ]
+      },
+      "divergences": [
+        "D11"
+      ]
+    },
+    {
+      "id": "update.empty-project",
+      "title": "Update an empty project deterministically",
+      "expectation": "native-divergence",
+      "covers": [
+        "command:update"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "project",
+            "path": "skills-lock.json",
+            "text": "{\"version\":1,\"skills\":{}}\n"
+          }
+        ],
+        "args": [
+          "update",
+          "--project",
+          "--json"
+        ]
+      },
+      "divergences": [
+        "D08",
+        "D11"
+      ]
+    },
+    {
+      "id": "update.upgrade-alias",
+      "title": "upgrade alias updates an empty project",
+      "expectation": "native-divergence",
+      "covers": [
+        "alias:upgrade"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "project",
+            "path": "skills-lock.json",
+            "text": "{\"version\":1,\"skills\":{}}\n"
+          }
+        ],
+        "args": [
+          "upgrade",
+          "--project",
+          "--json"
+        ]
+      },
+      "divergences": [
+        "D08",
+        "D11"
+      ]
+    },
+    {
+      "id": "use.prompt",
+      "title": "Emit the semantic local skill prompt",
+      "expectation": "npm-0.1.2",
+      "covers": [
+        "command:use",
+        "source:local"
+      ],
+      "input": {
+        "offline": true,
+        "files": [
+          {
+            "root": "tmp",
+            "path": "source/SKILL.md",
+            "text": "---\nname: launch\ndescription: launch golden fixture\n---\n\n# Launch\n"
+          }
+        ],
+        "args": [
+          "use",
+          "{{temp}}/source"
+        ]
+      }
+    },
+    {
+      "id": "use.claude-agent",
+      "title": "Launch Claude only when explicitly selected",
+      "expectation": "npm-0.1.2",
+      "covers": [
+        "agent-launch:claude-code"
+      ],
+      "input": {
+        "files": [
+          {
+            "root": "tmp",
+            "path": "source/SKILL.md",
+            "text": "---\nname: launch\ndescription: launch golden fixture\n---\n\n# Launch\n"
+          }
+        ],
+        "commands": [
+          {
+            "name": "claude",
+            "stdout": "claude golden output\n"
+          }
+        ],
+        "args": [
+          "use",
+          "{{temp}}/source",
+          "--agent",
+          "claude-code"
+        ]
+      }
+    },
+    {
+      "id": "use.codex-agent",
+      "title": "Propagate an explicitly launched Codex exit",
+      "expectation": "npm-0.1.2",
+      "covers": [
+        "agent-launch:codex"
+      ],
+      "input": {
+        "files": [
+          {
+            "root": "tmp",
+            "path": "source/SKILL.md",
+            "text": "---\nname: launch\ndescription: launch golden fixture\n---\n\n# Launch\n"
+          }
+        ],
+        "commands": [
+          {
+            "name": "codex",
+            "stdout": "codex golden output\n",
+            "exitCode": 37
+          }
+        ],
+        "args": [
+          "use",
+          "{{temp}}/source",
+          "--agent",
+          "codex"
+        ]
+      }
+    },
+    {
+      "id": "trust.list",
+      "title": "List trust records offline as versioned JSON",
+      "expectation": "native-divergence",
+      "covers": [
+        "command:trust"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "trust",
+          "list",
+          "--json"
+        ]
+      },
+      "divergences": [
+        "D10",
+        "D11"
+      ]
+    },
+    {
+      "id": "trust.revoke",
+      "title": "Revoke one exact commit without broad confirmation",
+      "expectation": "native-divergence",
+      "covers": [
+        "command:trust"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "trust",
+          "revoke",
+          "https://example.test/repository.git",
+          "--commit",
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ]
+      },
+      "divergences": [
+        "D10"
+      ]
+    },
+    {
+      "id": "trust.clear-confirmation",
+      "title": "Refuse broad trust clearing without confirmation",
+      "expectation": "native-divergence",
+      "covers": [
+        "command:trust"
+      ],
+      "input": {
+        "offline": true,
+        "args": [
+          "trust",
+          "clear"
+        ]
+      },
+      "divergences": [
+        "D10"
+      ]
+    },
+    {
+      "id": "use.trust-required",
+      "title": "Remote agent use requires exact non-interactive trust",
+      "expectation": "native-divergence",
+      "covers": [
+        "decision:trust"
+      ],
+      "input": {
+        "httpRoutes": [
+          {
+            "method": "GET",
+            "path": "/.well-known/agent-skills/index.json",
+            "body": "{\"skills\":[{\"name\":\"trusted\",\"description\":\"trusted golden fixture\",\"files\":[\"SKILL.md\"]}]}"
+          },
+          {
+            "method": "GET",
+            "path": "/.well-known/agent-skills/trusted/SKILL.md",
+            "body": "---\nname: trusted\ndescription: trusted golden fixture\n---\n\n# Trusted\n"
+          }
+        ],
+        "commands": [
+          {
+            "name": "claude",
+            "stdout": "must not launch\n"
+          }
+        ],
+        "args": [
+          "use",
+          "{{http:url}}",
+          "--agent",
+          "claude-code",
+          "--allow-insecure-transport"
+        ]
+      },
+      "divergences": [
+        "D03",
+        "D10"
+      ]
+    },
+    {
+      "id": "use.trust-authorized",
+      "title": "Dedicated trust authorization launches one exact remote commit",
+      "expectation": "native-divergence",
+      "covers": [
+        "decision:trust"
+      ],
+      "input": {
+        "httpRoutes": [
+          {
+            "method": "GET",
+            "path": "/.well-known/agent-skills/index.json",
+            "body": "{\"skills\":[{\"name\":\"trusted\",\"description\":\"trusted golden fixture\",\"files\":[\"SKILL.md\"]}]}"
+          },
+          {
+            "method": "GET",
+            "path": "/.well-known/agent-skills/trusted/SKILL.md",
+            "body": "---\nname: trusted\ndescription: trusted golden fixture\n---\n\n# Trusted\n"
+          }
+        ],
+        "commands": [
+          {
+            "name": "claude",
+            "stdout": "trusted golden output\n"
+          }
+        ],
+        "args": [
+          "use",
+          "{{http:url}}",
+          "--agent",
+          "claude-code",
+          "--allow-insecure-transport",
+          "--trust"
+        ]
+      },
+      "divergences": [
+        "D03",
+        "D10"
+      ]
+    },
+    {
+      "id": "environment.legacy-internal",
+      "title": "Legacy environment remains supported with migration warning",
+      "expectation": "native-divergence",
+      "covers": [
+        "command:add"
+      ],
+      "input": {
+        "offline": true,
+        "env": {
+          "INSTALL_INTERNAL_SKILLS": "1"
+        },
+        "files": [
+          {
+            "root": "tmp",
+            "path": "source/SKILL.md",
+            "text": "---\nname: internal\ndescription: internal\nmetadata:\n  internal: true\n---\n"
+          }
+        ],
+        "args": [
+          "add",
+          "{{temp}}/source",
+          "--list"
+        ]
+      },
+      "divergences": [
+        "D12"
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "D01",
+      "expectation": "Native distributions expose only open-skills and run with Node absent.",
+      "rationale": "Avoid executable-name collisions and remove JavaScript as a runtime dependency.",
+      "migrationDoc": "docs/native-migration.md#d01-one-native-executable-name",
+      "scenarios": [],
+      "verification": [
+        "TestD01BuildNativeProducesOnlyOpenSkillsAndRunsWithoutNode",
+        "TestVerifyReleaseBundleRejectsExecutableAliases"
+      ]
+    },
+    {
+      "id": "D02",
+      "expectation": "Local shell and discovery guidance perform no automatic network or subprocess activity.",
+      "rationale": "Routine local work must not phone home or retain a binary self-updater.",
+      "migrationDoc": "docs/native-migration.md#d02-offline-command-shell",
+      "scenarios": [
+        "find.command",
+        "shell.banner"
+      ],
+      "verification": [
+        "TestD02OfflineShellHasNoLowLevelDependencies"
+      ]
+    },
+    {
+      "id": "D03",
+      "expectation": "Insecure transports require an exact flag; redirects and diagnostics protect credentials.",
+      "rationale": "Transport integrity and secret confinement are stronger than npm 0.1.2.",
+      "migrationDoc": "docs/native-migration.md#d03-d06-remote-source-acquisition",
+      "scenarios": [
+        "add.github-source",
+        "add.gitlab-source",
+        "add.insecure-denied",
+        "add.well-known-source",
+        "shell.help",
+        "shell.short-help",
+        "use.trust-authorized",
+        "use.trust-required"
+      ],
+      "verification": [
+        "TestNativeD03RedirectReportsFinalHostAndRedactsPersistedURL"
+      ]
+    },
+    {
+      "id": "D04",
+      "expectation": "Remote Git installs resolve, record, and install one immutable commit.",
+      "rationale": "Immutable provenance prevents branch movement between check and installation.",
+      "migrationDoc": "docs/native-migration.md#d03-d06-remote-source-acquisition",
+      "scenarios": [
+        "add.generic-git-source",
+        "add.github-source",
+        "add.gitlab-source"
+      ],
+      "verification": [
+        "TestD04GitSourceInstallsExactCommitAndCleansWorkspace",
+        "TestUpdateInstallsExactlyCheckedCommitWhenBranchMoves"
+      ]
+    },
+    {
+      "id": "D05",
+      "expectation": "Repositories remain inert data; Git uses direct argv without hooks, submodules, or LFS smudge.",
+      "rationale": "Untrusted repositories must not gain code-execution authority.",
+      "migrationDoc": "docs/native-migration.md#d03-d06-remote-source-acquisition",
+      "scenarios": [
+        "add.generic-git-source",
+        "add.github-source",
+        "add.gitlab-source"
+      ],
+      "verification": [
+        "TestGitValidRefShellMetacharactersRemainOneInertArgument",
+        "TestGitAcquisitionDoesNotInitializeSubmodules",
+        "TestSelectedGitLFSPointersFailAddUseAndUpdateWithoutMutation"
+      ]
+    },
+    {
+      "id": "D06",
+      "expectation": "Discovery is bounded and ambiguous normalized names require exact selection.",
+      "rationale": "Resource exhaustion and order-dependent skill selection are unsafe baseline behaviors.",
+      "migrationDoc": "docs/native-migration.md#d03-d06-remote-source-acquisition",
+      "scenarios": [
+        "add.selection-required",
+        "shell.help",
+        "shell.short-help"
+      ],
+      "verification": [
+        "TestNativeFullDepthCeilingPreservesShallowDiscovery",
+        "TestNativeAddRejectsAmbiguousNameWithoutInstalling",
+        "TestNativeAddRejectsUnconfinedRepositorySymlinksWithoutPartialInstallation"
+      ]
+    },
+    {
+      "id": "D07",
+      "expectation": "--replace and --force authorize separate risks and --yes grants neither.",
+      "rationale": "Provenance replacement and local-content loss require independent intent.",
+      "migrationDoc": "docs/native-migration.md#d07-provenance-and-local-content-safe-replacement",
+      "scenarios": [
+        "add.force-required",
+        "add.replace-required",
+        "remove.command",
+        "remove.r-alias",
+        "remove.rm-alias",
+        "shell.help",
+        "shell.remove-subcommand-help",
+        "shell.short-help"
+      ],
+      "verification": [
+        "TestNativeAddRequiresReplaceAndForceIndependently"
+      ]
+    },
+    {
+      "id": "D08",
+      "expectation": "Mutations are journaled, recoverable, rolled back where practical, and advisory-locked with bounded waits.",
+      "rationale": "Partial writes and concurrent corruption are data-loss risks.",
+      "migrationDoc": "docs/native-migration.md#d08-crash-recoverable-mutation-transactions",
+      "scenarios": [
+        "add.alias-global-copy",
+        "add.all-global-adapters",
+        "add.eve-subagents",
+        "add.generic-git-source",
+        "add.i-alias",
+        "add.install-alias",
+        "add.openclaw-legacy-global",
+        "add.project-symlink",
+        "add.well-known-source",
+        "remove.command",
+        "remove.r-alias",
+        "remove.rm-alias",
+        "restore.experimental-install",
+        "restore.i-alias",
+        "restore.install-alias",
+        "sync.node-modules",
+        "update.empty-project",
+        "update.upgrade-alias"
+      ],
+      "verification": [
+        "TestNativeAddReplaceRollsBackContentAndLockWhenPlacementFails",
+        "TestInvalidLockTimeoutFailsBeforeManagedStateIsTouched"
+      ]
+    },
+    {
+      "id": "D09",
+      "expectation": "Malformed and version-skewed state is preserved; supported unknown fields survive rewrites.",
+      "rationale": "Silent state reset or downgrade can destroy provenance and extensions.",
+      "migrationDoc": "docs/native-migration.md#d09-safe-existing-state-inspection",
+      "scenarios": [
+        "add.alias-global-copy",
+        "add.all-global-adapters",
+        "add.eve-subagents",
+        "add.generic-git-source",
+        "add.i-alias",
+        "add.install-alias",
+        "add.openclaw-legacy-global",
+        "add.project-symlink",
+        "add.well-known-source",
+        "list.global-malformed",
+        "list.global-newer",
+        "list.global-older",
+        "list.global-unknown-fields",
+        "list.project-malformed",
+        "list.project-newer",
+        "list.project-older",
+        "list.project-unknown-fields",
+        "remove.command",
+        "remove.r-alias",
+        "remove.rm-alias",
+        "restore.experimental-install",
+        "restore.i-alias",
+        "restore.install-alias",
+        "sync.node-modules"
+      ],
+      "verification": [
+        "TestNativeListRejectsUnsupportedAndStructurallyInvalidState"
+      ]
+    },
+    {
+      "id": "D10",
+      "expectation": "Remote agent instruction injection is trusted by sanitized source and exact commit, with offline audit and revocation.",
+      "rationale": "Explicit exact-commit trust limits prompt-injection exposure.",
+      "migrationDoc": "docs/native-migration.md#d10-exact-remote-instruction-trust",
+      "scenarios": [
+        "shell.help",
+        "shell.short-help",
+        "trust.clear-confirmation",
+        "trust.list",
+        "trust.revoke",
+        "use.trust-authorized",
+        "use.trust-required"
+      ],
+      "verification": [
+        "TestNativeRemoteWellKnownAgentUseRecordsExactTrustBeforeInjection"
+      ]
+    },
+    {
+      "id": "D11",
+      "expectation": "Management JSON is deterministic, versioned, machine-only, prompt-free, and uses stable symbolic errors.",
+      "rationale": "Automation must not parse decoration or infer risky decisions.",
+      "migrationDoc": "docs/native-migration.md#d11-versioned-json-automation",
+      "scenarios": [
+        "add.selection-required",
+        "check.empty-project",
+        "shell.help",
+        "shell.remove-subcommand-help",
+        "shell.short-help",
+        "trust.list",
+        "update.empty-project",
+        "update.upgrade-alias"
+      ],
+      "verification": [
+        "TestNativeGlobalJSONModeSupportsManagementCommands",
+        "TestNativeJSONFailuresUseStableCodesAndOneDocument"
+      ]
+    },
+    {
+      "id": "D12",
+      "expectation": "OPEN_SKILLS_* settings win exactly while legacy names remain warned through 1.x; risk flags stay independent.",
+      "rationale": "Namespaced configuration and exact authorization provide deterministic migration behavior.",
+      "migrationDoc": "docs/native-migration.md#d12-namespaced-configuration-and-exact-authorization",
+      "scenarios": [
+        "add.force-required",
+        "add.insecure-denied",
+        "add.replace-required",
+        "environment.legacy-internal",
+        "shell.help",
+        "shell.short-help",
+        "use.trust-required"
+      ],
+      "verification": [
+        "TestD12CanonicalInternalSkillsSettingWinsLegacyConflict"
+      ]
+    },
+    {
+      "id": "D13",
+      "expectation": "Native releases are immutable, checksummed, signed, provenanced, and never downloaded by npm.",
+      "rationale": "The native supply chain must not preserve npm as a downloader or mutable trust root.",
+      "migrationDoc": "docs/native-compatibility-baseline.md#intentional-divergences",
+      "scenarios": [],
+      "verification": [
+        "TestPackageAllBuildsTheNativePreviewTargetSet",
+        "TestVerifyReleaseBundleRequiresSignaturesAndProvenance",
+        "TestHomebrewFormulaRequiresTheChecksummedCanonicalArtifact",
+        "TestScoopManifestRequiresTheChecksummedCanonicalArtifact"
+      ]
+    }
+  ]
+}

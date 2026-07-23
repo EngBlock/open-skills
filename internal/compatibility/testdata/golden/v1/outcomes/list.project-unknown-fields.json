@@ -1,0 +1,87 @@
+{
+  "stdout": "Installed new-project\n",
+  "stderr": "",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions/\u003ctransaction\u003e": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/existing": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/existing/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: existing\ndescription: existing golden fixture\n---\n\n# existing\n"
+    },
+    "project/.agents/skills/new-project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/new-project/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: new-project\ndescription: new-project golden fixture\n---\n\n# new-project\n"
+    },
+    "project/skills-lock.json": {
+      "kind": "file",
+      "mode": 384,
+      "text": "{\n  \"reviewedExtension\": {\n    \"owner\": \"corpus\"\n  },\n  \"skills\": {\n    \"existing\": {\n      \"computedHash\": \"old\",\n      \"source\": \"fixture\",\n      \"sourceType\": \"local\",\n      \"vendorExtension\": {\n        \"keep\": true\n      }\n    },\n    \"new-project\": {\n      \"agents\": [\n        \"universal\"\n      ],\n      \"computedHash\": \"a22f0041eb23fe9a8511c47236a29023d3b0fb4bbe2eb35f11f300ef39d64b03\",\n      \"installedContentHash\": \"a22f0041eb23fe9a8511c47236a29023d3b0fb4bbe2eb35f11f300ef39d64b03\",\n      \"installedPlacements\": {\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"6197c2c8a0e474ee22d5ab939698c67dfd4802ed565a542aaeab7a436c6745ff\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"source\": \"\u003ctmp\u003e/new\",\n      \"sourceType\": \"local\",\n      \"sourceUrl\": \"\u003ctmp\u003e/new\"\n    }\n  },\n  \"version\": 1\n}\n"
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/new": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/new/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: new-project\ndescription: new-project golden fixture\n---\n\n# new-project\n"
+    }
+  },
+  "locks": {
+    "project": "{\n  \"reviewedExtension\": {\n    \"owner\": \"corpus\"\n  },\n  \"skills\": {\n    \"existing\": {\n      \"computedHash\": \"old\",\n      \"source\": \"fixture\",\n      \"sourceType\": \"local\",\n      \"vendorExtension\": {\n        \"keep\": true\n      }\n    },\n    \"new-project\": {\n      \"agents\": [\n        \"universal\"\n      ],\n      \"computedHash\": \"a22f0041eb23fe9a8511c47236a29023d3b0fb4bbe2eb35f11f300ef39d64b03\",\n      \"installedContentHash\": \"a22f0041eb23fe9a8511c47236a29023d3b0fb4bbe2eb35f11f300ef39d64b03\",\n      \"installedPlacements\": {\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"6197c2c8a0e474ee22d5ab939698c67dfd4802ed565a542aaeab7a436c6745ff\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"source\": \"\u003ctmp\u003e/new\",\n      \"sourceType\": \"local\",\n      \"sourceUrl\": \"\u003ctmp\u003e/new\"\n    }\n  },\n  \"version\": 1\n}\n"
+  },
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

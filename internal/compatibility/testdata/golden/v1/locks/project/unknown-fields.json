@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "reviewedExtension": {"owner": "corpus"},
+  "skills": {
+    "existing": {
+      "source": "fixture",
+      "sourceType": "local",
+      "computedHash": "old",
+      "vendorExtension": {"keep": true}
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "stdout": "{\n  \"schemaVersion\": 1,\n  \"error\": {\n    \"code\": \"selection_required\",\n    \"message\": \"multiple skills are available; select skills with --skill or --skill-path\"\n  }\n}\n",
+  "stderr": "multiple skills are available; select skills with --skill or --skill-path\n",
+  "exitCode": 1,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/source": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/source/alpha": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/source/alpha/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: alpha\ndescription: alpha golden fixture\n---\n\n# alpha\n"
+    },
+    "tmp/source/beta": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/source/beta/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: beta\ndescription: beta golden fixture\n---\n\n# beta\n"
+    }
+  },
+  "locks": {},
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

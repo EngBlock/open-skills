@@ -1,0 +1,25 @@
+{
+  "stdout": "\nUsage: open-skills remove [skills...] [options]\n\nDescription:\n  Remove installed skills from agents. If no skill names are provided,\n  an interactive selection menu will be shown.\n\nArguments:\n  skills            Optional skill names to remove (space-separated)\n\nOptions:\n  -g, --global       Remove from global scope (~/) instead of project scope\n  -a, --agent        Remove from specific agents (use '*' for all agents)\n  -s, --skill        Specify skills to remove (use '*' for all skills)\n  -y, --yes          Skip confirmation prompts\n  -f, --force        Authorize deleting locally modified installed content\n  --all              Shorthand for --skill '*' --agent '*' -y\n  --json             Emit the versioned remove JSON schema without prompts\n\nExamples:\n  $ open-skills remove                           # interactive selection\n  $ open-skills remove my-skill                   # remove specific skill\n  $ open-skills remove skill1 skill2 -y           # remove multiple skills\n  $ open-skills remove --global my-skill          # remove from global scope\n  $ open-skills rm --agent claude-code my-skill   # remove from specific agent\n  $ open-skills remove --all                      # remove all skills\n  $ open-skills remove --skill '*' -a cursor      # remove all skills from cursor\n\n",
+  "stderr": "",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    }
+  },
+  "locks": {},
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

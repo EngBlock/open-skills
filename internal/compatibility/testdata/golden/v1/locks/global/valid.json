@@ -1,0 +1,21 @@
+{
+  "version": 3,
+  "skills": {
+    "npm:global-beta": {
+      "source": "EngBlock/global-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/EngBlock/global-skills",
+      "skillPath": "skills/npm-global-beta/SKILL.md",
+      "skillFolderHash": "npm-global-beta-tree",
+      "installedAt": "2026-07-01T00:00:00.000Z",
+      "updatedAt": "2026-07-02T00:00:00.000Z",
+      "pluginName": "native-tools"
+    }
+  },
+  "dismissed": {
+    "findSkillsPrompt": true
+  },
+  "lastSelectedAgents": [
+    "claude-code"
+  ]
+}

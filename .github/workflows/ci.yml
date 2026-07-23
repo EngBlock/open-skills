@@ -88,7 +88,7 @@ jobs:
       - name: Tests
         run: go test ./...
 
-      - name: D02 network-disabled shell tests
+      - name: Network-disabled native compatibility corpus
         run: |
           GO_BIN="$(command -v go)"
           MOD_CACHE="${RUNNER_TEMP}/open-skills-go-mod-cache"
@@ -99,7 +99,7 @@ jobs:
             export GOCACHE=/tmp/open-skills-go-cache
             export GOMODCACHE="$2"
             export GOPROXY=off GOSUMDB=off GOTOOLCHAIN=local
-            exec "$1" test ./internal/compatibility -run "TestNativeShell|TestD02OfflineShellHasNoNetworkOrSubprocessDependencies" -count=1
+            exec "$1" test ./internal/compatibility -run "TestNativeGoldenCorpus|TestNativeShell|TestD02OfflineShellHasNoNetworkOrSubprocessDependencies" -count=1
           ' sh "$GO_BIN" "$MOD_CACHE"
 
       - name: Build standalone executable

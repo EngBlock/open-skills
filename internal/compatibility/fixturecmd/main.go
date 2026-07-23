@@ -6,15 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 )
 
 type behavior struct {
-	Stdout   string `json:"stdout"`
-	Stderr   string `json:"stderr"`
-	ExitCode int    `json:"exitCode"`
+	Stdout      string `json:"stdout"`
+	Stderr      string `json:"stderr"`
+	ExitCode    int    `json:"exitCode"`
+	Passthrough string `json:"passthrough"`
 }
 
 type event struct {
@@ -60,6 +62,22 @@ func main() {
 	selected, ok := behaviors[name]
 	if !ok {
 		fmt.Fprintf(os.Stderr, "no command fixture configured for %s\n", name)
+		os.Exit(125)
+	}
+	if selected.Passthrough != "" {
+		command := exec.Command(selected.Passthrough, os.Args[1:]...)
+		command.Stdin = os.Stdin
+		command.Stdout = os.Stdout
+		command.Stderr = os.Stderr
+		command.Env = os.Environ()
+		err := command.Run()
+		if err == nil {
+			return
+		}
+		if exitError, ok := err.(*exec.ExitError); ok {
+			os.Exit(exitError.ExitCode())
+		}
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(125)
 	}
 	_, _ = os.Stdout.WriteString(selected.Stdout)

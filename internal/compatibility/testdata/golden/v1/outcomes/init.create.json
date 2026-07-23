@@ -1,0 +1,34 @@
+{
+  "stdout": "\n███████╗██╗  ██╗██╗██╗     ██╗     ███████╗\n██╔════╝██║ ██╔╝██║██║     ██║     ██╔════╝\n███████╗█████╔╝ ██║██║     ██║     ███████╗\n╚════██║██╔═██╗ ██║██║     ██║     ╚════██║\n███████║██║  ██╗██║███████╗███████╗███████║\n╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚══════╝\n\nInitialized skill: golden-skill\n\nCreated:\n  golden-skill/SKILL.md\n\nNext steps:\n  1. Edit golden-skill/SKILL.md to define your skill instructions\n  2. Update the name and description in the frontmatter\n\nPublishing:\n  GitHub:  Push to a repo, then open-skills add \u003cowner\u003e/\u003crepo\u003e\n  URL:     Host the file, then open-skills add https://example.com/golden-skill/SKILL.md\n\n",
+  "stderr": "",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/golden-skill": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/golden-skill/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: golden-skill\ndescription: A brief description of what this skill does\n---\n\n# golden-skill\n\nInstructions for the agent to follow when this skill is activated.\n\n## When to use\n\nDescribe when this skill should be used.\n\n## Instructions\n\n1. First step\n2. Second step\n3. Additional steps as needed\n"
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    }
+  },
+  "locks": {},
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

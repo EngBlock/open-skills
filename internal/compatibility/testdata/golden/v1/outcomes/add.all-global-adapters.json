@@ -1,0 +1,812 @@
+{
+  "stdout": "Installed topology-skill\n",
+  "stderr": "",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.adal": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.adal/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.adal/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.agents": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.agents/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.agents/skills/topology-skill": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.agents/skills/topology-skill/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: topology-skill\ndescription: topology-skill golden fixture\n---\n\n# topology\n"
+    },
+    "home/.aider-desk": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.aider-desk/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.aider-desk/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.astrbot": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.astrbot/data": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.astrbot/data/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.astrbot/data/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.augment": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.augment/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.augment/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.autohand": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.autohand/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.autohand/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.bob": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.bob/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.bob/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.claude": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.claude/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.claude/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.codeartsdoer": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.codeartsdoer/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.codeartsdoer/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.codebuddy": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.codebuddy/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.codebuddy/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.codeium": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.codeium/windsurf": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.codeium/windsurf/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.codeium/windsurf/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.codemaker": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.codemaker/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.codemaker/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.codestudio": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.codestudio/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.codestudio/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.commandcode": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.commandcode/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.commandcode/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.config": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.config/crush": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.config/crush/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.config/crush/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.config/devin": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.config/devin/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.config/devin/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.config/goose": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.config/goose/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.config/goose/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.config/kimchi": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.config/kimchi/harness": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.config/kimchi/harness/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.config/kimchi/harness/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.continue": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.continue/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.continue/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.factory": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.factory/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.factory/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.forge": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.forge/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.forge/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.grok": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.grok/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.grok/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.hermes": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.hermes/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.hermes/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.iflow": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.iflow/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.iflow/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.inferencesh": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.inferencesh/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.inferencesh/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.jazz": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.jazz/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.jazz/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.junie": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.junie/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.junie/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.kilocode": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.kilocode/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.kilocode/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.kiro": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.kiro/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.kiro/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.kode": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.kode/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.kode/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.lingma": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.lingma/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.lingma/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.local": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions/\u003ctransaction\u003e": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local/state/skills/.skill-lock.json": {
+      "kind": "file",
+      "mode": 384,
+      "text": "{\n  \"skills\": {\n    \"topology-skill\": {\n      \"agents\": [\n        \"aider-desk\",\n        \"amp\",\n        \"antigravity\",\n        \"antigravity-cli\",\n        \"astrbot\",\n        \"autohand-code\",\n        \"augment\",\n        \"bob\",\n        \"claude-code\",\n        \"openclaw\",\n        \"cline\",\n        \"codearts-agent\",\n        \"codebuddy\",\n        \"codemaker\",\n        \"codestudio\",\n        \"codex\",\n        \"command-code\",\n        \"continue\",\n        \"cortex\",\n        \"crush\",\n        \"cursor\",\n        \"deepagents\",\n        \"devin\",\n        \"dexto\",\n        \"droid\",\n        \"firebender\",\n        \"forgecode\",\n        \"gemini-cli\",\n        \"github-copilot\",\n        \"goose\",\n        \"grok\",\n        \"hermes-agent\",\n        \"inference-sh\",\n        \"jazz\",\n        \"junie\",\n        \"iflow-cli\",\n        \"kilo\",\n        \"kimchi\",\n        \"kimi-code-cli\",\n        \"kiro-cli\",\n        \"kode\",\n        \"lingma\",\n        \"loaf\",\n        \"mcpjam\",\n        \"mistral-vibe\",\n        \"moxby\",\n        \"mux\",\n        \"opencode\",\n        \"openhands\",\n        \"ona\",\n        \"pi\",\n        \"qoder\",\n        \"qoder-cn\",\n        \"qwen-code\",\n        \"replit\",\n        \"reasonix\",\n        \"rovodev\",\n        \"roo\",\n        \"tabnine-cli\",\n        \"terramind\",\n        \"tinycloud\",\n        \"trae\",\n        \"trae-cn\",\n        \"warp\",\n        \"windsurf\",\n        \"zed\",\n        \"zcode\",\n        \"zencoder\",\n        \"zenflow\",\n        \"neovate\",\n        \"pochi\",\n        \"adal\",\n        \"universal\"\n      ],\n      \"installedAt\": \"\u003ctimestamp\u003e\",\n      \"installedContentHash\": \"501cab78e7f7ea06baadc6c36181c5d877223cf472a46a50259dbd26327f829a\",\n      \"installedPlacements\": {\n        \"agent:adal\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:aider-desk\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:astrbot\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:augment\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:autohand-code\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:bob\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:claude-code\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:codearts-agent\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:codebuddy\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:codemaker\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:codestudio\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:command-code\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:continue\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:cortex\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:crush\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:devin\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:droid\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:forgecode\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:goose\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:grok\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:hermes-agent\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:iflow-cli\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:inference-sh\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:jazz\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:junie\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:kilo\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:kimchi\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:kiro-cli\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:kode\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:lingma\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:mcpjam\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:mistral-vibe\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:moxby\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:mux\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:neovate\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:ona\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:openclaw\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:openhands\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:pi\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:pochi\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:qoder\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:qoder-cn\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:qwen-code\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:reasonix\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:roo\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:rovodev\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:tabnine-cli\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:terramind\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:tinycloud\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:trae\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:trae-cn\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:windsurf\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:zcode\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:zencoder\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:zenflow\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"d4fdd99668f2b2497871bc0c0e6780a1f30d89a7a5457106876fc691829ed9ee\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"skillFolderHash\": \"501cab78e7f7ea06baadc6c36181c5d877223cf472a46a50259dbd26327f829a\",\n      \"source\": \"\u003ctmp\u003e/source\",\n      \"sourceType\": \"local\",\n      \"sourceUrl\": \"\u003ctmp\u003e/source\",\n      \"updatedAt\": \"\u003ctimestamp\u003e\"\n    }\n  },\n  \"version\": 3\n}\n"
+    },
+    "home/.mcpjam": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.mcpjam/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.mcpjam/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.moxby": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.moxby/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.moxby/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.mux": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.mux/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.mux/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.neovate": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.neovate/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.neovate/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.ona": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.ona/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.ona/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.openclaw": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.openclaw/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.openclaw/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.openhands": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.openhands/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.openhands/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.pi": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.pi/agent": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.pi/agent/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.pi/agent/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.pochi": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.pochi/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.pochi/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.qoder": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.qoder-cn": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.qoder-cn/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.qoder-cn/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.qoder/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.qoder/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.qwen": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.qwen/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.qwen/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.reasonix": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.reasonix/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.reasonix/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.roo": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.roo/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.roo/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.rovodev": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.rovodev/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.rovodev/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.snowflake": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.snowflake/cortex": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.snowflake/cortex/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.snowflake/cortex/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.tabnine": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.tabnine/agent": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.tabnine/agent/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.tabnine/agent/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.terramind": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.terramind/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.terramind/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.tinycloud": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.tinycloud/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.tinycloud/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.trae": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.trae-cn": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.trae-cn/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.trae-cn/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.trae/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.trae/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.vibe": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.vibe/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.vibe/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.zcode": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.zcode/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.zcode/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "home/.zencoder": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.zencoder/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.zencoder/skills/topology-skill": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003chome\u003e/.agents/skills/topology-skill"
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/source": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/source/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: topology-skill\ndescription: topology-skill golden fixture\n---\n\n# topology\n"
+    }
+  },
+  "locks": {
+    "global-xdg": "{\n  \"skills\": {\n    \"topology-skill\": {\n      \"agents\": [\n        \"aider-desk\",\n        \"amp\",\n        \"antigravity\",\n        \"antigravity-cli\",\n        \"astrbot\",\n        \"autohand-code\",\n        \"augment\",\n        \"bob\",\n        \"claude-code\",\n        \"openclaw\",\n        \"cline\",\n        \"codearts-agent\",\n        \"codebuddy\",\n        \"codemaker\",\n        \"codestudio\",\n        \"codex\",\n        \"command-code\",\n        \"continue\",\n        \"cortex\",\n        \"crush\",\n        \"cursor\",\n        \"deepagents\",\n        \"devin\",\n        \"dexto\",\n        \"droid\",\n        \"firebender\",\n        \"forgecode\",\n        \"gemini-cli\",\n        \"github-copilot\",\n        \"goose\",\n        \"grok\",\n        \"hermes-agent\",\n        \"inference-sh\",\n        \"jazz\",\n        \"junie\",\n        \"iflow-cli\",\n        \"kilo\",\n        \"kimchi\",\n        \"kimi-code-cli\",\n        \"kiro-cli\",\n        \"kode\",\n        \"lingma\",\n        \"loaf\",\n        \"mcpjam\",\n        \"mistral-vibe\",\n        \"moxby\",\n        \"mux\",\n        \"opencode\",\n        \"openhands\",\n        \"ona\",\n        \"pi\",\n        \"qoder\",\n        \"qoder-cn\",\n        \"qwen-code\",\n        \"replit\",\n        \"reasonix\",\n        \"rovodev\",\n        \"roo\",\n        \"tabnine-cli\",\n        \"terramind\",\n        \"tinycloud\",\n        \"trae\",\n        \"trae-cn\",\n        \"warp\",\n        \"windsurf\",\n        \"zed\",\n        \"zcode\",\n        \"zencoder\",\n        \"zenflow\",\n        \"neovate\",\n        \"pochi\",\n        \"adal\",\n        \"universal\"\n      ],\n      \"installedAt\": \"\u003ctimestamp\u003e\",\n      \"installedContentHash\": \"501cab78e7f7ea06baadc6c36181c5d877223cf472a46a50259dbd26327f829a\",\n      \"installedPlacements\": {\n        \"agent:adal\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:aider-desk\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:astrbot\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:augment\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:autohand-code\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:bob\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:claude-code\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:codearts-agent\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:codebuddy\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:codemaker\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:codestudio\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:command-code\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:continue\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:cortex\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:crush\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:devin\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:droid\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:forgecode\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:goose\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:grok\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:hermes-agent\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:iflow-cli\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:inference-sh\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:jazz\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:junie\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:kilo\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:kimchi\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:kiro-cli\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:kode\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:lingma\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:mcpjam\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:mistral-vibe\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:moxby\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:mux\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:neovate\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:ona\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:openclaw\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:openhands\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:pi\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:pochi\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:qoder\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:qoder-cn\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:qwen-code\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:reasonix\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:roo\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:rovodev\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:tabnine-cli\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:terramind\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:tinycloud\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:trae\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:trae-cn\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:windsurf\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:zcode\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:zencoder\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"agent:zenflow\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"d4fdd99668f2b2497871bc0c0e6780a1f30d89a7a5457106876fc691829ed9ee\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"skillFolderHash\": \"501cab78e7f7ea06baadc6c36181c5d877223cf472a46a50259dbd26327f829a\",\n      \"source\": \"\u003ctmp\u003e/source\",\n      \"sourceType\": \"local\",\n      \"sourceUrl\": \"\u003ctmp\u003e/source\",\n      \"updatedAt\": \"\u003ctimestamp\u003e\"\n    }\n  },\n  \"version\": 3\n}\n"
+  },
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

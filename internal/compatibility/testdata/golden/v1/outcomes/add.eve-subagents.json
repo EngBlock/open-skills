@@ -1,0 +1,116 @@
+{
+  "stdout": "Installed topology-skill\n",
+  "stderr": "",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions/\u003ctransaction\u003e": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/agent": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/agent/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/agent/skills/topology-skill": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/agent/skills/topology-skill/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\ndescription: topology fixture\nlicense: MIT\nmetadata:\n  owner: EngBlock\n---\n# topology\n"
+    },
+    "project/agent/subagents": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/agent/subagents/research": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/agent/subagents/research/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/agent/subagents/research/skills/topology-skill": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/agent/subagents/research/skills/topology-skill/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\ndescription: topology fixture\nlicense: MIT\nmetadata:\n  owner: EngBlock\n---\n# topology\n"
+    },
+    "project/agent/subagents/writer": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/agent/subagents/writer/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/agent/subagents/writer/skills/topology-skill": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/agent/subagents/writer/skills/topology-skill/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\ndescription: topology fixture\nlicense: MIT\nmetadata:\n  owner: EngBlock\n---\n# topology\n"
+    },
+    "project/skills-lock.json": {
+      "kind": "file",
+      "mode": 384,
+      "text": "{\n  \"skills\": {\n    \"topology-skill\": {\n      \"agents\": [\n        \"eve\"\n      ],\n      \"computedHash\": \"7bfb40814f1074e533ff8beebd83405b69dd0c0cb4908d15c04d88d3c5af0e4c\",\n      \"installedContentHash\": \"7bfb40814f1074e533ff8beebd83405b69dd0c0cb4908d15c04d88d3c5af0e4c\",\n      \"installedPlacements\": {\n        \"eve:research\": {\n          \"kind\": \"copy\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"8036d8ba7a510238d98abd0fa49340950a22e4157ce4274422014a42a09967f6\"\n            }\n          }\n        },\n        \"eve:root\": {\n          \"kind\": \"copy\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"8036d8ba7a510238d98abd0fa49340950a22e4157ce4274422014a42a09967f6\"\n            }\n          }\n        },\n        \"eve:writer\": {\n          \"kind\": \"copy\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"8036d8ba7a510238d98abd0fa49340950a22e4157ce4274422014a42a09967f6\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"source\": \"\u003ctmp\u003e/source\",\n      \"sourceType\": \"local\",\n      \"sourceUrl\": \"\u003ctmp\u003e/source\",\n      \"subagents\": [\n        \"\",\n        \"research\",\n        \"writer\"\n      ]\n    }\n  },\n  \"version\": 1\n}\n"
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/source": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/source/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: topology-skill\ndescription: topology fixture\nlicense: MIT\nmetadata:\n  owner: EngBlock\n---\n# topology\n"
+    }
+  },
+  "locks": {
+    "project": "{\n  \"skills\": {\n    \"topology-skill\": {\n      \"agents\": [\n        \"eve\"\n      ],\n      \"computedHash\": \"7bfb40814f1074e533ff8beebd83405b69dd0c0cb4908d15c04d88d3c5af0e4c\",\n      \"installedContentHash\": \"7bfb40814f1074e533ff8beebd83405b69dd0c0cb4908d15c04d88d3c5af0e4c\",\n      \"installedPlacements\": {\n        \"eve:research\": {\n          \"kind\": \"copy\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"8036d8ba7a510238d98abd0fa49340950a22e4157ce4274422014a42a09967f6\"\n            }\n          }\n        },\n        \"eve:root\": {\n          \"kind\": \"copy\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"8036d8ba7a510238d98abd0fa49340950a22e4157ce4274422014a42a09967f6\"\n            }\n          }\n        },\n        \"eve:writer\": {\n          \"kind\": \"copy\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"8036d8ba7a510238d98abd0fa49340950a22e4157ce4274422014a42a09967f6\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"source\": \"\u003ctmp\u003e/source\",\n      \"sourceType\": \"local\",\n      \"sourceUrl\": \"\u003ctmp\u003e/source\",\n      \"subagents\": [\n        \"\",\n        \"research\",\n        \"writer\"\n      ]\n    }\n  },\n  \"version\": 1\n}\n"
+  },
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

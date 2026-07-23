@@ -36,10 +36,14 @@ func CompareObservations(oracle, native Observation, normalization Normalization
 func normalizedObservation(observation Observation, normalization Normalization) Observation {
 	replacements := []Replacement{
 		{Pattern: observation.Paths.Project, With: "<project>"},
+		{Pattern: observation.ResolvedPaths.Project, With: "<project>"},
 		{Pattern: observation.Paths.Home, With: "<home>"},
+		{Pattern: observation.ResolvedPaths.Home, With: "<home>"},
 		{Pattern: observation.Paths.Temp, With: "<tmp>"},
+		{Pattern: observation.ResolvedPaths.Temp, With: "<tmp>"},
 		{Pattern: observation.Paths.FixtureURL, With: "<fixture-url>"},
 		{Pattern: observation.Paths.Root, With: "<sandbox>"},
+		{Pattern: observation.ResolvedPaths.Root, With: "<sandbox>"},
 	}
 	replacements = append(replacements, normalization.Replacements...)
 	sort.SliceStable(replacements, func(i, j int) bool { return len(replacements[i].Pattern) > len(replacements[j].Pattern) })
@@ -65,6 +69,7 @@ func normalizedObservation(observation Observation, normalization Normalization)
 	result.Stderr = normalizePresentation(observation.Stderr)
 	result.ProcessError = normalizePresentation(observation.ProcessError)
 	result.Paths = SandboxPaths{}
+	result.ResolvedPaths = SandboxPaths{}
 	result.Files = make(map[string]FileState, len(observation.Files))
 	for path, state := range observation.Files {
 		copy := state

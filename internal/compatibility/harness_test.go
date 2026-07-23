@@ -201,6 +201,15 @@ func TestD02HarnessOfflineScenariosFailOnCapturedNetworkAttempts(t *testing.T) {
 	})
 }
 
+func TestHarnessRestrictsHostCommandPassthroughToGit(t *testing.T) {
+	_, err := (Harness{}).Run(context.Background(), fixtureTarget(), Scenario{
+		Commands: []CommandFixture{{Name: "node", Passthrough: true}},
+	})
+	if err == nil || !strings.Contains(err.Error(), `passthrough command fixture "node" is not allowed`) {
+		t.Fatalf("arbitrary host passthrough error = %v", err)
+	}
+}
+
 func TestHarnessRejectsMalformedEnvironmentNames(t *testing.T) {
 	for _, test := range []struct {
 		name     string
@@ -288,6 +297,18 @@ func TestHarnessCapturesProcessStartFailure(t *testing.T) {
 	}
 	if observation.ExitCode != -1 || observation.ProcessError == "" || observation.TimedOut {
 		t.Fatalf("start failure = %#v", observation)
+	}
+}
+
+func TestNormalizerUsesRecordedResolvedSandboxPathsAfterCleanup(t *testing.T) {
+	observation := Observation{
+		Stdout:        "/private/var/sandbox/project/skills-lock.json\n",
+		Paths:         SandboxPaths{Root: "/var/sandbox", Project: "/var/sandbox/project"},
+		ResolvedPaths: SandboxPaths{Root: "/private/var/sandbox", Project: "/private/var/sandbox/project"},
+	}
+	normalized := normalizedObservation(observation, Normalization{})
+	if normalized.Stdout != "<project>/skills-lock.json\n" {
+		t.Fatalf("resolved sandbox path was not normalized: %q", normalized.Stdout)
 	}
 }
 

@@ -12,9 +12,10 @@ import (
 )
 
 type commandBehavior struct {
-	Stdout   string `json:"stdout"`
-	Stderr   string `json:"stderr"`
-	ExitCode int    `json:"exitCode"`
+	Stdout      string `json:"stdout"`
+	Stderr      string `json:"stderr"`
+	ExitCode    int    `json:"exitCode"`
+	Passthrough string `json:"passthrough,omitempty"`
 }
 
 func installCommandFixtures(ctx context.Context, control string, fixtures []CommandFixture) (string, string, error) {
@@ -49,7 +50,22 @@ func installCommandFixtures(ctx context.Context, control string, fixtures []Comm
 		if err := copyExecutable(helper, destination); err != nil {
 			return "", "", err
 		}
-		behaviors[behaviorName] = commandBehavior{Stdout: fixture.Stdout, Stderr: fixture.Stderr, ExitCode: fixture.ExitCode}
+		passthrough := ""
+		if fixture.Passthrough {
+			if !strings.EqualFold(fixture.Name, "git") {
+				return "", "", fmt.Errorf("passthrough command fixture %q is not allowed", fixture.Name)
+			}
+			var err error
+			passthrough, err = exec.LookPath("git")
+			if err != nil {
+				return "", "", fmt.Errorf("find Git passthrough fixture: %w", err)
+			}
+			passthrough, err = filepath.Abs(passthrough)
+			if err != nil {
+				return "", "", fmt.Errorf("resolve Git passthrough fixture: %w", err)
+			}
+		}
+		behaviors[behaviorName] = commandBehavior{Stdout: fixture.Stdout, Stderr: fixture.Stderr, ExitCode: fixture.ExitCode, Passthrough: passthrough}
 	}
 	encoded, err := json.Marshal(behaviors)
 	if err != nil {

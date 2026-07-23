@@ -1,0 +1,16 @@
+{
+  "version": 3,
+  "reviewedExtension": {"owner": "corpus"},
+  "skills": {
+    "existing": {
+      "source": "fixture",
+      "sourceType": "local",
+      "sourceUrl": "file:///fixture",
+      "skillPath": "existing",
+      "skillFolderHash": "old",
+      "installedAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z",
+      "vendorExtension": {"keep": true}
+    }
+  }
+}

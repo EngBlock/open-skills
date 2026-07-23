@@ -1,0 +1,25 @@
+{
+  "stdout": "Unknown command: unknown-command\nRun open-skills --help for usage.\n",
+  "stderr": "",
+  "exitCode": 1,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    }
+  },
+  "locks": {},
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

@@ -1,0 +1,65 @@
+{
+  "stdout": "",
+  "stderr": "Warning: allowing insecure HTTP well-known source for \u003cfixture-host\u003e; source contents may be intercepted or modified.\nRemote skill source: 127.0.0.1\nRemote skill commit: sha256:b478256253efdab5cb94de1230707f7267a3356e9a2cca18e2b92c062c7f8dc1\nremote agent use is not trusted; automation must re-run with --trust (not --yes) to approve this exact source commit\n",
+  "exitCode": 1,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/skills-use-\u003ctemporary\u003e": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "tmp/skills-use-\u003ctemporary\u003e/trusted": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/skills-use-\u003ctemporary\u003e/trusted/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: trusted\ndescription: trusted golden fixture\n---\n\n# Trusted\n"
+    }
+  },
+  "locks": {},
+  "lockParseErrors": {},
+  "httpRequests": [
+    {
+      "method": "GET",
+      "path": "/.well-known/agent-skills/index.json",
+      "host": "\u003cfixture-host\u003e",
+      "header": {
+        "Accept-Encoding": [
+          "gzip"
+        ],
+        "User-Agent": [
+          "Go-http-client/1.1"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/.well-known/agent-skills/trusted/SKILL.md",
+      "host": "\u003cfixture-host\u003e",
+      "header": {
+        "Accept-Encoding": [
+          "gzip"
+        ],
+        "User-Agent": [
+          "Go-http-client/1.1"
+        ]
+      }
+    }
+  ],
+  "spawnedCommands": []
+}

@@ -1,0 +1,25 @@
+{
+  "stdout": "Hosted skill search is no longer available.\nDiscover skills by searching GitHub and the web for SKILL.md files, then install one with:\n  open-skills add \u003cowner\u003e/\u003crepo\u003e@\u003cskill\u003e\n",
+  "stderr": "",
+  "exitCode": 1,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    }
+  },
+  "locks": {},
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

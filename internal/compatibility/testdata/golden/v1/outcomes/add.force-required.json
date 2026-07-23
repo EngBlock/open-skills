@@ -1,0 +1,58 @@
+{
+  "stdout": "",
+  "stderr": "installed skill content has local changes (changed: \u003cproject\u003e/.agents/skills/provenance-skill/SKILL.md); re-run with --force to authorize their destruction\n",
+  "exitCode": 1,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/provenance-skill": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/provenance-skill/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: provenance-skill\ndescription: locally modified\n---\n# local edit\n"
+    },
+    "project/skills-lock.json": {
+      "kind": "file",
+      "mode": 420,
+      "text": "{\"version\":1,\"skills\":{\"provenance-skill\":{\"source\":\"\u003ctmp\u003e/replacement\",\"sourceType\":\"local\",\"computedHash\":\"c366f6b83983f26174df4490dd23a8adee4487a2d1021edbaf8f4f2f73e9a97e\",\"installedContentHash\":\"c366f6b83983f26174df4490dd23a8adee4487a2d1021edbaf8f4f2f73e9a97e\",\"ownedFiles\":[\"SKILL.md\"],\"agents\":[\"universal\"],\"installedPlacements\":{\"canonical\":{\"kind\":\"canonical\",\"paths\":{\"SKILL.md\":{\"kind\":\"file\",\"hash\":\"7391f3d1e3eef04c5d23fb3431044f18d44ab9a6eb0e5d069531f6736b06168b\"}}}}}}}"
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/replacement": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/replacement/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: provenance-skill\ndescription: replacement source\n---\n# replacement\n"
+    }
+  },
+  "locks": {
+    "project": "{\"version\":1,\"skills\":{\"provenance-skill\":{\"source\":\"\u003ctmp\u003e/replacement\",\"sourceType\":\"local\",\"computedHash\":\"c366f6b83983f26174df4490dd23a8adee4487a2d1021edbaf8f4f2f73e9a97e\",\"installedContentHash\":\"c366f6b83983f26174df4490dd23a8adee4487a2d1021edbaf8f4f2f73e9a97e\",\"ownedFiles\":[\"SKILL.md\"],\"agents\":[\"universal\"],\"installedPlacements\":{\"canonical\":{\"kind\":\"canonical\",\"paths\":{\"SKILL.md\":{\"kind\":\"file\",\"hash\":\"7391f3d1e3eef04c5d23fb3431044f18d44ab9a6eb0e5d069531f6736b06168b\"}}}}}}}"
+  },
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

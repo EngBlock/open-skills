@@ -1,0 +1,32 @@
+{
+  "stdout": "{\n  \"schemaVersion\": 1,\n  \"scope\": \"project\",\n  \"results\": [],\n  \"summary\": {\n    \"checked\": 0,\n    \"updated\": 0,\n    \"failed\": 0\n  }\n}\n",
+  "stderr": "",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/skills-lock.json": {
+      "kind": "file",
+      "mode": 420,
+      "text": "{\"version\":1,\"skills\":{}}\n"
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    }
+  },
+  "locks": {
+    "project": "{\"version\":1,\"skills\":{}}\n"
+  },
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

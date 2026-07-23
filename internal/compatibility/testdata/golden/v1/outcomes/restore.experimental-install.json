@@ -1,0 +1,95 @@
+{
+  "stdout": "Restored restore-me\n",
+  "stderr": "",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions/\u003ctransaction\u003e": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/restore-me": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/restore-me/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: restore-me\ndescription: restore-me golden fixture\n---\n\n# restore-me\n"
+    },
+    "project/.claude": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.claude/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.claude/skills/restore-me": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003cproject\u003e/.agents/skills/restore-me"
+    },
+    "project/node_modules": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/node_modules/package-a": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/node_modules/package-a/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: restore-me\ndescription: restore-me golden fixture\n---\n\n# restore-me\n"
+    },
+    "project/skills-lock.json": {
+      "kind": "file",
+      "mode": 384,
+      "text": "{\n  \"skills\": {\n    \"restore-me\": {\n      \"agents\": [\n        \"claude-code\"\n      ],\n      \"computedHash\": \"dee4af70dcf340d77aaeeb90e60e8f880f09e58ad351b6cd4d9d6a7b4ca482ce\",\n      \"installedContentHash\": \"dee4af70dcf340d77aaeeb90e60e8f880f09e58ad351b6cd4d9d6a7b4ca482ce\",\n      \"installedPlacements\": {\n        \"agent:claude-code\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"6cb184fd6a1c73dad0ef0f45ef1a760d7f95276930396955d38a4843b5a9054e\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"source\": \"package-a\",\n      \"sourceType\": \"node_modules\"\n    }\n  },\n  \"version\": 1\n}\n"
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    }
+  },
+  "locks": {
+    "project": "{\n  \"skills\": {\n    \"restore-me\": {\n      \"agents\": [\n        \"claude-code\"\n      ],\n      \"computedHash\": \"dee4af70dcf340d77aaeeb90e60e8f880f09e58ad351b6cd4d9d6a7b4ca482ce\",\n      \"installedContentHash\": \"dee4af70dcf340d77aaeeb90e60e8f880f09e58ad351b6cd4d9d6a7b4ca482ce\",\n      \"installedPlacements\": {\n        \"agent:claude-code\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"6cb184fd6a1c73dad0ef0f45ef1a760d7f95276930396955d38a4843b5a9054e\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"source\": \"package-a\",\n      \"sourceType\": \"node_modules\"\n    }\n  },\n  \"version\": 1\n}\n"
+  },
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

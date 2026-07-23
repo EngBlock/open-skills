@@ -1,0 +1,34 @@
+{
+  "stdout": "internal\n",
+  "stderr": "Warning: INSTALL_INTERNAL_SKILLS is deprecated and will be removed in open-skills 2.0; use OPEN_SKILLS_INSTALL_INTERNAL_SKILLS instead.\n",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/source": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/source/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: internal\ndescription: internal\nmetadata:\n  internal: true\n---\n"
+    }
+  },
+  "locks": {},
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

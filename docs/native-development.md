@@ -61,4 +61,19 @@ environment contract is documented in the [D12 migration notes](native-migration
 
 The npm side must be prepared with `PrepareNPMOracle`. It reads `compatibility/npm-0.1.2/oracle.json` plus `runtime-dependencies.json`, verifies the exact CLI and pinned `yaml@2.9.0` tarball bytes, enforces their recorded file counts and unpacked sizes, and safely extracts `package/bin/cli.mjs` with its runtime dependency for an explicitly supplied Node executable. It never resolves a dist-tag or invokes npm/npx.
 
-Scenario processes inherit no credentials, proxies, agent markers, runtime injection variables, or host Git configuration. Their `PATH` is empty unless declared command fixtures are installed, in which case it contains only those fixtures. This fail-closed setup makes subprocess behavior explicit while local repository fixtures are initialized separately with isolated deterministic Git configuration.
+Scenario processes inherit no credentials, proxies, agent markers, runtime injection variables, or host Git configuration. Their `PATH` is empty unless declared command fixtures are installed, in which case it contains only those fixtures. This fail-closed setup makes subprocess behavior explicit while local repository fixtures are initialized separately with isolated deterministic Git configuration. Golden Git scenarios may opt into the recording wrapper around the absolute system Git executable; arbitrary host-command passthrough is rejected.
+
+## Reviewed compatibility corpus
+
+[`internal/compatibility/testdata/golden/v1`](../internal/compatibility/testdata/golden/v1) is the reviewed, versioned npm 0.1.2/native-divergence corpus. Its manifest is a closed inventory of commands, aliases, source families, scopes, installation topologies, agent launches, exact non-interactive decisions, lock fixtures, and D01–D13 expectations. Normal CI runs the built native process against every checked-in outcome and fails if the process invokes Node, npm, or npx.
+
+Run the native-only suite with one build:
+
+```sh
+mkdir -p build
+CGO_ENABLED=0 go build -trimpath -o "$PWD/build/open-skills" ./cmd/open-skills
+OPEN_SKILLS_NATIVE_UNDER_TEST="$PWD/build/open-skills" \
+  go test ./internal/compatibility -run '^TestNativeGoldenCorpus$' -count=1
+```
+
+The opt-in recorder is not a CI path. It uses the integrity-pinned Node oracle only for scenarios that retain npm behavior and native for scenarios carrying named divergence IDs. It requires an output directory outside the reviewed corpus and never overwrites v1; see the corpus README for the recording command and review protocol.

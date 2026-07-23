@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,6 +40,8 @@ func (h Harness) Run(ctx context.Context, target Target, scenario Scenario) (Obs
 	if target.Command == "" {
 		return Observation{}, errors.New("target command is required")
 	}
+	unlockUmask := lockScenarioUmask()
+	defer unlockUmask()
 
 	root, err := os.MkdirTemp("", "open-skills-compat-")
 	if err != nil {
@@ -69,6 +72,7 @@ func (h Harness) Run(ctx context.Context, target Target, scenario Scenario) (Obs
 	server := newFixtureServer(scenario.HTTPRoutes, &requestMu, &requests)
 	defer server.Close()
 	paths.FixtureURL = server.URL
+	resolvedPaths := resolveSandboxPaths(paths)
 
 	expand := func(value string) string {
 		value = strings.ReplaceAll(value, "{{root:json}}", filepath.ToSlash(paths.Root))
@@ -81,6 +85,7 @@ func (h Harness) Run(ctx context.Context, target Target, scenario Scenario) (Obs
 		value = strings.ReplaceAll(value, "{{temp}}", paths.Temp)
 		value = strings.ReplaceAll(value, "{{http:url}}", server.URL)
 		for name, path := range repositories {
+			value = strings.ReplaceAll(value, "{{repo:"+name+":url}}", repositoryFileURL(path))
 			value = strings.ReplaceAll(value, "{{repo:"+name+"}}", path)
 		}
 		return value
@@ -156,6 +161,7 @@ func (h Harness) Run(ctx context.Context, target Target, scenario Scenario) (Obs
 		HTTPRequests:    []HTTPRequest{},
 		SpawnedCommands: []SpawnedCommand{},
 		Paths:           paths,
+		ResolvedPaths:   resolvedPaths,
 	}
 	if runErr != nil {
 		var exitError *exec.ExitError
@@ -541,6 +547,28 @@ func confinedPath(root, relative string) (string, error) {
 		return "", errors.New("path escapes fixture root")
 	}
 	return filepath.Join(root, clean), nil
+}
+
+func resolveSandboxPaths(paths SandboxPaths) SandboxPaths {
+	resolve := func(path string) string {
+		if resolved, err := filepath.EvalSymlinks(path); err == nil {
+			return resolved
+		}
+		return path
+	}
+	return SandboxPaths{
+		Root: resolve(paths.Root), Home: resolve(paths.Home),
+		Project: resolve(paths.Project), Temp: resolve(paths.Temp),
+		FixtureURL: paths.FixtureURL,
+	}
+}
+
+func repositoryFileURL(repository string) string {
+	path := filepath.ToSlash(repository)
+	if runtime.GOOS == "windows" && len(path) >= 2 && path[1] == ':' {
+		path = "/" + path
+	}
+	return (&url.URL{Scheme: "file", Path: path}).String()
 }
 
 func moduleRoot() string {

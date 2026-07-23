@@ -1,0 +1,51 @@
+{
+  "stdout": "",
+  "stderr": "Acquire Git source: clone Git source: exit status 9\n",
+  "exitCode": 1,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    }
+  },
+  "locks": {},
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": [
+    {
+      "name": "git",
+      "args": [
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "submodule.recurse=false",
+        "-c",
+        "filter.lfs.required=false",
+        "-c",
+        "filter.lfs.clean=",
+        "-c",
+        "filter.lfs.smudge=",
+        "-c",
+        "filter.lfs.process=",
+        "clone",
+        "--no-checkout",
+        "--depth",
+        "1",
+        "--",
+        "https://github.com/EngBlock/golden-fixture.git",
+        "\u003ctmp\u003e/open-skills-git-\u003ctemporary\u003e/repository"
+      ],
+      "cwd": "\u003cproject\u003e"
+    }
+  ]
+}

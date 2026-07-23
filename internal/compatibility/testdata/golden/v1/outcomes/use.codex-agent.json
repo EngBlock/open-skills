@@ -1,0 +1,55 @@
+{
+  "stdout": "codex golden output\n",
+  "stderr": "",
+  "exitCode": 37,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/skills-use-\u003ctemporary\u003e": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "tmp/skills-use-\u003ctemporary\u003e/launch": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/skills-use-\u003ctemporary\u003e/launch/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: launch\ndescription: launch golden fixture\n---\n\n# Launch\n"
+    },
+    "tmp/source": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/source/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: launch\ndescription: launch golden fixture\n---\n\n# Launch\n"
+    }
+  },
+  "locks": {},
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": [
+    {
+      "name": "codex",
+      "args": [
+        "You are being given a Skill to execute for the user's next request.\n\nUse the following SKILL.md as your instructions:\n\n\u003cSKILL.md\u003e\n---\nname: launch\ndescription: launch golden fixture\n---\n\n# Launch\n\n\u003c/SKILL.md\u003e\n"
+      ],
+      "cwd": "\u003cproject\u003e"
+    }
+  ]
+}

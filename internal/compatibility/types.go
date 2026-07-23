@@ -59,6 +59,10 @@ type CommandFixture struct {
 	Stdout   string
 	Stderr   string
 	ExitCode int
+	// Passthrough runs the host Git executable through the recording fixture.
+	// It is intentionally Git-only so golden scenarios can exercise local
+	// repositories without exposing arbitrary host commands to the sandbox.
+	Passthrough bool
 }
 
 type Scenario struct {
@@ -140,6 +144,9 @@ type Observation struct {
 	HTTPRequests    []HTTPRequest
 	SpawnedCommands []SpawnedCommand
 	Paths           SandboxPaths
+	// ResolvedPaths retains symlink-resolved sandbox roots (for example,
+	// macOS /private/var) so normalization remains stable after cleanup.
+	ResolvedPaths SandboxPaths
 }
 
 type Replacement struct {

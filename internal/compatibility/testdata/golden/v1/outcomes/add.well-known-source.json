@@ -1,0 +1,96 @@
+{
+  "stdout": "Installed well-known\n",
+  "stderr": "Warning: allowing insecure HTTP well-known source for \u003cfixture-host\u003e; source contents may be intercepted or modified.\n",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions/\u003ctransaction\u003e": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/well-known": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/well-known/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: well-known\ndescription: well-known golden fixture\n---\n\n# well-known\n"
+    },
+    "project/skills-lock.json": {
+      "kind": "file",
+      "mode": 384,
+      "text": "{\n  \"skills\": {\n    \"well-known\": {\n      \"agents\": [\n        \"universal\"\n      ],\n      \"computedHash\": \"6b34ba0cc23552e58a863cac82126df7962677477289d1a21af6d46fa0c1ca1d\",\n      \"installedContentHash\": \"6b34ba0cc23552e58a863cac82126df7962677477289d1a21af6d46fa0c1ca1d\",\n      \"installedPlacements\": {\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"7be711955798a7609d497e9313f4026dbb1cd84a830fd35fd1fef0eb4ca04ec9\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"ref\": \"sha256:4f8ac5663254a329cc9689cea709a4e2cdb3ca5be212cc4e2fe41aaa04ceceb4\",\n      \"source\": \"127.0.0.1\",\n      \"sourceType\": \"well-known\",\n      \"sourceUrl\": \"\u003cfixture-url\u003e/.well-known/agent-skills/well-known/SKILL.md\"\n    }\n  },\n  \"version\": 1\n}\n"
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    }
+  },
+  "locks": {
+    "project": "{\n  \"skills\": {\n    \"well-known\": {\n      \"agents\": [\n        \"universal\"\n      ],\n      \"computedHash\": \"6b34ba0cc23552e58a863cac82126df7962677477289d1a21af6d46fa0c1ca1d\",\n      \"installedContentHash\": \"6b34ba0cc23552e58a863cac82126df7962677477289d1a21af6d46fa0c1ca1d\",\n      \"installedPlacements\": {\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"7be711955798a7609d497e9313f4026dbb1cd84a830fd35fd1fef0eb4ca04ec9\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"ref\": \"sha256:4f8ac5663254a329cc9689cea709a4e2cdb3ca5be212cc4e2fe41aaa04ceceb4\",\n      \"source\": \"127.0.0.1\",\n      \"sourceType\": \"well-known\",\n      \"sourceUrl\": \"\u003cfixture-url\u003e/.well-known/agent-skills/well-known/SKILL.md\"\n    }\n  },\n  \"version\": 1\n}\n"
+  },
+  "lockParseErrors": {},
+  "httpRequests": [
+    {
+      "method": "GET",
+      "path": "/.well-known/agent-skills/index.json",
+      "host": "\u003cfixture-host\u003e",
+      "header": {
+        "Accept-Encoding": [
+          "gzip"
+        ],
+        "User-Agent": [
+          "Go-http-client/1.1"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/.well-known/agent-skills/well-known/SKILL.md",
+      "host": "\u003cfixture-host\u003e",
+      "header": {
+        "Accept-Encoding": [
+          "gzip"
+        ],
+        "User-Agent": [
+          "Go-http-client/1.1"
+        ]
+      }
+    }
+  ],
+  "spawnedCommands": []
+}

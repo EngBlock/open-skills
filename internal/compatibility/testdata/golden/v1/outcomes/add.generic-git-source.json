@@ -1,0 +1,116 @@
+{
+  "stdout": "Installed generic-git\n",
+  "stderr": "",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions/\u003ctransaction\u003e": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/generic-git": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/generic-git/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: generic-git\ndescription: generic-git golden fixture\n---\n\n# generic-git\n"
+    },
+    "project/skills-lock.json": {
+      "kind": "file",
+      "mode": 384,
+      "text": "{\n  \"skills\": {\n    \"generic-git\": {\n      \"agents\": [\n        \"universal\"\n      ],\n      \"computedHash\": \"5401f2500ccf213861037c10452508a47ec76eb36ba2f8a6438970f033f2903b\",\n      \"installedContentHash\": \"5401f2500ccf213861037c10452508a47ec76eb36ba2f8a6438970f033f2903b\",\n      \"installedPlacements\": {\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"882407bf3241921b514518499ba992ffddd3e95ae99f3137605f06dba2859c39\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"ref\": \"b7dde9e1f721e787635efed404ff2e5774179c31\",\n      \"skillPath\": \"golden/SKILL.md\",\n      \"source\": \"file://\u003csandbox\u003e/repositories/generic\",\n      \"sourceType\": \"git\",\n      \"sourceUrl\": \"file://\u003csandbox\u003e/repositories/generic\"\n    }\n  },\n  \"version\": 1\n}\n"
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    }
+  },
+  "locks": {
+    "project": "{\n  \"skills\": {\n    \"generic-git\": {\n      \"agents\": [\n        \"universal\"\n      ],\n      \"computedHash\": \"5401f2500ccf213861037c10452508a47ec76eb36ba2f8a6438970f033f2903b\",\n      \"installedContentHash\": \"5401f2500ccf213861037c10452508a47ec76eb36ba2f8a6438970f033f2903b\",\n      \"installedPlacements\": {\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"882407bf3241921b514518499ba992ffddd3e95ae99f3137605f06dba2859c39\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"ref\": \"b7dde9e1f721e787635efed404ff2e5774179c31\",\n      \"skillPath\": \"golden/SKILL.md\",\n      \"source\": \"file://\u003csandbox\u003e/repositories/generic\",\n      \"sourceType\": \"git\",\n      \"sourceUrl\": \"file://\u003csandbox\u003e/repositories/generic\"\n    }\n  },\n  \"version\": 1\n}\n"
+  },
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": [
+    {
+      "name": "git",
+      "args": [
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "submodule.recurse=false",
+        "-c",
+        "filter.lfs.required=false",
+        "-c",
+        "filter.lfs.clean=",
+        "-c",
+        "filter.lfs.smudge=",
+        "-c",
+        "filter.lfs.process=",
+        "clone",
+        "--no-checkout",
+        "--depth",
+        "1",
+        "--",
+        "file://\u003csandbox\u003e/repositories/generic",
+        "\u003ctmp\u003e/open-skills-git-\u003ctemporary\u003e/repository"
+      ],
+      "cwd": "\u003cproject\u003e"
+    },
+    {
+      "name": "git",
+      "args": [
+        "-C",
+        "\u003ctmp\u003e/open-skills-git-\u003ctemporary\u003e/repository",
+        "rev-parse",
+        "HEAD^{commit}"
+      ],
+      "cwd": "\u003cproject\u003e"
+    },
+    {
+      "name": "git",
+      "args": [
+        "-C",
+        "\u003ctmp\u003e/open-skills-git-\u003ctemporary\u003e/repository",
+        "archive",
+        "--format=tar",
+        "b7dde9e1f721e787635efed404ff2e5774179c31"
+      ],
+      "cwd": "\u003cproject\u003e"
+    }
+  ]
+}

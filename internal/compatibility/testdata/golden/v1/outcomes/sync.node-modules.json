@@ -1,0 +1,103 @@
+{
+  "stdout": "Synced synced from catalog\n",
+  "stderr": "",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions/\u003ctransaction\u003e": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/synced": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/synced/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: synced\ndescription: synced golden fixture\n---\n\n# synced\n"
+    },
+    "project/.claude": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.claude/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.claude/skills/synced": {
+      "kind": "symlink",
+      "mode": 0,
+      "linkTarget": "relative:\u003cproject\u003e/.agents/skills/synced"
+    },
+    "project/node_modules": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/node_modules/catalog": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/node_modules/catalog/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/node_modules/catalog/skills/synced": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/node_modules/catalog/skills/synced/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: synced\ndescription: synced golden fixture\n---\n\n# synced\n"
+    },
+    "project/skills-lock.json": {
+      "kind": "file",
+      "mode": 384,
+      "text": "{\n  \"skills\": {\n    \"synced\": {\n      \"agents\": [\n        \"claude-code\"\n      ],\n      \"computedHash\": \"bb62968628688ababfca8e3d454436d528657afa5bdfede7f10236f468812090\",\n      \"installedContentHash\": \"bb62968628688ababfca8e3d454436d528657afa5bdfede7f10236f468812090\",\n      \"installedPlacements\": {\n        \"agent:claude-code\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"d22c595b1b089c03c3acc8fbb4107a29a2059005e826654059759e2fb3c5659e\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"source\": \"catalog\",\n      \"sourceType\": \"node_modules\"\n    }\n  },\n  \"version\": 1\n}\n"
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    }
+  },
+  "locks": {
+    "project": "{\n  \"skills\": {\n    \"synced\": {\n      \"agents\": [\n        \"claude-code\"\n      ],\n      \"computedHash\": \"bb62968628688ababfca8e3d454436d528657afa5bdfede7f10236f468812090\",\n      \"installedContentHash\": \"bb62968628688ababfca8e3d454436d528657afa5bdfede7f10236f468812090\",\n      \"installedPlacements\": {\n        \"agent:claude-code\": {\n          \"kind\": \"link\",\n          \"linkTarget\": \"canonical\"\n        },\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"d22c595b1b089c03c3acc8fbb4107a29a2059005e826654059759e2fb3c5659e\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"source\": \"catalog\",\n      \"sourceType\": \"node_modules\"\n    }\n  },\n  \"version\": 1\n}\n"
+  },
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

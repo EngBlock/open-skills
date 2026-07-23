@@ -1,0 +1,78 @@
+{
+  "stdout": "Installed alias-add\n",
+  "stderr": "",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions/\u003ctransaction\u003e": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/alias-add": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "project/.agents/skills/alias-add/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: alias-add\ndescription: alias-add golden fixture\n---\n\n# Alias add\n"
+    },
+    "project/skills-lock.json": {
+      "kind": "file",
+      "mode": 384,
+      "text": "{\n  \"skills\": {\n    \"alias-add\": {\n      \"agents\": [\n        \"universal\"\n      ],\n      \"computedHash\": \"177cbb66af98a618d09b336a83995fca230996b504177326517f168bdccbfbde\",\n      \"installedContentHash\": \"177cbb66af98a618d09b336a83995fca230996b504177326517f168bdccbfbde\",\n      \"installedPlacements\": {\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"bc5096b81a31e8abbfc6e99b5f0b7bfb35daaf186ba6f8cc533f78540589234e\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"source\": \"\u003ctmp\u003e/source\",\n      \"sourceType\": \"local\",\n      \"sourceUrl\": \"\u003ctmp\u003e/source\"\n    }\n  },\n  \"version\": 1\n}\n"
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/source": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/source/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: alias-add\ndescription: alias-add golden fixture\n---\n\n# Alias add\n"
+    }
+  },
+  "locks": {
+    "project": "{\n  \"skills\": {\n    \"alias-add\": {\n      \"agents\": [\n        \"universal\"\n      ],\n      \"computedHash\": \"177cbb66af98a618d09b336a83995fca230996b504177326517f168bdccbfbde\",\n      \"installedContentHash\": \"177cbb66af98a618d09b336a83995fca230996b504177326517f168bdccbfbde\",\n      \"installedPlacements\": {\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"bc5096b81a31e8abbfc6e99b5f0b7bfb35daaf186ba6f8cc533f78540589234e\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"source\": \"\u003ctmp\u003e/source\",\n      \"sourceType\": \"local\",\n      \"sourceUrl\": \"\u003ctmp\u003e/source\"\n    }\n  },\n  \"version\": 1\n}\n"
+  },
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

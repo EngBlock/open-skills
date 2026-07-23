@@ -1,0 +1,91 @@
+{
+  "stdout": "Installed new-global\n",
+  "stderr": "",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.agents": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.agents/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.agents/skills/existing": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.agents/skills/existing/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: existing\ndescription: existing golden fixture\n---\n\n# existing\n"
+    },
+    "home/.agents/skills/new-global": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.agents/skills/new-global/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: new-global\ndescription: new-global golden fixture\n---\n\n# new-global\n"
+    },
+    "home/.local": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local/state": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local/state/open-skills": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/open-skills/transactions/\u003ctransaction\u003e": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.local/state/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local/state/skills/.skill-lock.json": {
+      "kind": "file",
+      "mode": 384,
+      "text": "{\n  \"reviewedExtension\": {\n    \"owner\": \"corpus\"\n  },\n  \"skills\": {\n    \"existing\": {\n      \"installedAt\": \"\u003ctimestamp\u003e\",\n      \"skillFolderHash\": \"old\",\n      \"skillPath\": \"existing\",\n      \"source\": \"fixture\",\n      \"sourceType\": \"local\",\n      \"sourceUrl\": \"file:///fixture\",\n      \"updatedAt\": \"\u003ctimestamp\u003e\",\n      \"vendorExtension\": {\n        \"keep\": true\n      }\n    },\n    \"new-global\": {\n      \"agents\": [\n        \"universal\"\n      ],\n      \"installedAt\": \"\u003ctimestamp\u003e\",\n      \"installedContentHash\": \"b050cd467feaf045ed908e424db7c53827f4b392e7b47daceec72991185ba8cf\",\n      \"installedPlacements\": {\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"6f0eb0874f329055785344b9c8f2d745bcc967a7eded27dc52914855f38fb092\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"skillFolderHash\": \"b050cd467feaf045ed908e424db7c53827f4b392e7b47daceec72991185ba8cf\",\n      \"source\": \"\u003ctmp\u003e/new\",\n      \"sourceType\": \"local\",\n      \"sourceUrl\": \"\u003ctmp\u003e/new\",\n      \"updatedAt\": \"\u003ctimestamp\u003e\"\n    }\n  },\n  \"version\": 3\n}\n"
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/new": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/new/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: new-global\ndescription: new-global golden fixture\n---\n\n# new-global\n"
+    }
+  },
+  "locks": {
+    "global-xdg": "{\n  \"reviewedExtension\": {\n    \"owner\": \"corpus\"\n  },\n  \"skills\": {\n    \"existing\": {\n      \"installedAt\": \"\u003ctimestamp\u003e\",\n      \"skillFolderHash\": \"old\",\n      \"skillPath\": \"existing\",\n      \"source\": \"fixture\",\n      \"sourceType\": \"local\",\n      \"sourceUrl\": \"file:///fixture\",\n      \"updatedAt\": \"\u003ctimestamp\u003e\",\n      \"vendorExtension\": {\n        \"keep\": true\n      }\n    },\n    \"new-global\": {\n      \"agents\": [\n        \"universal\"\n      ],\n      \"installedAt\": \"\u003ctimestamp\u003e\",\n      \"installedContentHash\": \"b050cd467feaf045ed908e424db7c53827f4b392e7b47daceec72991185ba8cf\",\n      \"installedPlacements\": {\n        \"canonical\": {\n          \"kind\": \"canonical\",\n          \"paths\": {\n            \"SKILL.md\": {\n              \"kind\": \"file\",\n              \"hash\": \"6f0eb0874f329055785344b9c8f2d745bcc967a7eded27dc52914855f38fb092\"\n            }\n          }\n        }\n      },\n      \"ownedFiles\": [\n        \"SKILL.md\"\n      ],\n      \"skillFolderHash\": \"b050cd467feaf045ed908e424db7c53827f4b392e7b47daceec72991185ba8cf\",\n      \"source\": \"\u003ctmp\u003e/new\",\n      \"sourceType\": \"local\",\n      \"sourceUrl\": \"\u003ctmp\u003e/new\",\n      \"updatedAt\": \"\u003ctimestamp\u003e\"\n    }\n  },\n  \"version\": 3\n}\n"
+  },
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}

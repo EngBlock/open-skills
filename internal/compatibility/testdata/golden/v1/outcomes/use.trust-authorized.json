@@ -1,0 +1,86 @@
+{
+  "stdout": "trusted golden output\n",
+  "stderr": "Warning: allowing insecure HTTP well-known source for \u003cfixture-host\u003e; source contents may be intercepted or modified.\nRemote skill source: 127.0.0.1\nRemote skill commit: sha256:b478256253efdab5cb94de1230707f7267a3356e9a2cca18e2b92c062c7f8dc1\n",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.config": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.config/open-skills": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "home/.config/open-skills/trust.json": {
+      "kind": "file",
+      "mode": 384,
+      "text": "{\n  \"version\": 1,\n  \"approvals\": [\n    {\n      \"source\": \"127.0.0.1\",\n      \"commit\": \"sha256:b478256253efdab5cb94de1230707f7267a3356e9a2cca18e2b92c062c7f8dc1\",\n      \"approvedAt\": \"\u003ctimestamp\u003e\"\n    }\n  ]\n}\n"
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/skills-use-\u003ctemporary\u003e": {
+      "kind": "directory",
+      "mode": 448
+    },
+    "tmp/skills-use-\u003ctemporary\u003e/trusted": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp/skills-use-\u003ctemporary\u003e/trusted/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: trusted\ndescription: trusted golden fixture\n---\n\n# Trusted\n"
+    }
+  },
+  "locks": {},
+  "lockParseErrors": {},
+  "httpRequests": [
+    {
+      "method": "GET",
+      "path": "/.well-known/agent-skills/index.json",
+      "host": "\u003cfixture-host\u003e",
+      "header": {
+        "Accept-Encoding": [
+          "gzip"
+        ],
+        "User-Agent": [
+          "Go-http-client/1.1"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/.well-known/agent-skills/trusted/SKILL.md",
+      "host": "\u003cfixture-host\u003e",
+      "header": {
+        "Accept-Encoding": [
+          "gzip"
+        ],
+        "User-Agent": [
+          "Go-http-client/1.1"
+        ]
+      }
+    }
+  ],
+  "spawnedCommands": [
+    {
+      "name": "claude",
+      "args": [
+        "Remote skill source: 127.0.0.1\nRemote skill commit: sha256:b478256253efdab5cb94de1230707f7267a3356e9a2cca18e2b92c062c7f8dc1\n\nYou are being given a Skill to execute for the user's next request.\n\nUse the following SKILL.md as your instructions:\n\n\u003cSKILL.md\u003e\n---\nname: trusted\ndescription: trusted golden fixture\n---\n\n# Trusted\n\n\u003c/SKILL.md\u003e\n"
+      ],
+      "cwd": "\u003cproject\u003e"
+    }
+  ]
+}

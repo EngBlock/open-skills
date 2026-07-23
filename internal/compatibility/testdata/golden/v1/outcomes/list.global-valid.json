@@ -1,0 +1,61 @@
+{
+  "stdout": "Global Skills\n\nNative Tools\n npm-global-beta ~/.agents/skills/npm-global-beta\n Agents: not linked Source: EngBlock/global-skills\n\n",
+  "stderr": "",
+  "exitCode": 0,
+  "timedOut": false,
+  "processError": "",
+  "files": {
+    "home": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.agents": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.agents/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.agents/skills/npm-global-beta": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.agents/skills/npm-global-beta/SKILL.md": {
+      "kind": "file",
+      "mode": 420,
+      "text": "---\nname: npm-global-beta\ndescription: npm-global-beta golden fixture\n---\n\n# npm-global-beta\n"
+    },
+    "home/.local": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local/state": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local/state/skills": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "home/.local/state/skills/.skill-lock.json": {
+      "kind": "file",
+      "mode": 420,
+      "text": "{\n  \"version\": 3,\n  \"skills\": {\n    \"npm:global-beta\": {\n      \"source\": \"EngBlock/global-skills\",\n      \"sourceType\": \"github\",\n      \"sourceUrl\": \"https://github.com/EngBlock/global-skills\",\n      \"skillPath\": \"skills/npm-global-beta/SKILL.md\",\n      \"skillFolderHash\": \"npm-global-beta-tree\",\n      \"installedAt\": \"\u003ctimestamp\u003e\",\n      \"updatedAt\": \"\u003ctimestamp\u003e\",\n      \"pluginName\": \"native-tools\"\n    }\n  },\n  \"dismissed\": {\n    \"findSkillsPrompt\": true\n  },\n  \"lastSelectedAgents\": [\n    \"claude-code\"\n  ]\n}\n"
+    },
+    "project": {
+      "kind": "directory",
+      "mode": 493
+    },
+    "tmp": {
+      "kind": "directory",
+      "mode": 493
+    }
+  },
+  "locks": {
+    "global-xdg": "{\n  \"version\": 3,\n  \"skills\": {\n    \"npm:global-beta\": {\n      \"source\": \"EngBlock/global-skills\",\n      \"sourceType\": \"github\",\n      \"sourceUrl\": \"https://github.com/EngBlock/global-skills\",\n      \"skillPath\": \"skills/npm-global-beta/SKILL.md\",\n      \"skillFolderHash\": \"npm-global-beta-tree\",\n      \"installedAt\": \"\u003ctimestamp\u003e\",\n      \"updatedAt\": \"\u003ctimestamp\u003e\",\n      \"pluginName\": \"native-tools\"\n    }\n  },\n  \"dismissed\": {\n    \"findSkillsPrompt\": true\n  },\n  \"lastSelectedAgents\": [\n    \"claude-code\"\n  ]\n}\n"
+  },
+  "lockParseErrors": {},
+  "httpRequests": [],
+  "spawnedCommands": []
+}
