@@ -50,13 +50,13 @@ func TestNativeAddDereferencesConfinedRepositorySymlinks(t *testing.T) {
 		filepath.Join("project", ".agents", "skills", "confined-links", "absolute.txt"):               "internal payload\n",
 		filepath.Join("project", ".agents", "skills", "confined-links", "reference-copy", "guide.md"): "internal guide\n",
 	} {
-		installed := observation.Files[path]
-		if installed.Kind != FileKindRegular || string(installed.Data) != contents {
+		installed, exists := fileAt(observation, path)
+		if !exists || installed.Kind != FileKindRegular || string(installed.Data) != contents {
 			t.Fatalf("dereferenced content %s = %#v", path, installed)
 		}
 	}
-	agentLink := observation.Files[filepath.Join("project", ".claude", "skills", "confined-links")]
-	if agentLink.Kind != FileKindSymlink {
+	agentLink, exists := fileAt(observation, filepath.Join("project", ".claude", "skills", "confined-links"))
+	if !exists || agentLink.Kind != FileKindSymlink {
 		t.Fatalf("tool-created agent link was not preserved: %#v", agentLink)
 	}
 }
@@ -147,8 +147,8 @@ func TestNativeAddConfinesDirectoryJunctions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	installed := success.Files[filepath.Join("project", ".agents", "skills", "junction-skill", "reference-copy", "guide.md")]
-	if success.ExitCode != 0 || installed.Kind != FileKindRegular || string(installed.Data) != "internal guide\n" {
+	installed, exists := fileAt(success, filepath.Join("project", ".agents", "skills", "junction-skill", "reference-copy", "guide.md"))
+	if success.ExitCode != 0 || !exists || installed.Kind != FileKindRegular || string(installed.Data) != "internal guide\n" {
 		t.Fatalf("confined junction add = exit %d stdout %q stderr %q file %#v", success.ExitCode, success.Stdout, success.Stderr, installed)
 	}
 
@@ -167,7 +167,7 @@ func TestNativeAddConfinesDirectoryJunctions(t *testing.T) {
 	if escape.ExitCode != 1 || !strings.Contains(escape.Stderr, "symlink target escapes selected skill directory") {
 		t.Fatalf("escaping junction add = exit %d stdout %q stderr %q", escape.ExitCode, escape.Stdout, escape.Stderr)
 	}
-	if _, exists := escape.Files[filepath.Join("project", ".agents", "skills", "escaping-junction")]; exists {
+	if _, exists := fileAt(escape, filepath.Join("project", ".agents", "skills", "escaping-junction")); exists {
 		t.Fatalf("escaping junction left a partial installation")
 	}
 }

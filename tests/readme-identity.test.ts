@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const readme = readFileSync(join(import.meta.dirname, '..', 'README.md'), 'utf-8');
+const readme = readFileSync(join(import.meta.dirname, '..', 'README.md'), 'utf-8').replaceAll(
+  '\r\n',
+  '\n'
+);
 
 describe('README identity', () => {
   it('documents open-skills as the preferred independent CLI', () => {

@@ -28,7 +28,12 @@ describe('@engblock/open-skills package identity', () => {
   });
 
   it('packs the release files under the open-skills identity', () => {
-    const packOutput = execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {
+    const npmCommand = process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : 'npm';
+    const npmArgs =
+      process.platform === 'win32'
+        ? ['/d', '/s', '/c', 'npm pack --dry-run --json --ignore-scripts']
+        : ['pack', '--dry-run', '--json', '--ignore-scripts'];
+    const packOutput = execFileSync(npmCommand, npmArgs, {
       cwd: rootDir,
       encoding: 'utf-8',
     });

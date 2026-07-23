@@ -106,6 +106,20 @@ func TestNativePreviewWorkflowGatesPublicationOnHomebrewSmoke(t *testing.T) {
 	}
 }
 
+func TestOfflineCIPrefetchesGoModulesBeforeDisablingNetwork(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	workflow := readRepositoryFile(t, root, ".github", "workflows", "ci.yml")
+	for _, text := range []string{
+		`GOMODCACHE="$MOD_CACHE" go mod download`,
+		`export GOMODCACHE="$2"`,
+		`export GOPROXY=off GOSUMDB=off GOTOOLCHAIN=local`,
+	} {
+		if !strings.Contains(workflow, text) {
+			t.Errorf("CI offline test setup does not contain %q", text)
+		}
+	}
+}
+
 func TestRepositoryWorkflowActionsArePinnedToCommits(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
 	entries, err := os.ReadDir(filepath.Join(root, ".github", "workflows"))
@@ -126,6 +140,17 @@ func TestRepositoryWorkflowActionsArePinnedToCommits(t *testing.T) {
 	}
 }
 
+func TestReadRepositoryFileNormalizesLineEndings(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "fixture.txt")
+	if err := os.WriteFile(path, []byte("first\r\nsecond\r\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if contents := readRepositoryFile(t, root, "fixture.txt"); contents != "first\nsecond\n" {
+		t.Fatalf("normalized contents = %q", contents)
+	}
+}
+
 func requireFormulaValue(t *testing.T, formula string, name string, valuePattern string) string {
 	t.Helper()
 	match := regexp.MustCompile(`(?m)^  ` + regexp.QuoteMeta(name) + ` \"(` + valuePattern + `)\"$`).FindStringSubmatch(formula)
@@ -142,5 +167,5 @@ func readRepositoryFile(t *testing.T, root string, elements ...string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return string(contents)
+	return strings.ReplaceAll(string(contents), "\r\n", "\n")
 }

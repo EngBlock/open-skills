@@ -27,11 +27,11 @@ func TestNativeSyncDiscoversSupportedNodeModuleLayoutsOffline(t *testing.T) {
 		t.Fatalf("sync = exit %d stdout %q stderr %q", observation.ExitCode, observation.Stdout, observation.Stderr)
 	}
 	for _, name := range []string{"root", "alpha", "beta", "scoped"} {
-		canonical, exists := observation.Files[filepath.Join("project", ".agents", "skills", name, "SKILL.md")]
+		canonical, exists := fileAt(observation, filepath.Join("project", ".agents", "skills", name, "SKILL.md"))
 		if !exists || canonical.Kind != FileKindRegular {
 			t.Fatalf("missing canonical %s: %#v", name, canonical)
 		}
-		link, exists := observation.Files[filepath.Join("project", ".claude", "skills", name)]
+		link, exists := fileAt(observation, filepath.Join("project", ".claude", "skills", name))
 		if !exists || link.Kind != FileKindSymlink {
 			t.Fatalf("missing Claude link %s: %#v", name, link)
 		}

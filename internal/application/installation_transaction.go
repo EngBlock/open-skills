@@ -926,16 +926,7 @@ func syncReplacementPath(path string) error {
 		return err
 	}
 	if info.Mode().IsRegular() {
-		file, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		err = file.Sync()
-		closeErr := file.Close()
-		if err != nil {
-			return err
-		}
-		return closeErr
+		return syncRegularFile(path)
 	}
 	if info.IsDir() {
 		entries, err := os.ReadDir(path)

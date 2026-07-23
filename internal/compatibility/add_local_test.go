@@ -46,12 +46,12 @@ func TestNativeAddInstallsFilteredLocalSkillIntoProjectTopologyAndLock(t *testin
 		t.Fatalf("add = exit %d stdout %q stderr %q", observation.ExitCode, observation.Stdout, observation.Stderr)
 	}
 	canonical := filepath.Join(observation.Paths.Project, ".agents", "skills", "beta")
-	canonicalSkill, ok := observation.Files[strings.TrimPrefix(filepath.Join(canonical, "SKILL.md"), observation.Paths.Root+string(filepath.Separator))]
+	canonicalSkill, ok := fileAt(observation, filepath.Join(canonical, "SKILL.md"))
 	if !ok || string(canonicalSkill.Data) == "" {
 		t.Fatalf("canonical skill was not installed: %#v", observation.Files)
 	}
-	link := observation.Files[strings.TrimPrefix(filepath.Join(observation.Paths.Project, ".claude", "skills", "beta"), observation.Paths.Root+string(filepath.Separator))]
-	if link.Kind != FileKindSymlink {
+	link, ok := fileAt(observation, filepath.Join(observation.Paths.Project, ".claude", "skills", "beta"))
+	if !ok || link.Kind != FileKindSymlink {
 		t.Fatalf("Claude target is not a canonical symlink: %#v", link)
 	}
 	var lock struct {
@@ -127,7 +127,7 @@ func TestNativeAddPromptsForMultipleLocalSkills(t *testing.T) {
 	if observation.ExitCode != 0 || !strings.Contains(observation.Stdout, "Select skills to install") || !strings.Contains(observation.Stdout, "Installed beta") {
 		t.Fatalf("interactive add = exit %d stdout %q stderr %q", observation.ExitCode, observation.Stdout, observation.Stderr)
 	}
-	if _, found := observation.Files[filepath.Join("project", ".agents", "skills", "alpha", "SKILL.md")]; found {
+	if _, found := fileAt(observation, filepath.Join("project", ".agents", "skills", "alpha", "SKILL.md")); found {
 		t.Fatalf("interactive selection installed unselected alpha: %#v", observation.Files)
 	}
 	assertOfflineShellObservation(t, observation)

@@ -11,6 +11,31 @@ import (
 	"testing"
 )
 
+func TestSyncReplacementPathFlushesRegularFiles(t *testing.T) {
+	for _, mode := range []os.FileMode{0o644, 0o444} {
+		t.Run(mode.String(), func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "SKILL.md")
+			if err := os.WriteFile(path, []byte("content"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(path, mode); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = os.Chmod(path, 0o644) })
+			if err := syncReplacementPath(path); err != nil {
+				t.Fatalf("sync regular file: %v", err)
+			}
+			info, err := os.Stat(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if info.Mode().Perm() != mode.Perm() {
+				t.Fatalf("mode after sync = %o; want %o", info.Mode().Perm(), mode.Perm())
+			}
+		})
+	}
+}
+
 func TestMutationTransactionRollsBackStagedDeletion(t *testing.T) {
 	project, _ := transactionFixture(t, "first")
 	target := filepath.Join(project, ".agents", "skills", "removed")

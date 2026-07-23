@@ -50,7 +50,11 @@ func prepareSkillContentWithBudget(source string, budget *resourceBudget) (*skil
 	if err != nil {
 		return nil, fmt.Errorf("inspect selected skill directory: %w", err)
 	}
-	if selectedInfo.Mode()&os.ModeSymlink != 0 {
+	selectedLink, err := isRepositoryLink(absolute, selectedInfo.Mode())
+	if err != nil {
+		return nil, fmt.Errorf("inspect selected skill directory link: %w", err)
+	}
+	if selectedLink {
 		return nil, fmt.Errorf("selected skill directory is a symbolic link: %s", source)
 	}
 	root, err := filepath.EvalSymlinks(absolute)
@@ -121,7 +125,11 @@ func (content *skillContent) scanDirectory(directory, destination string, active
 		if destination != "." {
 			relative = filepath.Join(destination, entry.Name())
 		}
-		if entry.Type()&os.ModeSymlink != 0 {
+		link, err := isRepositoryLink(sourcePath, entry.Type())
+		if err != nil {
+			return fmt.Errorf("inspect repository link %q: %w", filepath.ToSlash(relative), err)
+		}
+		if link {
 			if err := content.scanSymlink(sourcePath, relative, active, budget); err != nil {
 				return err
 			}

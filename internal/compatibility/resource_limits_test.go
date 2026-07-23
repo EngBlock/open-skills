@@ -59,7 +59,7 @@ func TestNativeRemoteResourceFailureLeavesNoInstalledContentOrLock(t *testing.T)
 	if failure.ExitCode != 1 || failure.Stdout != "" || !strings.Contains(failure.Stderr, "--max-file-bytes") {
 		t.Fatalf("failure = exit %d stdout %q stderr %q", failure.ExitCode, failure.Stdout, failure.Stderr)
 	}
-	if _, found := failure.Files[filepath.Join("project", ".agents", "skills", "bounded")]; found {
+	if _, found := fileAt(failure, filepath.Join("project", ".agents", "skills", "bounded")); found {
 		t.Fatal("resource failure left installed content")
 	}
 	if _, found := failure.Locks[ProjectLock]; found {
@@ -83,8 +83,8 @@ func TestNativeRemoteResourceFailureLeavesNoInstalledContentOrLock(t *testing.T)
 	if success.ExitCode != 0 || !strings.Contains(success.Stderr, "Warning: allowing insecure HTTP") || success.Stdout != "Installed bounded\n" {
 		t.Fatalf("success = exit %d stdout %q stderr %q", success.ExitCode, success.Stdout, success.Stderr)
 	}
-	installed := success.Files[filepath.Join("project", ".agents", "skills", "bounded", "SKILL.md")]
-	if installed.Kind != FileKindRegular || string(installed.Data) != string(skillMD) {
+	installed, exists := fileAt(success, filepath.Join("project", ".agents", "skills", "bounded", "SKILL.md"))
+	if !exists || installed.Kind != FileKindRegular || string(installed.Data) != string(skillMD) {
 		t.Fatalf("installed skill = %#v", installed)
 	}
 	if _, found := success.Locks[ProjectLock]; !found {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -27,8 +28,8 @@ func TestNativeRemoteWellKnownAgentUseRecordsExactTrustBeforeInjection(t *testin
 	if len(observation.SpawnedCommands) != 1 || len(observation.SpawnedCommands[0].Args) != 1 || !strings.Contains(observation.SpawnedCommands[0].Args[0], "Remote skill source: 127.0.0.1") || !strings.Contains(observation.SpawnedCommands[0].Args[0], "Remote skill commit: sha256:") || !strings.Contains(observation.SpawnedCommands[0].Args[0], "Do remote work.") {
 		t.Fatalf("agent prompt did not receive provenance before instructions: %#v", observation.SpawnedCommands)
 	}
-	file := observation.Files[filepath.Join("home", ".config", "open-skills", "trust.json")]
-	if file.Kind != FileKindRegular || file.Mode.Perm() != 0o600 {
+	file, exists := fileAt(observation, filepath.Join("home", ".config", "open-skills", "trust.json"))
+	if !exists || file.Kind != FileKindRegular || (runtime.GOOS != "windows" && file.Mode.Perm() != 0o600) {
 		t.Fatalf("trust store mode = %s %o", file.Kind, file.Mode.Perm())
 	}
 	var store struct {
@@ -114,8 +115,8 @@ func TestNativeTrustRevokeRejectsEmptyExactCommitWithoutBroadMutation(t *testing
 	if observation.ExitCode != 1 || observation.Stdout != "" || observation.Stderr == "" {
 		t.Fatalf("empty exact revoke = exit %d stdout %q stderr %q", observation.ExitCode, observation.Stdout, observation.Stderr)
 	}
-	file := observation.Files[filepath.Join("home", ".config", "open-skills", "trust.json")]
-	if string(file.Data) != string(trustStoreFixture()[0].Data) {
+	file, exists := fileAt(observation, filepath.Join("home", ".config", "open-skills", "trust.json"))
+	if !exists || string(file.Data) != string(trustStoreFixture()[0].Data) {
 		t.Fatalf("empty exact revoke mutated trust store: %q", file.Data)
 	}
 	assertOfflineShellObservation(t, observation)
@@ -133,7 +134,10 @@ func TestNativeTrustRevokeExactCommitIsDeterministicAndOffline(t *testing.T) {
 	if observation.ExitCode != 0 || observation.Stderr != "" {
 		t.Fatalf("trust revoke = exit %d stdout %q stderr %q", observation.ExitCode, observation.Stdout, observation.Stderr)
 	}
-	file := observation.Files[filepath.Join("home", ".config", "open-skills", "trust.json")]
+	file, exists := fileAt(observation, filepath.Join("home", ".config", "open-skills", "trust.json"))
+	if !exists {
+		t.Fatal("exact revoke removed the trust store")
+	}
 	var remaining struct {
 		Approvals []struct{ Source, Commit string } `json:"approvals"`
 	}
@@ -173,8 +177,8 @@ func TestNativeTrustBroadRevokeRequiresConfirmationOffline(t *testing.T) {
 	if confirmed.ExitCode != 0 || confirmed.Stderr != "" {
 		t.Fatalf("confirmed revoke = exit %d stdout %q stderr %q", confirmed.ExitCode, confirmed.Stdout, confirmed.Stderr)
 	}
-	file := confirmed.Files[filepath.Join("home", ".config", "open-skills", "trust.json")]
-	if string(file.Data) == "" || string(file.Data) == string(trustStoreFixture()[0].Data) {
+	file, exists := fileAt(confirmed, filepath.Join("home", ".config", "open-skills", "trust.json"))
+	if !exists || string(file.Data) == "" || string(file.Data) == string(trustStoreFixture()[0].Data) {
 		t.Fatalf("confirmed broad revoke did not update trust store: %q", file.Data)
 	}
 	assertOfflineShellObservation(t, confirmed)
@@ -206,7 +210,7 @@ func TestNativeTrustClearRequiresConfirmationAndRemovesStoreOffline(t *testing.T
 	if confirmed.ExitCode != 0 || confirmed.Stderr != "" {
 		t.Fatalf("confirmed clear = exit %d stdout %q stderr %q", confirmed.ExitCode, confirmed.Stdout, confirmed.Stderr)
 	}
-	if _, exists := confirmed.Files[filepath.Join("home", ".config", "open-skills", "trust.json")]; exists {
+	if _, exists := fileAt(confirmed, filepath.Join("home", ".config", "open-skills", "trust.json")); exists {
 		t.Fatal("trust clear left the trust store on disk")
 	}
 	assertOfflineShellObservation(t, unconfirmed)

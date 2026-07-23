@@ -91,12 +91,16 @@ jobs:
       - name: D02 network-disabled shell tests
         run: |
           GO_BIN="$(command -v go)"
+          MOD_CACHE="${RUNNER_TEMP}/open-skills-go-mod-cache"
+          GOMODCACHE="$MOD_CACHE" go mod download
           sudo unshare --net -- sh -c '
             ip link set lo up
             export PATH="$(dirname "$1"):/usr/sbin:/usr/bin:/bin"
             export GOCACHE=/tmp/open-skills-go-cache
+            export GOMODCACHE="$2"
+            export GOPROXY=off GOSUMDB=off GOTOOLCHAIN=local
             exec "$1" test ./internal/compatibility -run "TestNativeShell|TestD02OfflineShellHasNoNetworkOrSubprocessDependencies" -count=1
-          ' sh "$GO_BIN"
+          ' sh "$GO_BIN" "$MOD_CACHE"
 
       - name: Build standalone executable
         env:

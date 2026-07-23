@@ -17,7 +17,8 @@ func sourceSkillFixture() FileFixture {
 }
 
 func fileAt(observation Observation, path string) (FileState, bool) {
-	state, ok := observation.Files[strings.TrimPrefix(path, observation.Paths.Root+string(filepath.Separator))]
+	relative := strings.TrimPrefix(path, observation.Paths.Root+string(filepath.Separator))
+	state, ok := observation.Files[filepath.ToSlash(relative)]
 	return state, ok
 }
 

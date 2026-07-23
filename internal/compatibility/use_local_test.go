@@ -48,7 +48,7 @@ func TestNativeUseLocalSkillWritesOnlySemanticPromptOffline(t *testing.T) {
 	if _, found := observation.Files[sandboxRelative(observation, filepath.Join(supportDirectory, "metadata.json"))]; found {
 		t.Fatal("metadata.json was copied into the temporary support directory")
 	}
-	if _, installed := observation.Files[filepath.Join("project", ".agents", "skills", "beta", "SKILL.md")]; installed || len(observation.Locks) != 0 {
+	if _, installed := fileAt(observation, filepath.Join("project", ".agents", "skills", "beta", "SKILL.md")); installed || len(observation.Locks) != 0 {
 		t.Fatalf("use installed or locked the selected skill: files %#v locks %#v", observation.Files, observation.Locks)
 	}
 	assertOfflineShellObservation(t, observation)
@@ -203,5 +203,5 @@ func supportDirectoryFromPrompt(prompt string) string {
 }
 
 func sandboxRelative(observation Observation, path string) string {
-	return strings.TrimPrefix(path, observation.Paths.Root+string(filepath.Separator))
+	return filepath.ToSlash(strings.TrimPrefix(path, observation.Paths.Root+string(filepath.Separator)))
 }

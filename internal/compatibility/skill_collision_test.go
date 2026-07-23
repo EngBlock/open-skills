@@ -108,8 +108,8 @@ func TestNativeAddSelectsExactRepositoryRelativeSkillPath(t *testing.T) {
 	if observation.ExitCode != 0 || observation.Stderr != "" || observation.Stdout != "Installed case\n" {
 		t.Fatalf("path-selected add = exit %d stdout %q stderr %q", observation.ExitCode, observation.Stdout, observation.Stderr)
 	}
-	installed := observation.Files[filepath.Join("project", ".agents", "skills", "case", "SKILL.md")]
-	if !strings.Contains(string(installed.Data), "# lower") {
+	installed, exists := fileAt(observation, filepath.Join("project", ".agents", "skills", "case", "SKILL.md"))
+	if !exists || !strings.Contains(string(installed.Data), "# lower") {
 		t.Fatalf("wrong collision candidate installed: %#v", installed)
 	}
 	assertOfflineShellObservation(t, observation)
