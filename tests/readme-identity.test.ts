@@ -14,9 +14,11 @@ describe('README identity', () => {
       '[![CI](https://github.com/EngBlock/open-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/EngBlock/open-skills/actions/workflows/ci.yml)'
     );
     expect(readme).toContain(
-      '[![npm version](https://img.shields.io/npm/v/@engblock/open-skills.svg)](https://www.npmjs.com/package/@engblock/open-skills)'
+      '[![GitHub release](https://img.shields.io/github/v/release/EngBlock/open-skills)](https://github.com/EngBlock/open-skills/releases/latest)'
     );
-    expect(readme).toContain('npm install --global @engblock/open-skills');
+    expect(readme).toContain('The JavaScript npm package is deprecated and frozen at 0.1.2.');
+    expect(readme).toContain('[native migration guide](docs/native-migration.md)');
+    expect(readme).not.toContain('npm install --global @engblock/open-skills');
     expect(readme).toContain('open-skills add EngBlock/open-skills@find-skills');
     expect(readme).not.toContain('npx @engblock/open-skills');
     expect(readme).not.toContain('npx skills');

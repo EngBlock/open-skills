@@ -1,10 +1,127 @@
-# Draft native 0.2.0 migration guidance
+# Migrate from npm to native open-skills 0.2.0
 
-The native release preserves the npm 0.1.2 command contract except for the approved divergences in the [native compatibility baseline](native-compatibility-baseline.md#intentional-divergences). This guidance remains a draft until the npm deprecation work in issue #42 publishes the final user-facing cutover instructions.
+The JavaScript package `@engblock/open-skills` is deprecated and frozen at 0.1.2. Native `open-skills` 0.2.0 is the production release and preserves the npm command contract except for the approved, security- and reliability-focused divergences documented below. The npm package remains a historical JavaScript artifact: it does not download the native executable and will receive no new features.
+
+System Git is the native executable's only runtime dependency. Node.js and npm are not required after the old global package is removed.
+
+## Install the native executable
+
+### Homebrew (supported macOS ARM64)
+
+```sh
+brew tap EngBlock/open-skills https://github.com/EngBlock/open-skills
+brew install EngBlock/open-skills/open-skills
+```
+
+Homebrew owns executable upgrades. `open-skills update` continues to update installed skills, not the executable.
+
+### Scoop (experimental Windows x86-64)
+
+```powershell
+scoop bucket add open-skills https://github.com/EngBlock/open-skills
+scoop install open-skills/open-skills
+```
+
+Windows x86-64 remains experimental. Scoop owns executable upgrades; use `scoop update open-skills` rather than expecting `open-skills update` to replace the executable.
+
+### Verified direct archive
+
+GitHub Releases are the canonical artifact source. Choose the archive for your target from the [v0.2.0 release](https://github.com/EngBlock/open-skills/releases/tag/v0.2.0):
+
+| Target | Archive | Status |
+| --- | --- | --- |
+| macOS ARM64 | `open-skills_0.2.0_darwin_arm64.tar.gz` | Supported |
+| Linux x86-64 | `open-skills_0.2.0_linux_amd64.tar.gz` | Supported |
+| macOS x86-64 | `open-skills_0.2.0_darwin_amd64.tar.gz` | Experimental |
+| Linux ARM64 | `open-skills_0.2.0_linux_arm64.tar.gz` | Experimental |
+| Windows x86-64 | `open-skills_0.2.0_windows_amd64.zip` | Experimental |
+
+For example, set `ARCHIVE` to the selected filename and download only immutable release assets:
+
+```sh
+ARCHIVE=open-skills_0.2.0_linux_amd64.tar.gz
+gh release download v0.2.0 --repo EngBlock/open-skills \
+  --pattern "$ARCHIVE" \
+  --pattern "$ARCHIVE.sigstore.json" \
+  --pattern checksums.txt \
+  --pattern provenance.sigstore.json
+```
+
+Before extracting or executing the archive, verify its checksum, keyless signature, repository, tag, and producing workflow identity:
+
+```sh
+grep "  $ARCHIVE$" checksums.txt | sha256sum --check -
+cosign verify-blob \
+  --bundle "$ARCHIVE.sigstore.json" \
+  --certificate-identity 'https://github.com/EngBlock/open-skills/.github/workflows/native-preview.yml@refs/tags/v0.2.0' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+  "$ARCHIVE"
+gh attestation verify "$ARCHIVE" \
+  --bundle provenance.sigstore.json \
+  --repo EngBlock/open-skills \
+  --signer-workflow EngBlock/open-skills/.github/workflows/native-preview.yml
+```
+
+On macOS, replace `sha256sum --check -` with `shasum -a 256 --check -`. After every verification succeeds, extract the archive and place `open-skills` in a directory on `PATH`; for example:
+
+```sh
+tar -xzf "$ARCHIVE"
+mkdir -p "$HOME/.local/bin"
+install -m 0755 open-skills "$HOME/.local/bin/open-skills"
+```
+
+For the Windows ZIP, verify it before using `Expand-Archive`, then place `open-skills.exe` on `PATH`. Never install an unverified archive.
+
+## Remove the retired npm package
+
+After confirming the native executable is the one on `PATH`, remove the frozen JavaScript package and its `skills` and `add-skill` aliases:
+
+```sh
+open-skills --version
+npm uninstall --global @engblock/open-skills
+```
+
+Native distributions intentionally expose only `open-skills`. They never claim the `skills` or `add-skill` executable names.
+
+## Existing state is recognized in place
+
+No state import or skill reinstallation is required. Native `open-skills` reads existing npm and upstream state directly:
+
+- project state: `./skills-lock.json` schema version 1;
+- global state with `XDG_STATE_HOME`: `$XDG_STATE_HOME/skills/.skill-lock.json` schema version 3;
+- legacy global state otherwise: `~/.agents/.skill-lock.json` schema version 3.
+
+The native CLI also recognizes the existing canonical and agent skill placements recorded by those locks. Run `open-skills list` before the first mutation to inspect the recognized project and global state.
+
+Native writes can add optional provenance, content-ownership, and transaction metadata. This migration is forward-only: the native CLI preserves required legacy fields and safe unknown fields, but the retired npm CLI is not guaranteed to preserve or understand native metadata. After native `open-skills` mutates state, do not use npm 0.1.2 to mutate that same state. Checked-in project locks remain readable and should be reviewed like any other repository change.
+
+## Migrate environment variables
+
+Canonical native variables use the `OPEN_SKILLS_` prefix. The native 1.x line continues to accept the two baseline legacy names, emits a migration warning, and gives a present canonical value precedence even when that value is empty or invalid:
+
+| npm/legacy name | Native canonical name |
+| --- | --- |
+| `SKILLS_CLONE_TIMEOUT_MS` | `OPEN_SKILLS_CLONE_TIMEOUT_MS` |
+| `INSTALL_INTERNAL_SKILLS` | `OPEN_SKILLS_INSTALL_INTERNAL_SKILLS` |
+
+Legacy names remain supported through 1.x and are removed no earlier than 2.0. `OPEN_SKILLS_SUPPRESS_LEGACY_ENV_WARNINGS=1` suppresses only legacy-name warnings. Standard or third-party variables such as `NO_COLOR`, `XDG_*`, Git credentials, and agent-owned home variables keep their established names. The complete contract is in [D12](#d12-namespaced-configuration-and-exact-authorization).
+
+## Intentional behavior changes
+
+The most visible native differences are:
+
+- only the `open-skills` executable is installed;
+- startup, help, local operations, and retired search guidance remain offline, and there is no binary self-updater;
+- remote sources gain immutable commit provenance, transport restrictions, credential redaction, resource limits, and confined link handling;
+- replacing another source requires `--replace`, discarding local changes requires `--force`, remote instruction trust requires `--trust`, and insecure transport requires `--allow-insecure-transport`; `--yes` grants none of these;
+- malformed or unsupported state fails safely instead of being reset, while mutations use advisory locks and recoverable transactions;
+- native-owned configuration uses `OPEN_SKILLS_*`, and supported commands offer deterministic versioned JSON.
+
+The D01-D13 sections below are the complete migration record. They describe every approved divergence and link to externally observable regression coverage through the [native compatibility baseline](native-compatibility-baseline.md#intentional-divergences).
 
 ## D01: one native executable name
 
-Native distributions contain only `open-skills`. They do not install the npm compatibility aliases `skills` or `add-skill`. The npm package keeps its existing aliases until its separate deprecation step; installing the native release does not claim those names.
+Native distributions contain only `open-skills`. They do not install the npm compatibility aliases `skills` or `add-skill`. The frozen npm artifact retains its historical aliases, so uninstall it to remove them; installing the native release does not claim those names.
 
 ## D02: offline command shell
 

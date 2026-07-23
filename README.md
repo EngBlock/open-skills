@@ -7,7 +7,7 @@ Supports **OpenCode**, **Claude Code**, **Codex**, **Cursor**, and [70 more](#su
 <!-- agent-list:end -->
 
 [![CI](https://github.com/EngBlock/open-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/EngBlock/open-skills/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/@engblock/open-skills.svg)](https://www.npmjs.com/package/@engblock/open-skills)
+[![GitHub release](https://img.shields.io/github/v/release/EngBlock/open-skills)](https://github.com/EngBlock/open-skills/releases/latest)
 
 ## Install
 
@@ -43,17 +43,23 @@ brew update
 brew upgrade EngBlock/open-skills/open-skills
 ```
 
-Native 0.2.0 is the production release. The npm implementation remains available until the separate deprecation step described by the draft [native migration guidance](docs/native-migration.md).
+Native 0.2.0 is the production release.
 
 ### Verified direct archives
 
-GitHub Releases are the canonical source for supported and experimental archives. Each release includes `checksums.txt`, an adjacent keyless Sigstore bundle for every archive and the checksum file, and GitHub build provenance. Follow the exact checksum, Cosign identity, and `gh attestation verify` commands in the release notes before installing a direct download. Direct archives contain only `open-skills` (`open-skills.exe` on Windows) and require system Git.
+GitHub Releases are the canonical source for supported and experimental archives. Download the archive for your platform together with `checksums.txt`, its adjacent Sigstore bundle, and `provenance.sigstore.json`. Verify the selected checksum, keyless signature, repository, tag, and producing workflow before extracting the executable. The [native migration guide](docs/native-migration.md#verified-direct-archive) gives exact download, verification, and installation commands.
 
-### npm
+Direct archives contain only `open-skills` (`open-skills.exe` on Windows), require system Git, and do not require Node.js or npm.
+
+### Deprecated npm implementation
+
+The JavaScript npm package is deprecated and frozen at 0.1.2. It will receive no new features and will not download or bootstrap the native executable. Remove it after installing native `open-skills` through Homebrew, Scoop, or a verified direct archive:
 
 ```bash
-npm install --global @engblock/open-skills
+npm uninstall --global @engblock/open-skills
 ```
+
+Existing skill and lock state remains in place. See the [native migration guide](docs/native-migration.md) for state compatibility, forward-only metadata, legacy environment variables, and intentional behavior changes.
 
 ## Install a Skill
 
