@@ -52,16 +52,18 @@ func (failure *InspectionError) Unwrap() error {
 }
 
 type LockEntry struct {
-	Source       string
-	SourceURL    string
-	SourceType   string
-	Ref          string
-	SkillPath    string
-	ComputedHash string
-	PluginName   string
-	Agents       []string
-	Subagents    []string
-	raw          map[string]json.RawMessage
+	Source               string
+	SourceURL            string
+	SourceType           string
+	Ref                  string
+	SkillPath            string
+	ComputedHash         string
+	SkillFolderHash      string
+	InstalledContentHash string
+	PluginName           string
+	Agents               []string
+	Subagents            []string
+	raw                  map[string]json.RawMessage
 }
 
 // InstallationRecord is the stable information recorded for a locally
@@ -269,11 +271,11 @@ func decodeLockEntry(fields map[string]json.RawMessage, expectedVersion int) (Lo
 				return LockEntry{}, err
 			}
 		}
-		if _, err := stringField(fields, "skillFolderHash", true); err != nil {
+		if entry.SkillFolderHash, err = stringField(fields, "skillFolderHash", true); err != nil {
 			return LockEntry{}, err
 		}
 	}
-	for _, name := range []string{"sourceUrl", "ref", "skillPath", "pluginName"} {
+	for _, name := range []string{"sourceUrl", "ref", "skillPath", "pluginName", "installedContentHash"} {
 		value, exists := fields[name]
 		if !exists {
 			continue
@@ -291,27 +293,33 @@ func decodeLockEntry(fields map[string]json.RawMessage, expectedVersion int) (Lo
 			entry.SkillPath = decoded
 		case "pluginName":
 			entry.PluginName = decoded
+		case "installedContentHash":
+			entry.InstalledContentHash = decoded
 		}
 	}
-	if expectedVersion == 1 {
-		for field, destination := range map[string]*[]string{
-			"agents":    &entry.Agents,
-			"subagents": &entry.Subagents,
-		} {
-			value, exists := fields[field]
-			if !exists {
+	for field, destination := range map[string]*[]string{
+		"agents":    &entry.Agents,
+		"subagents": &entry.Subagents,
+	} {
+		value, exists := fields[field]
+		if !exists {
+			continue
+		}
+		if err := json.Unmarshal(value, destination); err != nil {
+			// v3 baseline state may use these names for unrelated extensions.
+			// Preserve them verbatim unless they have the native array shape.
+			if expectedVersion != 1 {
+				*destination = nil
 				continue
 			}
-			if err := json.Unmarshal(value, destination); err != nil {
-				return LockEntry{}, fmt.Errorf("%s must be an array of strings", field)
+			return LockEntry{}, fmt.Errorf("%s must be an array of strings", field)
+		}
+		for _, name := range *destination {
+			if name == "" && field == "subagents" {
+				continue
 			}
-			for _, name := range *destination {
-				if name == "" && field == "subagents" {
-					continue
-				}
-				if strings.TrimSpace(name) == "" {
-					return LockEntry{}, fmt.Errorf("%s must not contain empty names", field)
-				}
+			if strings.TrimSpace(name) == "" {
+				return LockEntry{}, fmt.Errorf("%s must not contain empty names", field)
 			}
 		}
 	}
@@ -472,25 +480,26 @@ func (document *Document) RecordInstallation(name string, record InstallationRec
 		return err
 	}
 	fields["ownedFiles"] = owned
-	if document.Version == 1 {
-		for field, values := range map[string][]string{
-			"agents":    record.Agents,
-			"subagents": record.Subagents,
-		} {
-			if len(values) == 0 {
+	for field, values := range map[string][]string{
+		"agents":    record.Agents,
+		"subagents": record.Subagents,
+	} {
+		if len(values) == 0 {
+			if document.Version == 1 {
 				delete(fields, field)
-				continue
 			}
-			encoded, err := json.Marshal(values)
-			if err != nil {
-				return err
-			}
-			fields[field] = encoded
+			continue
 		}
+		encoded, err := json.Marshal(values)
+		if err != nil {
+			return err
+		}
+		fields[field] = encoded
 	}
 	document.Skills[name] = LockEntry{
 		Source: record.Source, SourceURL: record.SourceURL, SourceType: record.SourceType,
 		Ref: record.Ref, SkillPath: record.SkillPath, ComputedHash: record.InstalledContentHash,
+		SkillFolderHash: record.SkillFolderHash, InstalledContentHash: record.InstalledContentHash,
 		Agents: record.Agents, Subagents: record.Subagents, raw: fields,
 	}
 	return nil

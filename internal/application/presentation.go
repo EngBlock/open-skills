@@ -41,7 +41,8 @@ Manage Skills:
   find, search, f, s  Show migration guidance for decentralized discovery
 
 Updates:
-  update [skills...]   Update skills to latest versions (alias: upgrade)
+  check [skills...]    Inspect available skill updates
+  update [skills...]   Apply available skill updates (alias: upgrade)
 
 Update Options:
   -g, --global           Update global skills only
@@ -104,6 +105,7 @@ Examples:
   $ open-skills ls -g                         # list global skills
   $ open-skills ls -a claude-code             # filter by agent
   $ open-skills ls --json                      # JSON output
+  $ open-skills check
   $ open-skills update
   $ open-skills update my-skill             # update a single skill
   $ open-skills update -g                    # update global skills only
