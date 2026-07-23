@@ -383,8 +383,42 @@ func runAdd(invocation Invocation, arguments []string) int {
 			recordAutomationSuccess(invocation, addJSONOutput{SchemaVersion: automationSchemaVersion, Scope: scope, Installed: installed})
 			return 0
 		}
+		if !invocation.Interactive {
+			for _, skill := range selected {
+				_, _ = fmt.Fprintf(invocation.Stdout, "Installed %s\n", skill.Name)
+			}
+			return 0
+		}
+		committedState, err := state.Read(lockPath, lockVersion)
+		if err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Read committed installation state: %v\n", err)
+			return 1
+		}
 		for _, skill := range selected {
-			_, _ = fmt.Fprintf(invocation.Stdout, "Installed %s\n", skill.Name)
+			entry := committedState.Entry(skill.Name)
+			if entry == nil {
+				_, _ = fmt.Fprintf(invocation.Stderr, "Read committed installation state: missing entry for %s\n", skill.Name)
+				return 1
+			}
+			installedAgents := entry.Agents
+			agentText := formatAgentNames(displayAgentNames(installedAgents))
+			if agentText == "" {
+				agentText = "none"
+			}
+			_, _ = fmt.Fprintf(invocation.Stdout, "Installed %s\n  Agents: %s\n", skill.Name, agentText)
+			installed := make(map[string]bool, len(installedAgents))
+			for _, agent := range installedAgents {
+				installed[agent] = true
+			}
+			skippedAgents := []string{}
+			for _, agent := range orderedAgentIDs(agents) {
+				if !installed[agent] {
+					skippedAgents = append(skippedAgents, agent)
+				}
+			}
+			if len(skippedAgents) > 0 {
+				_, _ = fmt.Fprintf(invocation.Stdout, "  Skipped: %s\n", formatAgentNames(displayAgentNames(skippedAgents)))
+			}
 		}
 		return 0
 	})

@@ -267,6 +267,149 @@ func TestRunAddInteractiveReplacementDisplaysSanitizedSourcesAndCanReject(t *tes
 	}
 }
 
+func writeAddOutputSkill(t *testing.T, directory, name string) {
+	t.Helper()
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	contents := "---\nname: " + name + "\ndescription: output fixture\n---\n"
+	if err := os.WriteFile(filepath.Join(directory, "SKILL.md"), []byte(contents), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func isolateAddOutputEnvironment(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	if err := os.MkdirAll(home, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_STATE_HOME", filepath.Join(root, "state"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
+	for _, name := range []string{"AUTOHAND_HOME", "CLAUDE_CONFIG_DIR", "CODEX_HOME", "GROK_HOME", "HERMES_HOME", "VIBE_HOME", "APPDATA", "FLATPAK_XDG_CONFIG_HOME"} {
+		t.Setenv(name, "")
+	}
+	return home
+}
+
+func TestRunAddInteractiveOutputReportsActualAgents(t *testing.T) {
+	project := t.TempDir()
+	source := filepath.Join(t.TempDir(), "output-skill")
+	writeAddOutputSkill(t, source, "output-skill")
+	isolateAddOutputEnvironment(t)
+	t.Chdir(project)
+
+	var stdout, stderr bytes.Buffer
+	code := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr, Interactive: true}, []string{source, "--agent", "claude-code", "pi", "--copy", "--yes"})
+	if code != 0 || stderr.String() != "" {
+		t.Fatalf("runAdd = %d stdout %q stderr %q", code, stdout.String(), stderr.String())
+	}
+	if got, want := stdout.String(), "Installed output-skill\n  Agents: Claude Code, Pi\n"; got != want {
+		t.Fatalf("stdout = %q; want %q", got, want)
+	}
+}
+
+func TestRunAddInteractiveOutputDistinguishesSkippedDetectedAgentsAndCompactsLargeLists(t *testing.T) {
+	project := t.TempDir()
+	source := filepath.Join(t.TempDir(), "find-skills")
+	writeAddOutputSkill(t, source, "find-skills")
+	home := isolateAddOutputEnvironment(t)
+	if err := os.MkdirAll(filepath.Join(home, ".pi", "agent"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(project)
+
+	var stdout, stderr bytes.Buffer
+	code := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr, Interactive: true}, []string{source, "--yes"})
+	if code != 0 || stderr.String() != "" {
+		t.Fatalf("runAdd = %d stdout %q stderr %q", code, stdout.String(), stderr.String())
+	}
+	prefix := "Installed find-skills\n  Agents: Amp, Antigravity, Antigravity CLI, Cline, Codex +14 more\n  Skipped: "
+	if got := stdout.String(); !strings.HasPrefix(got, prefix) {
+		t.Fatalf("stdout = %q; want prefix %q", got, prefix)
+	}
+	// ZCode has a system-wide detector outside the isolated test home.
+	skipped := strings.TrimSuffix(strings.TrimPrefix(stdout.String(), prefix), "\n")
+	if skipped != "Pi" && skipped != "Pi, ZCode" {
+		t.Fatalf("skipped agents = %q; want Pi with only an optional system ZCode detection", skipped)
+	}
+}
+
+func TestRunAddInteractiveOutputReportsNoneWhenEverySelectedAgentIsSkipped(t *testing.T) {
+	project := t.TempDir()
+	source := t.TempDir()
+	for _, name := range []string{"alpha", "beta"} {
+		writeAddOutputSkill(t, filepath.Join(source, name), name)
+	}
+	isolateAddOutputEnvironment(t)
+	t.Chdir(project)
+
+	var stdout, stderr bytes.Buffer
+	code := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr, Interactive: true}, []string{source, "--agent", "pi", "--yes"})
+	if code != 0 || stderr.String() != "" {
+		t.Fatalf("runAdd = %d stdout %q stderr %q", code, stdout.String(), stderr.String())
+	}
+	want := "Installed alpha\n  Agents: none\n  Skipped: Pi\n" +
+		"Installed beta\n  Agents: none\n  Skipped: Pi\n"
+	if got := stdout.String(); got != want {
+		t.Fatalf("stdout = %q; want %q", got, want)
+	}
+}
+
+func TestRunAddNonInteractiveOutputRemainsOneLine(t *testing.T) {
+	project := t.TempDir()
+	source := filepath.Join(t.TempDir(), "legacy-output")
+	writeAddOutputSkill(t, source, "legacy-output")
+	isolateAddOutputEnvironment(t)
+	t.Chdir(project)
+
+	var stdout, stderr bytes.Buffer
+	code := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{source, "--agent", "universal", "--yes"})
+	if code != 0 || stderr.String() != "" {
+		t.Fatalf("runAdd = %d stdout %q stderr %q", code, stdout.String(), stderr.String())
+	}
+	if got, want := stdout.String(), "Installed legacy-output\n"; got != want {
+		t.Fatalf("stdout = %q; want %q", got, want)
+	}
+}
+
+func TestRunAddJSONOutputRemainsUnchanged(t *testing.T) {
+	project := t.TempDir()
+	source := filepath.Join(t.TempDir(), "json-output")
+	writeAddOutputSkill(t, source, "json-output")
+	isolateAddOutputEnvironment(t)
+	t.Chdir(project)
+
+	var stdout, stderr bytes.Buffer
+	code := Run(nil, Invocation{Args: []string{"add", source, "--agent", "universal", "--json"}, Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr, Interactive: true})
+	if code != 0 || stderr.String() != "" {
+		t.Fatalf("Run = %d stdout %q stderr %q", code, stdout.String(), stderr.String())
+	}
+	got := strings.ReplaceAll(stdout.String(), project, "{{project}}")
+	got = strings.ReplaceAll(got, source, "{{source}}")
+	want := "{\n" +
+		"  \"schemaVersion\": 1,\n" +
+		"  \"scope\": \"project\",\n" +
+		"  \"installed\": [\n" +
+		"    {\n" +
+		"      \"name\": \"json-output\",\n" +
+		"      \"path\": \"{{project}}/.agents/skills/json-output\",\n" +
+		"      \"agents\": [\n" +
+		"        \"universal\"\n" +
+		"      ],\n" +
+		"      \"source\": \"{{source}}\",\n" +
+		"      \"sourceType\": \"local\",\n" +
+		"      \"revision\": null\n" +
+		"    }\n" +
+		"  ]\n" +
+		"}\n"
+	if got != want {
+		t.Fatalf("stdout = %q; want %q", got, want)
+	}
+}
+
 func TestInstallLocalSkillSkipsOverlappingAgentDestination(t *testing.T) {
 	project := t.TempDir()
 	source := filepath.Join(project, "skills", "topology-skill")
