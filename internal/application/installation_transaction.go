@@ -197,7 +197,7 @@ func prepareInstallationTransaction(lockPath string, destinations []string) (*in
 	}
 	transaction := &installationTransaction{
 		root: root, byPath: make(map[string]int),
-		journal: installationJournal{Version: 1, State: "staging", CommitModel: orderedRenameCommitModel, LockPath: cleanAbsolutePath(lockPath), Current: -1},
+		journal: installationJournal{Version: 1, State: "staging", CommitModel: orderedRenameCommitModel, LockPath: canonicalAdvisoryResource(lockPath), Current: -1},
 	}
 	for index, destination := range unique {
 		destination = cleanAbsolutePath(destination)
@@ -538,7 +538,7 @@ func (transaction *installationTransaction) writeJournal() error {
 	return syncDirectory(transaction.root)
 }
 
-func recoverPendingInstallations() error {
+func recoverPendingInstallations(invocation Invocation) error {
 	project, err := os.Getwd()
 	if err != nil {
 		return err
@@ -562,11 +562,76 @@ func recoverPendingInstallations() error {
 			continue
 		}
 		seen[path] = true
-		if err := recoverInstallationTransactions(path); err != nil {
+		pending, err := hasPendingInstallationRecovery(path)
+		if err != nil {
+			return err
+		}
+		if !pending {
+			continue
+		}
+		if err := recoverInstallationState(invocation, path); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func recoverInstallationState(invocation Invocation, lockPath string) error {
+	stateSpec, err := stateAdvisoryLockSpec(lockPath)
+	if err != nil {
+		return err
+	}
+	return withAdvisoryLocks(invocationContext(invocation), invocation.Stderr, []advisoryLockSpec{stateSpec}, advisoryLockExclusive, func() error {
+		bases, _, err := pendingInstallationBases(lockPath)
+		if err != nil {
+			return err
+		}
+		return withAdvisoryLocks(invocationContext(invocation), invocation.Stderr, installationAdvisoryLockSpecs(bases), advisoryLockExclusive, func() error {
+			// Re-enumerate only after every lease is held. A live writer may have
+			// completed and retired its journal while recovery waited.
+			return recoverInstallationTransactions(lockPath)
+		})
+	})
+}
+
+func pendingInstallationBases(lockPath string) ([]string, bool, error) {
+	directories, err := installationTransactionDirectories(lockPath)
+	if err != nil {
+		return nil, false, err
+	}
+	bases := []string{}
+	for _, directory := range directories {
+		journal, err := readInstallationJournal(directory, lockPath)
+		if err != nil {
+			return nil, false, invalidInstallationJournalError(directory, err)
+		}
+		for _, target := range journal.Targets {
+			if canonicalAdvisoryResource(target.Destination) != canonicalAdvisoryResource(lockPath) {
+				bases = append(bases, filepath.Dir(target.Destination))
+			}
+		}
+	}
+	return bases, len(directories) > 0, nil
+}
+
+func hasPendingInstallationRecovery(lockPath string) (bool, error) {
+	base, err := installationTransactionScope(lockPath)
+	if err != nil {
+		return false, err
+	}
+	entries, err := os.ReadDir(base)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() && (strings.HasPrefix(entry.Name(), "transaction-") || strings.HasPrefix(entry.Name(), "cleanup-")) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func recoverInstallationTransactions(lockPath string) error {
@@ -678,8 +743,8 @@ func readInstallationJournal(directory, expectedLockPath string) (*installationJ
 	if err := json.Unmarshal(data, &journal); err != nil {
 		return nil, err
 	}
-	expectedLockPath = cleanAbsolutePath(expectedLockPath)
-	if journal.Version != 1 || journal.CommitModel != orderedRenameCommitModel || journal.LockPath != expectedLockPath || journal.Current < -1 || len(journal.Targets) == 0 || len(journal.Targets) > maximumInstallationTargets {
+	expectedLockPath = canonicalAdvisoryResource(expectedLockPath)
+	if journal.Version != 1 || journal.CommitModel != orderedRenameCommitModel || canonicalAdvisoryResource(journal.LockPath) != expectedLockPath || journal.Current < -1 || len(journal.Targets) == 0 || len(journal.Targets) > maximumInstallationTargets {
 		return nil, errors.New("unsupported or malformed installation journal")
 	}
 	seen := map[string]bool{}
@@ -698,7 +763,7 @@ func readInstallationJournal(directory, expectedLockPath string) (*installationJ
 			return nil, errors.New("installation journal has invalid backup path")
 		}
 	}
-	if journal.Targets[len(journal.Targets)-1].Destination != expectedLockPath || journal.Current >= len(journal.Targets) {
+	if canonicalAdvisoryResource(journal.Targets[len(journal.Targets)-1].Destination) != expectedLockPath || journal.Current >= len(journal.Targets) {
 		return nil, errors.New("installation journal has invalid lock or current step")
 	}
 	if err := validateInstallationJournalState(journal); err != nil {
@@ -828,7 +893,7 @@ func installationTransactionScope(lockPath string) (string, error) {
 		}
 		base = filepath.Join(home, ".local", "state")
 	}
-	hash := sha256.Sum256([]byte(cleanAbsolutePath(lockPath)))
+	hash := sha256.Sum256([]byte(canonicalAdvisoryResource(lockPath)))
 	return filepath.Join(base, "open-skills", "transactions", hex.EncodeToString(hash[:12])), nil
 }
 

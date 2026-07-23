@@ -123,6 +123,32 @@ explicitly. On Windows, Go cannot flush directory handles, so process-interrupti
 recovery is journaled but power-loss persistence retains the guarantees of the
 underlying Windows filesystem rather than a portable directory-`fsync` claim.
 
+Mutating commands hold exclusive OS advisory locks for the affected state and
+installation resources from state-dependent preflight through commit. Project
+and global operations that reach the same canonical installation directory use
+the same installation lock even when their state locations differ. Unix builds
+use `flock`; Windows builds use `LockFileEx`. The OS releases these leases on
+normal completion, errors, cancellation, and process death. Recovery treats a
+journal directory as a lock-free hint only: it acquires the exclusive state and
+installation leases, re-enumerates journals, and then repairs state, so it never
+recovers a live writer that completed while recovery was waiting. Shared readers
+also recheck for a journal after acquiring the state lease; if a writer died
+between the startup hint and that acquisition, the reader releases its shared
+lease, recovers under exclusive leases, and retries inspection.
+
+`list`, `check`, installed-commit trust inspection, and `trust list` use shared
+leases, allowing read-only inspections to run together while excluding a
+commit. Installation identities are locked even before their directories exist;
+the lock registry is outside managed installation paths, so read-only inspection
+does not create those directories. A contended lease prints one status line to
+stderr. Waiting defaults to 10 seconds and is bounded by
+`OPEN_SKILLS_LOCK_TIMEOUT_MS`, a non-negative decimal millisecond value.
+Invalid values fail before managed state is touched; timeouts identify the
+contended lease and recommend waiting for the other
+command or increasing the setting. Correctness takes priority over lock hold
+time, so this preview may retain a lease through state-dependent prompts and
+remote update acquisition.
+
 ## D09: safe existing-state inspection
 
 `open-skills list` reads project state from `./skills-lock.json`. Global listing reads `$XDG_STATE_HOME/skills/.skill-lock.json` when `XDG_STATE_HOME` is set and otherwise uses `~/.agents/.skill-lock.json`. Existing project schema version 1 and global schema version 3 state from upstream skills v1.5.20 and npm open-skills 0.1.2 is used in place; no first-run migration occurs.

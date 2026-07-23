@@ -161,6 +161,12 @@ func ClearAll() error {
 	return err
 }
 
+// Path returns the stable trust store location so command orchestration can
+// protect mutations with an advisory lock without locking the replaceable file.
+func Path() (string, error) {
+	return storePath()
+}
+
 func storePath() (string, error) {
 	config := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME"))
 	if config == "" {

@@ -79,98 +79,101 @@ func runList(invocation Invocation, arguments []string) int {
 	if options.Global {
 		scope = state.Global
 	}
-	snapshot, err := state.Inspect(state.InspectOptions{
-		Scope:         scope,
-		Project:       project,
-		Home:          home,
-		XDGStateHome:  os.Getenv("XDG_STATE_HOME"),
-		XDGConfigHome: os.Getenv("XDG_CONFIG_HOME"),
-		AgentFilter:   options.Agents,
-	})
-	if err != nil {
-		return listFailure(invocation, options.JSON, err)
-	}
-	if options.JSON {
-		output := listJSONOutput{SchemaVersion: 1, Scope: scope, Skills: make([]listJSONSkill, 0, len(snapshot.Skills))}
-		for _, skill := range snapshot.Skills {
-			item := listJSONSkill{Name: skill.Name, Path: skill.CanonicalPath, Scope: skill.Scope, Agents: displayAgentNames(skill.Agents)}
-			if skill.Lock != nil {
-				if skill.Lock.Source != "" {
-					source := credentialFreeSource(skill.Lock.Source)
-					item.Source = &source
+	lockPath, _ := installationLockLocation(scope, project, home)
+	return runWithStateAndInstallationLocks(invocation, lockPath, removalSkillDirectories(scope, project, home), advisoryLockShared, func() int {
+		snapshot, err := state.Inspect(state.InspectOptions{
+			Scope:         scope,
+			Project:       project,
+			Home:          home,
+			XDGStateHome:  os.Getenv("XDG_STATE_HOME"),
+			XDGConfigHome: os.Getenv("XDG_CONFIG_HOME"),
+			AgentFilter:   options.Agents,
+		})
+		if err != nil {
+			return listFailure(invocation, options.JSON, err)
+		}
+		if options.JSON {
+			output := listJSONOutput{SchemaVersion: 1, Scope: scope, Skills: make([]listJSONSkill, 0, len(snapshot.Skills))}
+			for _, skill := range snapshot.Skills {
+				item := listJSONSkill{Name: skill.Name, Path: skill.CanonicalPath, Scope: skill.Scope, Agents: displayAgentNames(skill.Agents)}
+				if skill.Lock != nil {
+					if skill.Lock.Source != "" {
+						source := credentialFreeSource(skill.Lock.Source)
+						item.Source = &source
+					}
+					if skill.Lock.SourceURL != "" {
+						sourceURL := credentialFreeSource(skill.Lock.SourceURL)
+						item.SourceURL = &sourceURL
+					}
+					if skill.Lock.SourceType != "" {
+						item.SourceType = &skill.Lock.SourceType
+					}
 				}
-				if skill.Lock.SourceURL != "" {
-					sourceURL := credentialFreeSource(skill.Lock.SourceURL)
-					item.SourceURL = &sourceURL
-				}
-				if skill.Lock.SourceType != "" {
-					item.SourceType = &skill.Lock.SourceType
-				}
+				output.Skills = append(output.Skills, item)
 			}
-			output.Skills = append(output.Skills, item)
+			encoder := json.NewEncoder(invocation.Stdout)
+			encoder.SetIndent("", "  ")
+			if err := encoder.Encode(output); err != nil {
+				_, _ = fmt.Fprintf(invocation.Stderr, "Failed to write list JSON: %v\n", err)
+				return 1
+			}
+			return 0
 		}
-		encoder := json.NewEncoder(invocation.Stdout)
-		encoder.SetIndent("", "  ")
-		if err := encoder.Encode(output); err != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Failed to write list JSON: %v\n", err)
-			return 1
-		}
-		return 0
-	}
 
-	if len(snapshot.Skills) == 0 {
+		if len(snapshot.Skills) == 0 {
+			if scope == state.Global {
+				_, _ = fmt.Fprintln(invocation.Stdout, "No global skills found.")
+				_, _ = fmt.Fprintln(invocation.Stdout, "Try listing project skills without -g")
+			} else {
+				_, _ = fmt.Fprintln(invocation.Stdout, "No project skills found.")
+				_, _ = fmt.Fprintln(invocation.Stdout, "Try listing global skills with -g")
+			}
+			return 0
+		}
+
+		scopeLabel := "Project"
 		if scope == state.Global {
-			_, _ = fmt.Fprintln(invocation.Stdout, "No global skills found.")
-			_, _ = fmt.Fprintln(invocation.Stdout, "Try listing project skills without -g")
-		} else {
-			_, _ = fmt.Fprintln(invocation.Stdout, "No project skills found.")
-			_, _ = fmt.Fprintln(invocation.Stdout, "Try listing global skills with -g")
+			scopeLabel = "Global"
+		}
+		_, _ = fmt.Fprintf(invocation.Stdout, "%s Skills\n", scopeLabel)
+		_, _ = fmt.Fprintln(invocation.Stdout)
+		groups := make(map[string][]state.InstalledSkill)
+		ungrouped := []state.InstalledSkill{}
+		for _, skill := range snapshot.Skills {
+			if skill.Lock != nil && skill.Lock.PluginName != "" {
+				groups[skill.Lock.PluginName] = append(groups[skill.Lock.PluginName], skill)
+			} else {
+				ungrouped = append(ungrouped, skill)
+			}
+		}
+		if len(groups) == 0 {
+			for _, skill := range ungrouped {
+				writeHumanSkill(invocation, skill, scope, project, home, false)
+			}
+			_, _ = fmt.Fprintln(invocation.Stdout)
+			return 0
+		}
+		groupNames := make([]string, 0, len(groups))
+		for name := range groups {
+			groupNames = append(groupNames, name)
+		}
+		sort.Strings(groupNames)
+		for _, name := range groupNames {
+			_, _ = fmt.Fprintln(invocation.Stdout, pluginTitle(name))
+			for _, skill := range groups[name] {
+				writeHumanSkill(invocation, skill, scope, project, home, true)
+			}
+			_, _ = fmt.Fprintln(invocation.Stdout)
+		}
+		if len(ungrouped) > 0 {
+			_, _ = fmt.Fprintln(invocation.Stdout, "General")
+			for _, skill := range ungrouped {
+				writeHumanSkill(invocation, skill, scope, project, home, true)
+			}
+			_, _ = fmt.Fprintln(invocation.Stdout)
 		}
 		return 0
-	}
-
-	scopeLabel := "Project"
-	if scope == state.Global {
-		scopeLabel = "Global"
-	}
-	_, _ = fmt.Fprintf(invocation.Stdout, "%s Skills\n", scopeLabel)
-	_, _ = fmt.Fprintln(invocation.Stdout)
-	groups := make(map[string][]state.InstalledSkill)
-	ungrouped := []state.InstalledSkill{}
-	for _, skill := range snapshot.Skills {
-		if skill.Lock != nil && skill.Lock.PluginName != "" {
-			groups[skill.Lock.PluginName] = append(groups[skill.Lock.PluginName], skill)
-		} else {
-			ungrouped = append(ungrouped, skill)
-		}
-	}
-	if len(groups) == 0 {
-		for _, skill := range ungrouped {
-			writeHumanSkill(invocation, skill, scope, project, home, false)
-		}
-		_, _ = fmt.Fprintln(invocation.Stdout)
-		return 0
-	}
-	groupNames := make([]string, 0, len(groups))
-	for name := range groups {
-		groupNames = append(groupNames, name)
-	}
-	sort.Strings(groupNames)
-	for _, name := range groupNames {
-		_, _ = fmt.Fprintln(invocation.Stdout, pluginTitle(name))
-		for _, skill := range groups[name] {
-			writeHumanSkill(invocation, skill, scope, project, home, true)
-		}
-		_, _ = fmt.Fprintln(invocation.Stdout)
-	}
-	if len(ungrouped) > 0 {
-		_, _ = fmt.Fprintln(invocation.Stdout, "General")
-		for _, skill := range ungrouped {
-			writeHumanSkill(invocation, skill, scope, project, home, true)
-		}
-		_, _ = fmt.Fprintln(invocation.Stdout)
-	}
-	return 0
+	})
 }
 
 func writeHumanSkill(invocation Invocation, skill state.InstalledSkill, scope state.Scope, project, home string, indent bool) {

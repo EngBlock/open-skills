@@ -249,57 +249,68 @@ func runAdd(invocation Invocation, arguments []string) int {
 		scope = state.Global
 		base = home
 	}
-	agents, err := selectInstallAgents(invocation, options, scope, project, home)
-	if err != nil {
-		_, _ = fmt.Fprintln(invocation.Stderr, err)
-		return 1
+	lockPath, _ := installationLockLocation(scope, project, home)
+	installationBases := removalSkillDirectories(scope, project, home)
+	if scope == state.Project {
+		for _, subagent := range options.Subagents {
+			if subagent != "" && subagent != "root" {
+				installationBases = append(installationBases, state.EveSkillsPath(project, subagent))
+			}
+		}
 	}
-	if _, err := authorizeSourceReplacements(invocation, selected, provenance, scope, project, home, options); err != nil {
-		_, _ = fmt.Fprintln(invocation.Stderr, err)
-		return 1
-	}
-	localChanges := []localChange{}
-	lockPath, lockVersion := installationLockLocation(scope, project, home)
-	installationState, err := state.Read(lockPath, lockVersion)
-	if err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "read installation state: %v\n", err)
-		return 1
-	}
-	for _, skill := range selected {
-		changes, changeErr := installationLocalChanges(skill.Name, installationState.Entry(skill.Name), scope, project, home, agents, options.Copy, options.Subagents, skill.Path)
-		if changeErr != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "inspect installed %s: %v\n", skill.Name, changeErr)
+	return runWithStateAndInstallationLocks(invocation, lockPath, installationBases, advisoryLockExclusive, func() int {
+		agents, err := selectInstallAgents(invocation, options, scope, project, home)
+		if err != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, err)
 			return 1
 		}
-		localChanges = append(localChanges, changes...)
-	}
-	if err := authorizeLocalChanges(invocation, localChanges, options.Force); err != nil {
-		_, _ = fmt.Fprintln(invocation.Stderr, err)
-		return 1
-	}
-	destinations, err := replacementPathsForSkills(selected, scope, base, project, home, agents, options.Subagents, options.Copy)
-	if err == nil {
-		err = withInstallationTransaction(lockPath, destinations, func(transaction *installationTransaction) error {
-			for _, skill := range selected {
-				skillProvenance := provenance
-				if sourceURL, ok := wellKnownURLs[skill.Name]; ok {
-					skillProvenance.URL = sourceURL
-				}
-				if err := installLocalSkillTransaction(skill, skillProvenance, scope, base, project, home, agents, options.Copy, options.Subagents, transaction); err != nil {
-					return fmt.Errorf("Install %s: %w", skill.Name, err)
-				}
+		if _, err := authorizeSourceReplacements(invocation, selected, provenance, scope, project, home, options); err != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, err)
+			return 1
+		}
+		localChanges := []localChange{}
+		_, lockVersion := installationLockLocation(scope, project, home)
+		installationState, err := state.Read(lockPath, lockVersion)
+		if err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "read installation state: %v\n", err)
+			return 1
+		}
+		for _, skill := range selected {
+			changes, changeErr := installationLocalChanges(skill.Name, installationState.Entry(skill.Name), scope, project, home, agents, options.Copy, options.Subagents, skill.Path)
+			if changeErr != nil {
+				_, _ = fmt.Fprintf(invocation.Stderr, "inspect installed %s: %v\n", skill.Name, changeErr)
+				return 1
 			}
-			return nil
-		})
-	}
-	if err != nil {
-		_, _ = fmt.Fprintln(invocation.Stderr, err)
-		return 1
-	}
-	for _, skill := range selected {
-		_, _ = fmt.Fprintf(invocation.Stdout, "Installed %s\n", skill.Name)
-	}
-	return 0
+			localChanges = append(localChanges, changes...)
+		}
+		if err := authorizeLocalChanges(invocation, localChanges, options.Force); err != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, err)
+			return 1
+		}
+		destinations, err := replacementPathsForSkills(selected, scope, base, project, home, agents, options.Subagents, options.Copy)
+		if err == nil {
+			err = withInstallationTransaction(lockPath, destinations, func(transaction *installationTransaction) error {
+				for _, skill := range selected {
+					skillProvenance := provenance
+					if sourceURL, ok := wellKnownURLs[skill.Name]; ok {
+						skillProvenance.URL = sourceURL
+					}
+					if err := installLocalSkillTransaction(skill, skillProvenance, scope, base, project, home, agents, options.Copy, options.Subagents, transaction); err != nil {
+						return fmt.Errorf("Install %s: %w", skill.Name, err)
+					}
+				}
+				return nil
+			})
+		}
+		if err != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, err)
+			return 1
+		}
+		for _, skill := range selected {
+			_, _ = fmt.Fprintf(invocation.Stdout, "Installed %s\n", skill.Name)
+		}
+		return 0
+	})
 }
 
 // runAddLocal is retained for callers that exercised the original native seam.

@@ -16,6 +16,7 @@ type Invocation struct {
 	Stdout      io.Writer
 	Stderr      io.Writer
 	Interactive bool
+	context     context.Context
 }
 
 // Version is the native preview version. Release builds may replace it with
@@ -23,8 +24,11 @@ type Invocation struct {
 var Version = "0.1.2"
 
 func Run(ctx context.Context, invocation Invocation) int {
-	_ = ctx
-	if err := recoverPendingInstallations(); err != nil {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	invocation.context = ctx
+	if err := recoverPendingInstallations(invocation); err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Recover installation state: %v\n", err)
 		return 1
 	}

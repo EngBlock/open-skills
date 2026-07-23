@@ -1,6 +1,6 @@
 # Native development
 
-The native preview is a Go module with one pinned dependency, `golang.org/x/text`, for Unicode normalization and case folding. Its supported seam is the built `open-skills` process; packages under `internal/` are implementation details and do not promise a public Go interface.
+The native preview is a Go module with two pinned dependencies: `golang.org/x/text` for Unicode normalization and case folding, and `golang.org/x/sys` for pure-Go Unix and Windows advisory-lock primitives. Its supported seam is the built `open-skills` process; packages under `internal/` are implementation details and do not promise a public Go interface.
 
 Build and smoke-test the standalone executable without a Node runtime:
 
@@ -16,6 +16,11 @@ gofmt -w cmd internal
 go vet ./...
 go test ./...
 ```
+
+Concurrent mutation waits are bounded to 10 seconds by default. Set
+`OPEN_SKILLS_LOCK_TIMEOUT_MS` to a non-negative decimal millisecond value when
+a development or CI scenario needs a different bound. Invalid or negative
+values fail closed before managed state is touched.
 
 `internal/compatibility` contains the process-level differential harness. Each target gets a fresh home, project, temporary directory, local Git repositories, HTTP server, stdin, environment, and PATH command fixtures. The harness records raw process streams and status, filesystem and lock state, HTTP requests, and child-command invocations before applying only documented presentation normalization.
 

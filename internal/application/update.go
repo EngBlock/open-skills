@@ -230,6 +230,24 @@ func hasProjectSkills() bool {
 }
 
 func updateScopeSkills(invocation Invocation, options updateOptions, apply bool, scope state.Scope, project, home string) updateResult {
+	lockPath, _ := installationLockLocation(scope, project, home)
+	mode := advisoryLockShared
+	if apply {
+		mode = advisoryLockExclusive
+	}
+	result := updateResult{failed: 1}
+	err := withStateAndInstallationLocks(invocation, lockPath, removalSkillDirectories(scope, project, home), mode, func() error {
+		result = updateScopeSkillsLocked(invocation, options, apply, scope, project, home)
+		return nil
+	})
+	if err != nil {
+		_, _ = fmt.Fprintf(invocation.Stderr, "Acquire advisory locks: %v\n", err)
+		return updateResult{failed: 1}
+	}
+	return result
+}
+
+func updateScopeSkillsLocked(invocation Invocation, options updateOptions, apply bool, scope state.Scope, project, home string) updateResult {
 	snapshot, err := state.Inspect(state.InspectOptions{
 		Scope: scope, Project: project, Home: home, XDGStateHome: os.Getenv("XDG_STATE_HOME"), XDGConfigHome: os.Getenv("XDG_CONFIG_HOME"),
 	})

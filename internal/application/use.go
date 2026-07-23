@@ -534,76 +534,113 @@ func buildUsePrompt(skillMD, supportDirectory string, hasSupportingFiles bool) s
 
 func authorizeRemoteAgentUse(invocation Invocation, options useOptions, provenance remoteUseProvenance, skill localSkill) error {
 	_, _ = fmt.Fprintf(invocation.Stderr, "Remote skill source: %s\nRemote skill commit: %s\n", provenance.source, provenance.commit)
-	store, err := truststore.Open()
+	path, err := truststore.Path()
 	if err != nil {
-		return fmt.Errorf("read trust approvals: %w", err)
+		return fmt.Errorf("determine trust approvals path: %w", err)
 	}
-	if store.Contains(provenance.source, provenance.commit) || installedCommitApproved(skill.Name, provenance) {
+	trusted := false
+	err = withAdvisoryLocks(invocationContext(invocation), invocation.Stderr, []advisoryLockSpec{trustAdvisoryLockSpec(path)}, advisoryLockShared, func() error {
+		store, err := truststore.Open()
+		if err != nil {
+			return fmt.Errorf("read trust approvals: %w", err)
+		}
+		trusted = store.Contains(provenance.source, provenance.commit)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if trusted {
 		return nil
 	}
-	if options.Trust {
+	installed, err := installedCommitApproved(invocation, skill.Name, provenance)
+	if err != nil {
+		return err
+	}
+	if installed {
+		return nil
+	}
+	if !options.Trust {
+		if !invocation.Interactive {
+			return errors.New("remote agent use is not trusted; automation must re-run with --trust (not --yes) to approve this exact source commit")
+		}
+		_, _ = fmt.Fprint(invocation.Stderr, "Trust this exact source commit and launch the agent? [y/N] ")
+		answer, readErr := readInputLine(invocation.Stdin)
+		if readErr != nil && !errors.Is(readErr, io.EOF) {
+			return fmt.Errorf("read trust confirmation: %w", readErr)
+		}
+		answer = strings.ToLower(strings.TrimSpace(answer))
+		if answer != "y" && answer != "yes" {
+			return errors.New("remote agent use cancelled")
+		}
+	}
+	return withAdvisoryLocks(invocationContext(invocation), invocation.Stderr, []advisoryLockSpec{trustAdvisoryLockSpec(path)}, advisoryLockExclusive, func() error {
+		// Reopen and recheck after waiting; another approver may have completed.
+		store, err := truststore.Open()
+		if err != nil {
+			return fmt.Errorf("read trust approvals: %w", err)
+		}
+		if store.Contains(provenance.source, provenance.commit) {
+			return nil
+		}
 		if err := store.Approve(provenance.source, provenance.commit, time.Now()); err != nil {
 			return fmt.Errorf("record trust approval: %w", err)
 		}
 		return nil
-	}
-	if !invocation.Interactive {
-		return errors.New("remote agent use is not trusted; automation must re-run with --trust (not --yes) to approve this exact source commit")
-	}
-	_, _ = fmt.Fprint(invocation.Stderr, "Trust this exact source commit and launch the agent? [y/N] ")
-	answer, err := readInputLine(invocation.Stdin)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return fmt.Errorf("read trust confirmation: %w", err)
-	}
-	answer = strings.ToLower(strings.TrimSpace(answer))
-	if answer != "y" && answer != "yes" {
-		return errors.New("remote agent use cancelled")
-	}
-	if err := store.Approve(provenance.source, provenance.commit, time.Now()); err != nil {
-		return fmt.Errorf("record trust approval: %w", err)
-	}
-	return nil
+	})
 }
 
-func installedCommitApproved(skillName string, provenance remoteUseProvenance) bool {
+func installedCommitApproved(invocation Invocation, skillName string, provenance remoteUseProvenance) (bool, error) {
 	project, projectErr := os.Getwd()
 	home, homeErr := os.UserHomeDir()
 	if projectErr != nil || homeErr != nil {
-		return false
+		return false, nil
 	}
 	base := state.InspectOptions{
 		Project: project, Home: home,
 		XDGStateHome: os.Getenv("XDG_STATE_HOME"), XDGConfigHome: os.Getenv("XDG_CONFIG_HOME"),
 	}
 	for _, scope := range []state.Scope{state.Project, state.Global} {
-		options := base
-		options.Scope = scope
-		snapshot, err := state.Inspect(options)
+		lockPath, _ := installationLockLocation(scope, project, home)
+		approved := false
+		err := withStateAndInstallationLocks(invocation, lockPath, removalSkillDirectories(scope, project, home), advisoryLockShared, func() error {
+			options := base
+			options.Scope = scope
+			snapshot, err := state.Inspect(options)
+			if err != nil {
+				return nil
+			}
+			for _, installed := range snapshot.Skills {
+				if installed.Name != skillName || installed.Lock == nil {
+					continue
+				}
+				entry := installed.Lock
+				if entry.Ref != provenance.commit || entry.SkillPath != provenance.skillPath || (entry.Source != provenance.source && entry.SourceURL != provenance.source) {
+					continue
+				}
+				expectedHash := entry.InstalledContentHash
+				if expectedHash == "" && scope == state.Project {
+					expectedHash = entry.ComputedHash
+				}
+				if expectedHash == "" {
+					continue
+				}
+				actualHash, _, hashErr := contentIdentity(installed.CanonicalPath)
+				if hashErr == nil && actualHash == expectedHash {
+					approved = true
+					break
+				}
+			}
+			return nil
+		})
 		if err != nil {
-			continue
+			return false, fmt.Errorf("inspect installed trust: %w", err)
 		}
-		for _, installed := range snapshot.Skills {
-			if installed.Name != skillName || installed.Lock == nil {
-				continue
-			}
-			entry := installed.Lock
-			if entry.Ref != provenance.commit || entry.SkillPath != provenance.skillPath || (entry.Source != provenance.source && entry.SourceURL != provenance.source) {
-				continue
-			}
-			expectedHash := entry.InstalledContentHash
-			if expectedHash == "" && scope == state.Project {
-				expectedHash = entry.ComputedHash
-			}
-			if expectedHash == "" {
-				continue
-			}
-			actualHash, _, err := contentIdentity(installed.CanonicalPath)
-			if err == nil && actualHash == expectedHash {
-				return true
-			}
+		if approved {
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 func launchUseAgent(invocation Invocation, agent, prompt string) int {

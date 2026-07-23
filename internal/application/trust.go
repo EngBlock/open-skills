@@ -13,23 +13,45 @@ func runTrust(invocation Invocation, arguments []string) int {
 		_, _ = fmt.Fprint(invocation.Stderr, trustHelp)
 		return 1
 	}
-	if arguments[0] == "clear" {
-		return runTrustClear(invocation, arguments[1:])
-	}
-	store, err := truststore.Open()
+	path, err := truststore.Path()
 	if err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Read trust approvals: %v\n", err)
+		_, _ = fmt.Fprintf(invocation.Stderr, "Determine trust approvals path: %v\n", err)
 		return 1
 	}
-	switch arguments[0] {
-	case "list", "ls":
-		return runTrustList(invocation, store, arguments[1:])
-	case "revoke":
-		return runTrustRevoke(invocation, store, arguments[1:])
-	default:
-		_, _ = fmt.Fprintf(invocation.Stderr, "Unknown trust command: %s\n", arguments[0])
+	mode := advisoryLockExclusive
+	if arguments[0] == "list" || arguments[0] == "ls" {
+		mode = advisoryLockShared
+	}
+	result := 1
+	err = withAdvisoryLocks(invocationContext(invocation), invocation.Stderr, []advisoryLockSpec{trustAdvisoryLockSpec(path)}, mode, func() error {
+		if arguments[0] == "clear" {
+			result = runTrustClear(invocation, arguments[1:])
+			return nil
+		}
+		// Mutators intentionally reopen after acquiring exclusive ownership so a
+		// waiting process never writes from a stale approval snapshot.
+		store, openErr := truststore.Open()
+		if openErr != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Read trust approvals: %v\n", openErr)
+			result = 1
+			return nil
+		}
+		switch arguments[0] {
+		case "list", "ls":
+			result = runTrustList(invocation, store, arguments[1:])
+		case "revoke":
+			result = runTrustRevoke(invocation, store, arguments[1:])
+		default:
+			_, _ = fmt.Fprintf(invocation.Stderr, "Unknown trust command: %s\n", arguments[0])
+			result = 1
+		}
+		return nil
+	})
+	if err != nil {
+		_, _ = fmt.Fprintf(invocation.Stderr, "Acquire advisory locks: %v\n", err)
 		return 1
 	}
+	return result
 }
 
 func runTrustList(invocation Invocation, store *truststore.Store, arguments []string) int {

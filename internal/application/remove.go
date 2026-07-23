@@ -50,77 +50,80 @@ func runRemove(invocation Invocation, arguments []string) int {
 	if options.Global {
 		scope = state.Global
 	}
-	targetAgents, allAgents, err := selectRemoveAgents(options, scope)
-	if err != nil {
-		_, _ = fmt.Fprintln(invocation.Stderr, err)
-		return 1
-	}
-
-	snapshot, err := state.Inspect(state.InspectOptions{
-		Scope: scope, Project: project, Home: home, XDGStateHome: os.Getenv("XDG_STATE_HOME"), XDGConfigHome: os.Getenv("XDG_CONFIG_HOME"),
-	})
-	if err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Failed to inspect skill state: %v\n", err)
-		return 1
-	}
-	candidates := removalCandidates(snapshot, scope, project, home)
-	selected, cancelled, err := selectRemoveSkills(invocation, candidates, options)
-	if err != nil {
-		_, _ = fmt.Fprintln(invocation.Stderr, err)
-		return 1
-	}
-	if cancelled {
-		_, _ = fmt.Fprintln(invocation.Stdout, "Removal cancelled.")
-		return 0
-	}
-	if len(selected) == 0 {
-		_, _ = fmt.Fprintln(invocation.Stdout, "No skills found to remove.")
-		return 0
-	}
-	localChanges := []localChange{}
-	for _, skill := range selected {
-		changes, changeErr := removalLocalChanges(skill.Name, snapshot.Lock.Entry(skill.Name), scope, project, home, targetAgents, allAgents)
-		if changeErr != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Inspect installed %s: %v\n", skill.Name, changeErr)
+	lockPath, _ := installationLockLocation(scope, project, home)
+	return runWithStateAndInstallationLocks(invocation, lockPath, removalSkillDirectories(scope, project, home), advisoryLockExclusive, func() int {
+		targetAgents, allAgents, err := selectRemoveAgents(options, scope)
+		if err != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, err)
 			return 1
 		}
-		localChanges = append(localChanges, changes...)
-	}
-	if err := authorizeLocalChanges(invocation, localChanges, options.Force); err != nil {
-		_, _ = fmt.Fprintln(invocation.Stderr, err)
-		return 1
-	}
 
-	if !options.Yes {
-		_, _ = fmt.Fprintln(invocation.Stdout, "Skills to remove:")
-		for _, skill := range selected {
-			_, _ = fmt.Fprintf(invocation.Stdout, "  - %s\n", skill.Name)
-		}
-		_, _ = fmt.Fprintf(invocation.Stdout, "Are you sure you want to uninstall %d skill(s)? [y/N] ", len(selected))
-		line, readErr := readInputLine(invocation.Stdin)
-		if readErr != nil && readErr != io.EOF {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Read confirmation: %v\n", readErr)
+		snapshot, err := state.Inspect(state.InspectOptions{
+			Scope: scope, Project: project, Home: home, XDGStateHome: os.Getenv("XDG_STATE_HOME"), XDGConfigHome: os.Getenv("XDG_CONFIG_HOME"),
+		})
+		if err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Failed to inspect skill state: %v\n", err)
 			return 1
 		}
-		answer := strings.ToLower(strings.TrimSpace(line))
-		if answer != "y" && answer != "yes" {
+		candidates := removalCandidates(snapshot, scope, project, home)
+		selected, cancelled, err := selectRemoveSkills(invocation, candidates, options)
+		if err != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, err)
+			return 1
+		}
+		if cancelled {
 			_, _ = fmt.Fprintln(invocation.Stdout, "Removal cancelled.")
 			return 0
 		}
-	}
+		if len(selected) == 0 {
+			_, _ = fmt.Fprintln(invocation.Stdout, "No skills found to remove.")
+			return 0
+		}
+		localChanges := []localChange{}
+		for _, skill := range selected {
+			changes, changeErr := removalLocalChanges(skill.Name, snapshot.Lock.Entry(skill.Name), scope, project, home, targetAgents, allAgents)
+			if changeErr != nil {
+				_, _ = fmt.Fprintf(invocation.Stderr, "Inspect installed %s: %v\n", skill.Name, changeErr)
+				return 1
+			}
+			localChanges = append(localChanges, changes...)
+		}
+		if err := authorizeLocalChanges(invocation, localChanges, options.Force); err != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, err)
+			return 1
+		}
 
-	names := make([]string, 0, len(selected))
-	for _, skill := range selected {
-		names = append(names, skill.Name)
-	}
-	if err := removeSkills(names, snapshot.Lock, scope, project, home, targetAgents, allAgents); err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Remove skills: %v\n", err)
-		_, _ = fmt.Fprintf(invocation.Stderr, "Failed to remove %d skill(s)\n", len(selected))
-		return 1
-	}
-	_, _ = fmt.Fprintf(invocation.Stdout, "Successfully removed %d skill(s)\n", len(selected))
-	_, _ = fmt.Fprintln(invocation.Stdout, "Done!")
-	return 0
+		if !options.Yes {
+			_, _ = fmt.Fprintln(invocation.Stdout, "Skills to remove:")
+			for _, skill := range selected {
+				_, _ = fmt.Fprintf(invocation.Stdout, "  - %s\n", skill.Name)
+			}
+			_, _ = fmt.Fprintf(invocation.Stdout, "Are you sure you want to uninstall %d skill(s)? [y/N] ", len(selected))
+			line, readErr := readInputLine(invocation.Stdin)
+			if readErr != nil && readErr != io.EOF {
+				_, _ = fmt.Fprintf(invocation.Stderr, "Read confirmation: %v\n", readErr)
+				return 1
+			}
+			answer := strings.ToLower(strings.TrimSpace(line))
+			if answer != "y" && answer != "yes" {
+				_, _ = fmt.Fprintln(invocation.Stdout, "Removal cancelled.")
+				return 0
+			}
+		}
+
+		names := make([]string, 0, len(selected))
+		for _, skill := range selected {
+			names = append(names, skill.Name)
+		}
+		if err := removeSkills(names, snapshot.Lock, scope, project, home, targetAgents, allAgents); err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Remove skills: %v\n", err)
+			_, _ = fmt.Fprintf(invocation.Stderr, "Failed to remove %d skill(s)\n", len(selected))
+			return 1
+		}
+		_, _ = fmt.Fprintf(invocation.Stdout, "Successfully removed %d skill(s)\n", len(selected))
+		_, _ = fmt.Fprintln(invocation.Stdout, "Done!")
+		return 0
+	})
 }
 
 func parseRemoveOptions(arguments []string) (removeOptions, error) {

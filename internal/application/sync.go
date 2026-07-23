@@ -52,74 +52,76 @@ func runSync(invocation Invocation, arguments []string) int {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Scan node_modules for skills: %v\n", err)
 		return 1
 	}
-	lock, err := state.Read(filepath.Join(project, "skills-lock.json"), 1)
-	if err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Read skills-lock.json: %v\n", err)
-		return 1
-	}
-	toInstall := make([]nodeModuleSkill, 0, len(skills))
-	for _, skill := range skills {
-		hash, _, err := contentIdentity(skill.Path)
+	lockPath := filepath.Join(project, "skills-lock.json")
+	return runWithStateAndInstallationLocks(invocation, lockPath, removalSkillDirectories(state.Project, project, ""), advisoryLockExclusive, func() int {
+		lock, err := state.Read(lockPath, 1)
 		if err != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Hash %s: %v\n", skill.Name, err)
+			_, _ = fmt.Fprintf(invocation.Stderr, "Read skills-lock.json: %v\n", err)
 			return 1
 		}
-		if !options.Force && lock.Entry(skill.Name) != nil && lock.Entry(skill.Name).ComputedHash == hash {
-			_, _ = fmt.Fprintf(invocation.Stdout, "%s already up to date\n", skill.Name)
-			continue
+		toInstall := make([]nodeModuleSkill, 0, len(skills))
+		for _, skill := range skills {
+			hash, _, err := contentIdentity(skill.Path)
+			if err != nil {
+				_, _ = fmt.Fprintf(invocation.Stderr, "Hash %s: %v\n", skill.Name, err)
+				return 1
+			}
+			if !options.Force && lock.Entry(skill.Name) != nil && lock.Entry(skill.Name).ComputedHash == hash {
+				_, _ = fmt.Fprintf(invocation.Stdout, "%s already up to date\n", skill.Name)
+				continue
+			}
+			toInstall = append(toInstall, skill)
 		}
-		toInstall = append(toInstall, skill)
-	}
-	if len(toInstall) == 0 {
-		return 0
-	}
-	agents, err := selectSyncAgents(invocation, options, project)
-	if err != nil {
-		_, _ = fmt.Fprintln(invocation.Stderr, err)
-		return 1
-	}
-	localChanges := []localChange{}
-	for _, skill := range toInstall {
-		provenance := installationProvenance{Identity: skill.Package, URL: skill.Package, Type: "node_modules"}
-		if _, err := authorizeSourceReplacement(invocation, skill.Name, lock.Entry(skill.Name), provenance, project, options.Replace); err != nil {
+		if len(toInstall) == 0 {
+			return 0
+		}
+		agents, err := selectSyncAgents(invocation, options, project)
+		if err != nil {
 			_, _ = fmt.Fprintln(invocation.Stderr, err)
 			return 1
 		}
-		changes, changeErr := installationLocalChanges(skill.Name, lock.Entry(skill.Name), state.Project, project, "", agents, false, nil, skill.Path)
-		if changeErr != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Inspect installed %s: %v\n", skill.Name, changeErr)
+		localChanges := []localChange{}
+		for _, skill := range toInstall {
+			provenance := installationProvenance{Identity: skill.Package, URL: skill.Package, Type: "node_modules"}
+			if _, err := authorizeSourceReplacement(invocation, skill.Name, lock.Entry(skill.Name), provenance, project, options.Replace); err != nil {
+				_, _ = fmt.Fprintln(invocation.Stderr, err)
+				return 1
+			}
+			changes, changeErr := installationLocalChanges(skill.Name, lock.Entry(skill.Name), state.Project, project, "", agents, false, nil, skill.Path)
+			if changeErr != nil {
+				_, _ = fmt.Fprintf(invocation.Stderr, "Inspect installed %s: %v\n", skill.Name, changeErr)
+				return 1
+			}
+			localChanges = append(localChanges, changes...)
+		}
+		if err := authorizeLocalChanges(invocation, localChanges, options.Force); err != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, err)
 			return 1
 		}
-		localChanges = append(localChanges, changes...)
-	}
-	if err := authorizeLocalChanges(invocation, localChanges, options.Force); err != nil {
-		_, _ = fmt.Fprintln(invocation.Stderr, err)
-		return 1
-	}
-	selected := make([]localSkill, 0, len(toInstall))
-	for _, skill := range toInstall {
-		selected = append(selected, skill.localSkill)
-	}
-	lockPath := filepath.Join(project, "skills-lock.json")
-	destinations, err := replacementPathsForSkills(selected, state.Project, project, project, "", agents, nil, false)
-	if err == nil {
-		err = withInstallationTransaction(lockPath, destinations, func(transaction *installationTransaction) error {
-			for _, skill := range toInstall {
-				if err := installRecordedSkillTransaction(skill.localSkill, skill.Package, "node_modules", project, agents, nil, transaction); err != nil {
-					return fmt.Errorf("Sync %s: %w", skill.Name, err)
+		selected := make([]localSkill, 0, len(toInstall))
+		for _, skill := range toInstall {
+			selected = append(selected, skill.localSkill)
+		}
+		destinations, err := replacementPathsForSkills(selected, state.Project, project, project, "", agents, nil, false)
+		if err == nil {
+			err = withInstallationTransaction(lockPath, destinations, func(transaction *installationTransaction) error {
+				for _, skill := range toInstall {
+					if err := installRecordedSkillTransaction(skill.localSkill, skill.Package, "node_modules", project, agents, nil, transaction); err != nil {
+						return fmt.Errorf("Sync %s: %w", skill.Name, err)
+					}
 				}
-			}
-			return nil
-		})
-	}
-	if err != nil {
-		_, _ = fmt.Fprintln(invocation.Stderr, err)
-		return 1
-	}
-	for _, skill := range toInstall {
-		_, _ = fmt.Fprintf(invocation.Stdout, "Synced %s from %s\n", skill.Name, skill.Package)
-	}
-	return 0
+				return nil
+			})
+		}
+		if err != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, err)
+			return 1
+		}
+		for _, skill := range toInstall {
+			_, _ = fmt.Fprintf(invocation.Stdout, "Synced %s from %s\n", skill.Name, skill.Package)
+		}
+		return 0
+	})
 }
 
 func parseSyncOptions(arguments []string) (syncOptions, error) {
@@ -300,80 +302,82 @@ func runInstallFromLock(invocation Invocation) int {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Determine project directory: %v\n", err)
 		return 1
 	}
-	lock, err := state.Read(filepath.Join(project, "skills-lock.json"), 1)
-	if err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Read skills-lock.json: %v\n", err)
-		return 1
-	}
-	if len(lock.Skills) == 0 {
-		_, _ = fmt.Fprintln(invocation.Stdout, "No project skills found in skills-lock.json")
-		return 0
-	}
-	type recordedRestoration struct {
-		name      string
-		entry     state.LockEntry
-		skill     localSkill
-		agents    []string
-		subagents []string
-	}
-	names := make([]string, 0, len(lock.Skills))
-	for name := range lock.Skills {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	restorations := make([]recordedRestoration, 0, len(names))
-	destinations := []string{}
-	failed := false
-	for _, name := range names {
-		entry := lock.Skills[name]
-		agents := append([]string(nil), entry.Agents...)
-		if len(agents) == 0 {
-			agents = state.UniversalAgentIDs(state.Project)
-		}
-		if len(entry.Subagents) > 0 && !contains(agents, "eve") {
-			agents = append(agents, "eve")
-		}
-		skill, found := restoreSourceSkill(project, name, entry)
-		if !found {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Cannot restore %s offline: its recorded source is unavailable locally\n", name)
-			failed = true
-			continue
-		}
-		content, contentErr := prepareSkillContent(skill.Path)
-		if contentErr != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Restore %s: %v\n", name, contentErr)
-			failed = true
-			continue
-		}
-		skill.content = content
-		paths, pathErr := replacementPathsForSkills([]localSkill{skill}, state.Project, project, project, "", agents, entry.Subagents, false)
-		if pathErr != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Restore %s: %v\n", name, pathErr)
-			failed = true
-			continue
-		}
-		destinations = append(destinations, paths...)
-		restorations = append(restorations, recordedRestoration{name: name, entry: entry, skill: skill, agents: agents, subagents: entry.Subagents})
-	}
-	if failed {
-		return 1
-	}
 	lockPath := filepath.Join(project, "skills-lock.json")
-	if err := withInstallationTransaction(lockPath, destinations, func(transaction *installationTransaction) error {
-		for _, restoration := range restorations {
-			if err := installRecordedSkillTransaction(restoration.skill, restoration.entry.Source, restoration.entry.SourceType, project, restoration.agents, restoration.subagents, transaction); err != nil {
-				return fmt.Errorf("Restore %s: %w", restoration.name, err)
-			}
+	return runWithStateAndInstallationLocks(invocation, lockPath, removalSkillDirectories(state.Project, project, ""), advisoryLockExclusive, func() int {
+		lock, err := state.Read(lockPath, 1)
+		if err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Read skills-lock.json: %v\n", err)
+			return 1
 		}
-		return nil
-	}); err != nil {
-		_, _ = fmt.Fprintln(invocation.Stderr, err)
-		return 1
-	}
-	for _, restoration := range restorations {
-		_, _ = fmt.Fprintf(invocation.Stdout, "Restored %s\n", restoration.name)
-	}
-	return 0
+		if len(lock.Skills) == 0 {
+			_, _ = fmt.Fprintln(invocation.Stdout, "No project skills found in skills-lock.json")
+			return 0
+		}
+		type recordedRestoration struct {
+			name      string
+			entry     state.LockEntry
+			skill     localSkill
+			agents    []string
+			subagents []string
+		}
+		names := make([]string, 0, len(lock.Skills))
+		for name := range lock.Skills {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		restorations := make([]recordedRestoration, 0, len(names))
+		destinations := []string{}
+		failed := false
+		for _, name := range names {
+			entry := lock.Skills[name]
+			agents := append([]string(nil), entry.Agents...)
+			if len(agents) == 0 {
+				agents = state.UniversalAgentIDs(state.Project)
+			}
+			if len(entry.Subagents) > 0 && !contains(agents, "eve") {
+				agents = append(agents, "eve")
+			}
+			skill, found := restoreSourceSkill(project, name, entry)
+			if !found {
+				_, _ = fmt.Fprintf(invocation.Stderr, "Cannot restore %s offline: its recorded source is unavailable locally\n", name)
+				failed = true
+				continue
+			}
+			content, contentErr := prepareSkillContent(skill.Path)
+			if contentErr != nil {
+				_, _ = fmt.Fprintf(invocation.Stderr, "Restore %s: %v\n", name, contentErr)
+				failed = true
+				continue
+			}
+			skill.content = content
+			paths, pathErr := replacementPathsForSkills([]localSkill{skill}, state.Project, project, project, "", agents, entry.Subagents, false)
+			if pathErr != nil {
+				_, _ = fmt.Fprintf(invocation.Stderr, "Restore %s: %v\n", name, pathErr)
+				failed = true
+				continue
+			}
+			destinations = append(destinations, paths...)
+			restorations = append(restorations, recordedRestoration{name: name, entry: entry, skill: skill, agents: agents, subagents: entry.Subagents})
+		}
+		if failed {
+			return 1
+		}
+		if err := withInstallationTransaction(lockPath, destinations, func(transaction *installationTransaction) error {
+			for _, restoration := range restorations {
+				if err := installRecordedSkillTransaction(restoration.skill, restoration.entry.Source, restoration.entry.SourceType, project, restoration.agents, restoration.subagents, transaction); err != nil {
+					return fmt.Errorf("Restore %s: %w", restoration.name, err)
+				}
+			}
+			return nil
+		}); err != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, err)
+			return 1
+		}
+		for _, restoration := range restorations {
+			_, _ = fmt.Fprintf(invocation.Stdout, "Restored %s\n", restoration.name)
+		}
+		return 0
+	})
 }
 
 func restoreSourceSkill(project, name string, entry state.LockEntry) (localSkill, bool) {
