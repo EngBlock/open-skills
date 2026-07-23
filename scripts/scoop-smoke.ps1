@@ -69,6 +69,7 @@ try {
     $env:SCOOP = Join-Path $work 'scoop-home'
     $installedScoopCore = Join-Path $env:SCOOP 'apps/scoop/current'
     New-Item (Split-Path $installedScoopCore) -ItemType Directory -Force | Out-Null
+    New-Item (Join-Path $env:SCOOP 'shims') -ItemType Directory -Force | Out-Null
     New-Item $installedScoopCore -ItemType Junction -Target $scoopCore | Out-Null
     $scoopCore = $installedScoopCore
 
