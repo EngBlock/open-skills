@@ -1,9 +1,9 @@
 class OpenSkills < Formula
   desc "CLI for the open agent skills ecosystem"
   homepage "https://github.com/EngBlock/open-skills"
-  url "https://github.com/EngBlock/open-skills/releases/download/v0.2.0-preview.1/open-skills_0.2.0-preview.1_darwin_arm64.tar.gz"
-  version "0.2.0-preview.1"
-  sha256 "192db297fdebfb65c8f27791f7116acbacf0ab5d95641f7abb2087e82578ec6a"
+  url "https://github.com/EngBlock/open-skills/releases/download/v0.2.0-preview.2/open-skills_0.2.0-preview.2_darwin_arm64.tar.gz"
+  version "0.2.0-preview.2"
+  sha256 "dff942838839bb278780942a8145ff512e9e945bdd2734c57015db6ba3d8842e"
   license "MIT"
 
   depends_on arch: :arm64

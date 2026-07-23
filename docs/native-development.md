@@ -25,7 +25,7 @@ Before creating a signed native preview tag, regenerate the archives and formula
 
 ```sh
 GOTOOLCHAIN=go1.24.0 go run ./internal/release/cmd/native-preview \
-  --version 0.2.0-preview.1 \
+  --version 0.2.0-preview.2 \
   --output native-dist \
   --homebrew-formula Formula/open-skills.rb \
   --skip-linux-smoke
@@ -36,7 +36,7 @@ Replace the example version with the release version and commit the resulting fo
 The release workflow rebuilds the artifacts, refuses to proceed unless its generated formula exactly matches the checked-in formula, and stages the verified bundle for `scripts/homebrew-smoke.sh` on macOS ARM64. That pre-publication check installs an older test keg, upgrades it to the exact archive pending publication, verifies the reported version and help output, confirms the keg exposes only `open-skills`, runs the formula test, and performs a clean install. Only after it succeeds does the workflow publish the immutable release. Maintainers can exercise the same seam locally:
 
 ```sh
-OPEN_SKILLS_HOMEBREW_ARTIFACT="$PWD/native-dist/open-skills_0.2.0-preview.1_darwin_arm64.tar.gz" \
+OPEN_SKILLS_HOMEBREW_ARTIFACT="$PWD/native-dist/open-skills_0.2.0-preview.2_darwin_arm64.tar.gz" \
   scripts/homebrew-smoke.sh Formula/open-skills.rb
 ```
 

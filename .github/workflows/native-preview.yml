@@ -97,7 +97,6 @@ jobs:
               --bundle native-dist/provenance.sigstore.json \
               --repo "${GITHUB_REPOSITORY}" \
               --signer-workflow "${workflow}" \
-              --cert-identity "${identity}" \
               --deny-self-hosted-runners
           done
           cosign verify-blob \
