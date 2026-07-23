@@ -198,6 +198,5 @@ jobs:
             native-dist/* \
             --prerelease \
             --verify-tag \
-            --target "${GITHUB_SHA}" \
             --title "open-skills ${GITHUB_REF_NAME} native preview" \
             --notes-file native-preview-notes.md

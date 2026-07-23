@@ -77,7 +77,6 @@ func TestNativePreviewWorkflowGatesPublicationOnHomebrewSmoke(t *testing.T) {
 		"native-dist/*",
 		"--prerelease",
 		"--verify-tag",
-		`--target "${GITHUB_SHA}"`,
 		`--signer-workflow "${workflow}"`,
 	} {
 		if !strings.Contains(workflow, text) {
@@ -86,6 +85,9 @@ func TestNativePreviewWorkflowGatesPublicationOnHomebrewSmoke(t *testing.T) {
 	}
 	if strings.Contains(workflow, "--skip-linux-smoke") {
 		t.Fatal("canonical release workflow skips the required Linux smoke test")
+	}
+	if strings.Contains(workflow, `--target "${GITHUB_SHA}"`) {
+		t.Fatal("release creation must not retarget the existing verified annotated tag")
 	}
 
 	attestationBlock := strings.SplitN(workflow, "gh attestation verify", 2)
