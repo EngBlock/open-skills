@@ -71,6 +71,10 @@ func (h Harness) Run(ctx context.Context, target Target, scenario Scenario) (Obs
 	paths.FixtureURL = server.URL
 
 	expand := func(value string) string {
+		value = strings.ReplaceAll(value, "{{root:json}}", filepath.ToSlash(paths.Root))
+		value = strings.ReplaceAll(value, "{{home:json}}", filepath.ToSlash(paths.Home))
+		value = strings.ReplaceAll(value, "{{project:json}}", filepath.ToSlash(paths.Project))
+		value = strings.ReplaceAll(value, "{{temp:json}}", filepath.ToSlash(paths.Temp))
 		value = strings.ReplaceAll(value, "{{root}}", paths.Root)
 		value = strings.ReplaceAll(value, "{{home}}", paths.Home)
 		value = strings.ReplaceAll(value, "{{project}}", paths.Project)
@@ -364,7 +368,8 @@ func materializeRepositories(ctx context.Context, root string, fixtures []Reposi
 		}
 		commands := [][]string{{"init", "-q", "-b", "main"}, {"-c", "core.hooksPath=" + os.DevNull, "add", "."}, {"-c", "core.hooksPath=" + os.DevNull, "commit", "-q", "-m", "fixture"}}
 		for _, args := range commands {
-			command := exec.CommandContext(ctx, "git", args...)
+			commandArgs := append([]string{"-c", "core.autocrlf=false"}, args...)
+			command := exec.CommandContext(ctx, "git", commandArgs...)
 			command.Dir = path
 			command.Env = append(gitHostEnvironment(),
 				"HOME="+gitHome, "XDG_CONFIG_HOME="+filepath.Join(gitHome, ".config"),

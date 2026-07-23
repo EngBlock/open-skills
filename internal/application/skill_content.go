@@ -159,7 +159,7 @@ func (content *skillContent) scanSymlink(linkPath, destination string, active []
 	if !filepath.IsAbs(target) && hasParentPathComponent(target) {
 		return fmt.Errorf("repository symlink %q has parent-directory symlink target %q", filepath.ToSlash(destination), target)
 	}
-	resolved, err := filepath.EvalSymlinks(linkPath)
+	resolved, err := resolveRepositoryLink(linkPath)
 	if err != nil {
 		return classifySymlinkResolutionError(destination, err)
 	}

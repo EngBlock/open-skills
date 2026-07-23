@@ -493,6 +493,7 @@ func updateTestDirectories(t *testing.T) (string, string) {
 		t.Fatal(err)
 	}
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	t.Setenv("XDG_STATE_HOME", filepath.Join(home, "state"))
 	return project, home
 }

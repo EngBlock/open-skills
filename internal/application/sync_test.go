@@ -3,6 +3,7 @@ package application
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -85,12 +86,9 @@ func TestInstallAliasWithSourceRemainsAnAddAlias(t *testing.T) {
 }
 
 func quoteJSON(value string) string {
-	result := `"`
-	for _, character := range value {
-		if character == '\\' || character == '"' {
-			result += `\\`
-		}
-		result += string(character)
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		panic(err)
 	}
-	return result + `"`
+	return string(encoded)
 }

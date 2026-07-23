@@ -35,7 +35,7 @@ func provenanceFixtures(lockSource string) []FileFixture {
 func TestNativeAddRequiresReplaceForCrossSourceCollisionEvenWithYes(t *testing.T) {
 	observation, err := (Harness{}).Run(context.Background(), buildShellTarget(t), Scenario{
 		Args:    []string{"add", "{{temp}}/replacement", "--agent", "universal", "--yes"},
-		Files:   provenanceFixtures("{{temp}}/prior"),
+		Files:   provenanceFixtures("{{temp:json}}/prior"),
 		Offline: true,
 	})
 	if err != nil {
@@ -49,7 +49,7 @@ func TestNativeAddRequiresReplaceForCrossSourceCollisionEvenWithYes(t *testing.T
 }
 
 func TestNativeAddPreflightsEverySourceCollisionBeforeMutation(t *testing.T) {
-	lock := []byte(`{"version":1,"skills":{"alpha":{"source":"{{temp}}/replacement","sourceType":"local","computedHash":"alpha-old"},"zeta":{"source":"{{temp}}/prior","sourceType":"local","computedHash":"zeta-old"}}}`)
+	lock := []byte(`{"version":1,"skills":{"alpha":{"source":"{{temp:json}}/replacement","sourceType":"local","computedHash":"alpha-old"},"zeta":{"source":"{{temp:json}}/prior","sourceType":"local","computedHash":"zeta-old"}}}`)
 	observation, err := (Harness{}).Run(context.Background(), buildShellTarget(t), Scenario{
 		Args: []string{"add", "{{temp}}/replacement", "--skill", "alpha", "zeta", "--agent", "universal", "--yes"},
 		Files: []FileFixture{
@@ -71,7 +71,7 @@ func TestNativeAddPreflightsEverySourceCollisionBeforeMutation(t *testing.T) {
 	if !ok || !strings.Contains(string(alpha.Data), "# alpha prior") {
 		t.Fatalf("same-source skill changed before later collision failed: %#v", alpha)
 	}
-	if string(observation.Locks[ProjectLock]) != string([]byte(strings.ReplaceAll(string(lock), "{{temp}}", filepath.ToSlash(observation.Paths.Temp)))) {
+	if string(observation.Locks[ProjectLock]) != string([]byte(strings.ReplaceAll(string(lock), "{{temp:json}}", filepath.ToSlash(observation.Paths.Temp)))) {
 		t.Fatalf("lock changed before collision authorization: %s", observation.Locks[ProjectLock])
 	}
 }
@@ -79,7 +79,7 @@ func TestNativeAddPreflightsEverySourceCollisionBeforeMutation(t *testing.T) {
 func TestNativeAddAllowsSameSourceReinstallWithoutReplace(t *testing.T) {
 	observation, err := (Harness{}).Run(context.Background(), buildShellTarget(t), Scenario{
 		Args:    []string{"add", "{{temp}}/replacement", "--agent", "universal", "--yes"},
-		Files:   provenanceFixtures("{{temp}}/replacement"),
+		Files:   provenanceFixtures("{{temp:json}}/replacement"),
 		Offline: true,
 	})
 	if err != nil {
@@ -97,7 +97,7 @@ func TestNativeAddAllowsSameSourceReinstallWithoutReplace(t *testing.T) {
 func TestNativeAddAllowsExplicitCrossSourceReplacement(t *testing.T) {
 	observation, err := (Harness{}).Run(context.Background(), buildShellTarget(t), Scenario{
 		Args:    []string{"add", "{{temp}}/replacement", "--agent", "universal", "--replace", "--yes"},
-		Files:   provenanceFixtures("{{temp}}/prior"),
+		Files:   provenanceFixtures("{{temp:json}}/prior"),
 		Offline: true,
 	})
 	if err != nil {
@@ -116,7 +116,7 @@ func TestNativeAddAllowsExplicitCrossSourceReplacement(t *testing.T) {
 }
 
 func TestNativeAddReplaceRollsBackContentAndLockWhenPlacementFails(t *testing.T) {
-	fixtures := append(provenanceFixtures("{{temp}}/prior"),
+	fixtures := append(provenanceFixtures("{{temp:json}}/prior"),
 		FileFixture{Root: ProjectRoot, Path: ".claude/skills/provenance-skill/SKILL.md", Data: []byte(priorProvenanceSkill)},
 		FileFixture{Root: ProjectRoot, Path: ".pi", Data: []byte("placement obstruction")},
 	)

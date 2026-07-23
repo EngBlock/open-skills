@@ -30,7 +30,7 @@ func TestNativeAddRequiresForceForLocalChangesEvenWithYes(t *testing.T) {
 				Files: []FileFixture{
 					{Root: TempRoot, Path: "replacement/SKILL.md", Data: []byte(replacementProvenanceSkill)},
 					{Root: ProjectRoot, Path: ".agents/skills/provenance-skill/SKILL.md", Data: []byte(modifiedProvenanceSkill)},
-					{Root: ProjectRoot, Path: "skills-lock.json", Data: provenanceLock("{{temp}}/replacement")},
+					{Root: ProjectRoot, Path: "skills-lock.json", Data: provenanceLock("{{temp:json}}/replacement")},
 				},
 				Offline: true,
 			})
@@ -77,7 +77,7 @@ func TestNativeAddRequiresReplaceAndForceIndependently(t *testing.T) {
 				Files: []FileFixture{
 					{Root: TempRoot, Path: "replacement/SKILL.md", Data: []byte(replacementProvenanceSkill)},
 					{Root: ProjectRoot, Path: ".agents/skills/provenance-skill/SKILL.md", Data: []byte(modifiedProvenanceSkill)},
-					{Root: ProjectRoot, Path: "skills-lock.json", Data: provenanceLock("{{temp}}/prior")},
+					{Root: ProjectRoot, Path: "skills-lock.json", Data: provenanceLock("{{temp:json}}/prior")},
 				},
 				Offline: true,
 			})

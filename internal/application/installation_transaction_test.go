@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -29,7 +30,11 @@ func TestSyncReplacementPathFlushesRegularFiles(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if info.Mode().Perm() != mode.Perm() {
+			if runtime.GOOS == "windows" {
+				if (info.Mode().Perm()&0o200 == 0) != (mode.Perm()&0o200 == 0) {
+					t.Fatalf("writability after sync = %o; want read-only state from %o", info.Mode().Perm(), mode.Perm())
+				}
+			} else if info.Mode().Perm() != mode.Perm() {
 				t.Fatalf("mode after sync = %o; want %o", info.Mode().Perm(), mode.Perm())
 			}
 		})

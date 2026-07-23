@@ -576,6 +576,7 @@ func createGitFixture(t *testing.T) (string, string, string) {
 
 func runFixtureGit(t *testing.T, directory string, arguments ...string) string {
 	t.Helper()
+	arguments = append([]string{"-c", "core.autocrlf=false"}, arguments...)
 	command := exec.Command("git", arguments...)
 	command.Dir = directory
 	command.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_AUTHOR_NAME=Fixture", "GIT_AUTHOR_EMAIL=fixture@example.test", "GIT_COMMITTER_NAME=Fixture", "GIT_COMMITTER_EMAIL=fixture@example.test")
