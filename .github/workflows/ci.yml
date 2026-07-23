@@ -10,63 +10,7 @@ on:
       - '**/*.md'
 
 jobs:
-  checks:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        node-version: ['22.20.0', '24', '26']
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-
-      - name: Setup Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build
-        run: pnpm build
-
-      - name: oxfmt
-        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '24'
-        run: pnpm format:check
-
-      - name: Tests
-        run: pnpm test
-
-  typecheck:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-
-      - name: Setup Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version: '24'
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Type check
-        run: pnpm type-check
-
-  native:
+  linux:
     runs-on: ubuntu-latest
 
     steps:
@@ -86,7 +30,7 @@ jobs:
         run: go vet ./...
 
       - name: Tests
-        run: go test ./...
+        run: go test ./... -count=1
 
       - name: Network-disabled native compatibility corpus
         run: |
@@ -115,7 +59,7 @@ jobs:
       - name: Verify native executable name
         run: test "$(find .native-dist -maxdepth 1 -type f -printf '%f\n')" = open-skills
 
-  native-windows:
+  windows:
     runs-on: windows-latest
 
     steps:
@@ -129,7 +73,7 @@ jobs:
           cache: true
 
       - name: Tests
-        run: go test ./...
+        run: go test ./... -count=1
 
       - name: Build standalone executable
         env:

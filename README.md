@@ -1,6 +1,6 @@
 # open-skills
 
-The CLI for the open agent skills ecosystem.
+The standalone Go CLI for the open agent skills ecosystem. Native releases require system Git at runtime and do not require Node.js, npm, or pnpm.
 
 <!-- agent-list:start -->
 Supports **OpenCode**, **Claude Code**, **Codex**, **Cursor**, and [70 more](#supported-agents).
@@ -51,9 +51,9 @@ GitHub Releases are the canonical source for supported and experimental archives
 
 Direct archives contain only `open-skills` (`open-skills.exe` on Windows), require system Git, and do not require Node.js or npm.
 
-### Deprecated npm implementation
+### Migrate from the retired npm implementation
 
-The JavaScript npm package is deprecated and frozen at 0.1.2. It will receive no new features and will not download or bootstrap the native executable. Remove it after installing native `open-skills` through Homebrew, Scoop, or a verified direct archive:
+The JavaScript npm package is retired and frozen at 0.1.2. It will receive no new features and will not download or bootstrap the native executable. Remove it after installing native `open-skills` through Homebrew, Scoop, or a verified direct archive:
 
 ```bash
 npm uninstall --global @engblock/open-skills
@@ -590,6 +590,19 @@ for precedence, deprecation, and exact authorization semantics.
 - [Replit Skills Documentation](https://docs.replit.com/replitai/skills)
 - [Roo Code Skills Documentation](https://docs.roocode.com/features/skills)
 - [Trae Skills Documentation](https://docs.trae.ai/ide/skills)
+
+## Development
+
+The active source tree is Go-only. Build, format, vet, and test it with the Go toolchain declared by `go.mod`:
+
+```sh
+gofmt -w cmd internal
+go vet ./...
+go test ./... -count=1
+CGO_ENABLED=0 go build -trimpath -o build/open-skills ./cmd/open-skills
+```
+
+See [native development](docs/native-development.md) for the compatibility corpus and signed native release process. The protected [`v0.1.2`](https://github.com/EngBlock/open-skills/tree/v0.1.2) tag and checked-in compatibility manifests preserve the retired implementation for historical inspection; they are not active development dependencies.
 
 ## Origin
 

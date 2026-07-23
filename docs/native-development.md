@@ -1,21 +1,23 @@
-# Native development
+# Go development and native releases
 
-The native release is a Go module with two pinned dependencies: `golang.org/x/text` for Unicode normalization and case folding, and `golang.org/x/sys` for pure-Go Unix and Windows advisory-lock primitives. Its supported seam is the built `open-skills` process; packages under `internal/` are implementation details and do not promise a public Go interface.
+The active project is a Go module with two pinned dependencies: `golang.org/x/text` for Unicode normalization and case folding, and `golang.org/x/sys` for pure-Go Unix and Windows advisory-lock primitives. It has no JavaScript or TypeScript build, test, formatting, packaging, or release toolchain. System Git is the CLI's only runtime dependency. The supported seam is the built `open-skills` process; packages under `internal/` are implementation details and do not promise a public Go interface.
 
-Build and smoke-test the standalone executable without a Node runtime:
+Build and smoke-test the standalone executable:
 
 ```sh
 CGO_ENABLED=0 go build -trimpath -o build/open-skills ./cmd/open-skills
 env PATH= ./build/open-skills
 ```
 
-Run native checks with:
+Run the active formatting and verification checks with:
 
 ```sh
 gofmt -w cmd internal
 go vet ./...
-go test ./...
+go test ./... -count=1
 ```
+
+`internal/repositorypolicy` guards the cutover: active tracked JavaScript/TypeScript and Node package metadata are rejected, active workflows may not set up or invoke Node/npm/pnpm, and the reviewed historical manifests must remain identity-linked.
 
 ## Homebrew native releases
 
@@ -57,9 +59,19 @@ five minutes and reads `OPEN_SKILLS_CLONE_TIMEOUT_MS`; internal-skill discovery
 uses `OPEN_SKILLS_INSTALL_INTERNAL_SKILLS`. The complete canonical and legacy
 environment contract is documented in the [D12 migration notes](native-migration.md#d12-namespaced-configuration-and-exact-authorization).
 
-`internal/compatibility` contains the process-level differential harness. Each target gets a fresh home, project, temporary directory, local Git repositories, HTTP server, stdin, environment, and PATH command fixtures. The harness records raw process streams and status, filesystem and lock state, HTTP requests, and child-command invocations before applying only documented presentation normalization.
+`internal/compatibility` contains the process-level harness and the frozen historical records. Each target gets a fresh home, project, temporary directory, local Git repositories, HTTP server, stdin, environment, and PATH command fixtures. The harness records raw process streams and status, filesystem and lock state, HTTP requests, and child-command invocations before applying only documented presentation normalization.
 
-The npm side must be prepared with `PrepareNPMOracle`. It reads `compatibility/npm-0.1.2/oracle.json` plus `runtime-dependencies.json`, verifies the exact CLI and pinned `yaml@2.9.0` tarball bytes, enforces their recorded file counts and unpacked sizes, and safely extracts `package/bin/cli.mjs` with its runtime dependency for an explicitly supplied Node executable. It never resolves a dist-tag or invokes npm/npx.
+Verify the live historical artifact, annotated tag chain, and tag-protection rules without the retired toolchain:
+
+```sh
+go run ./internal/compatibility/cmd/verify-native-baseline
+```
+
+The verifier uses the exact identities in `compatibility/npm-0.1.2/oracle.json`; it never resolves a dist-tag or invokes npm.
+
+### Optional historical oracle maintenance
+
+`PrepareNPMOracle`, the differential tests, and the corpus recorder are retained only for historical inspection and deliberate corpus maintenance. They are not part of normal development or CI. When explicitly enabled, they read `compatibility/npm-0.1.2/oracle.json` plus `runtime-dependencies.json`, verify the exact retired CLI and pinned `yaml@2.9.0` tarball bytes, enforce recorded file counts and unpacked sizes, and safely extract the historical entrypoint with its runtime dependency for an explicitly supplied Node executable. They never resolve a dist-tag or invoke npm/npx.
 
 Scenario processes inherit no credentials, proxies, agent markers, runtime injection variables, or host Git configuration. Their `PATH` is empty unless declared command fixtures are installed, in which case it contains only those fixtures. This fail-closed setup makes subprocess behavior explicit while local repository fixtures are initialized separately with isolated deterministic Git configuration. Golden Git scenarios may opt into the recording wrapper around the absolute system Git executable; arbitrary host-command passthrough is rejected.
 
@@ -76,4 +88,4 @@ OPEN_SKILLS_NATIVE_UNDER_TEST="$PWD/build/open-skills" \
   go test ./internal/compatibility -run '^TestNativeGoldenCorpus$' -count=1
 ```
 
-The opt-in recorder is not a CI path. It uses the integrity-pinned Node oracle only for scenarios that retain npm behavior and native for scenarios carrying named divergence IDs. It requires an output directory outside the reviewed corpus and never overwrites v1; see the corpus README for the recording command and review protocol.
+The opt-in recorder is not an active development or CI path. It uses the integrity-pinned historical oracle only for scenarios that retain npm behavior and native for scenarios carrying named divergence IDs. It requires an output directory outside the reviewed corpus and never overwrites v1; see the corpus README for the deliberate recording and review protocol.

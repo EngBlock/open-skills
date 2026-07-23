@@ -1,8 +1,8 @@
-# Migrate from npm to native open-skills 0.2.0
+# Migrate from the retired npm package to native open-skills 0.2.0
 
-The JavaScript package `@engblock/open-skills` is deprecated and frozen at 0.1.2. Native `open-skills` 0.2.0 is the production release and preserves the npm command contract except for the approved, security- and reliability-focused divergences documented below. The npm package remains a historical JavaScript artifact: it does not download the native executable and will receive no new features.
+The JavaScript package `@engblock/open-skills` is retired and frozen at 0.1.2. Native `open-skills` 0.2.0 is the production release and preserves the npm command contract except for the approved, security- and reliability-focused divergences documented below. The old package does not download the native executable and will receive no new features.
 
-System Git is the native executable's only runtime dependency. Node.js and npm are not required after the old global package is removed.
+System Git is the native executable's only runtime dependency. Node.js and npm are not required after the old global package is removed. Active development, testing, packaging, and release automation are Go-only; the protected `v0.1.2` tag and reviewed compatibility corpus retain the old source and behavior for historical inspection.
 
 ## Install the native executable
 
@@ -324,4 +324,4 @@ flag is required independently.
 
 Native releases come from immutable signed Git tags through the reviewed GitHub Actions workflow. Every supported and experimental archive is CGO-disabled, contains only the canonical `open-skills` executable, and is covered by SHA-256 checksums, keyless Sigstore signatures, and GitHub build provenance tied to the repository, tag, and workflow identity. Homebrew and Scoop metadata reference the same immutable GitHub Release artifacts; Windows remains explicitly experimental.
 
-The npm package is never used to download or bootstrap a native executable. Package managers or manually verified direct archives own executable installation and upgrades, while `open-skills update` continues to update installed skills. Documentation does not recommend `curl | sh` or any other mutable network-to-shell installer.
+The retired npm package is never used to download or bootstrap a native executable. Package managers or manually verified direct archives own executable installation and upgrades, while `open-skills update` continues to update installed skills. Documentation does not recommend `curl | sh` or any other mutable network-to-shell installer.

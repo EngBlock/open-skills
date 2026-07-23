@@ -1,6 +1,6 @@
 # Native compatibility baseline: npm 0.1.2
 
-Status: **reviewed; approval takes effect when issue #11 closes**. [Issue #10](https://github.com/EngBlock/open-skills/issues/10) approved the compatibility boundary and intentional divergences using a provisional 0.1.0 version. [Issue #11](https://github.com/EngBlock/open-skills/issues/11) is the explicit decision that updates the completed baseline to 0.1.2; closing it approves this inventory before Go behavior begins. Native behavior must not be implemented against another release unless a new explicit decision replaces this document and the machine-readable oracle together.
+Status: **reviewed and frozen**. [Issue #10](https://github.com/EngBlock/open-skills/issues/10) approved the compatibility boundary and intentional divergences using a provisional 0.1.0 version. [Issue #11](https://github.com/EngBlock/open-skills/issues/11) approved this completed 0.1.2 inventory before Go behavior began, and [issue #43](https://github.com/EngBlock/open-skills/issues/43) removed the retired implementation from active development without changing the baseline. Native behavior must not be implemented against another release unless a new explicit decision replaces this document and the machine-readable oracle together.
 
 ## Selected oracle
 
@@ -29,13 +29,13 @@ refs/tags/v0.1.2
 
 The tag object and npm artifact are content-addressed in [`compatibility/npm-0.1.2/oracle.json`](../compatibility/npm-0.1.2/oracle.json). GitHub ruleset `19578936` prevents updates and deletion of `refs/tags/v0.1.2`; the verifier additionally fails if that protection is disabled or its update/deletion rules disappear. Future npm releases, changes to a dist-tag, or GitHub configuration drift therefore cannot silently select a different oracle because verification compares the bytes, protection, annotated tag object, commit, and tree to fixed identities.
 
-Run the reproducible online check from the repository root:
+Run the reproducible Go verifier from the repository root:
 
 ```sh
-pnpm verify:native-baseline
+go run ./internal/compatibility/cmd/verify-native-baseline
 ```
 
-The verifier reads the checked-in manifest, fetches the version-specific npm and GitHub API resources, recomputes all artifact digests, and checks the tag protection plus complete tag-to-tree chain. GitHub authentication via `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth login` is required so the API exposes bypass configuration. It does not resolve `latest`.
+The verifier reads the checked-in manifest, fetches the version-specific registry and GitHub API resources, recomputes all artifact digests, and checks the tag protection plus complete tag-to-tree chain. GitHub authentication is resolved from `GITHUB_TOKEN`, then `GH_TOKEN`, then `gh auth token`, so the API exposes bypass configuration. It does not resolve `latest` and does not invoke npm.
 
 Primary records: [npm version metadata](https://registry.npmjs.org/%40engblock%2Fopen-skills/0.1.2), [npm publication history](https://registry.npmjs.org/%40engblock%2Fopen-skills), [tag ref](https://api.github.com/repos/EngBlock/open-skills/git/refs/tags/v0.1.2), [annotated tag object](https://api.github.com/repos/EngBlock/open-skills/git/tags/b3117c12d841b5fdfc3c2fead72c39d01e148ab2), and [source commit](https://github.com/EngBlock/open-skills/commit/a91eb79d035d7a33300d2cc60b18db3f81a94621).
 
@@ -159,5 +159,5 @@ The oracle manifest and this document form one reviewed decision record:
 1. Differential tests must invoke the artifact identified by the manifest, not `latest`, current `main`, or a freshly packed current checkout.
 2. New npm or upstream releases do not alter native compatibility expectations.
 3. A proposed baseline replacement requires a dedicated issue that records a new artifact, integrity, tag object, source commit/tree, compatibility review, and divergence review.
-4. Editing a digest or Git identity without that decision is a review blocker; `pnpm verify:native-baseline` fails if remote bytes or object links differ.
+4. Editing a digest or Git identity without that decision is a review blocker; `go run ./internal/compatibility/cmd/verify-native-baseline` fails if remote bytes or object links differ.
 5. Native implementation may add only the approved divergences above until another explicit product decision is accepted.

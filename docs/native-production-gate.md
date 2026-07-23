@@ -1,6 +1,6 @@
 # Native 0.2.0 production gate
 
-Native `open-skills` 0.2.0 may be published only through the protected release path below. This checklist is the release contract; the final evidence and maintainer approval are recorded on [issue #41](https://github.com/EngBlock/open-skills/issues/41).
+Native `open-skills` 0.2.0 was published through the protected release path below. This checklist remains the historical release contract; the final evidence and maintainer approval are recorded on [issue #41](https://github.com/EngBlock/open-skills/issues/41). Active development and release automation are now Go-only following the completed cutover in [issue #43](https://github.com/EngBlock/open-skills/issues/43).
 
 ## Technical gate
 
@@ -12,11 +12,11 @@ Native `open-skills` 0.2.0 may be published only through the protected release p
 - **Signed canonical artifacts:** every canonical archive and `checksums.txt` must have a verified keyless signature, every archive must have GitHub build provenance, and all checksums and workflow identities must be verified before publication.
 - **Homebrew availability:** `Formula/open-skills.rb` must match the generated macOS ARM64 artifact exactly and the pending production archive must pass the Homebrew smoke before approval. The public tap install is checked after publication before #41 closes.
 - **Scoop availability:** `bucket/open-skills.json` must match the generated experimental Windows x86-64 artifact exactly and the pending production archive must pass the Scoop smoke before approval. The public bucket install is checked after publication before #41 closes.
-- **Draft migration guidance:** `docs/native-migration.md` must describe every intentional divergence, existing-state recognition, forward-only native metadata, legacy environment behavior, authorization boundaries, and platform limitations before approval. npm deprecation and Node removal remain later work in #42 and #43.
+- **Migration guidance:** `docs/native-migration.md` describes every intentional divergence, existing-state recognition, forward-only native metadata, legacy environment behavior, authorization boundaries, and platform limitations. Issues #42 and #43 subsequently retired npm distribution and removed the JavaScript/TypeScript toolchain from active development without changing this release evidence.
 
 ## Candidate evidence
 
-On 2026-07-23, the issue #41 candidate passed the complete Go suite and frozen corpus plus the npm compatibility suite. A maintainer-controlled macOS ARM64 host ran the pending `0.2.0` archive through `scripts/homebrew-smoke.sh`, including install, upgrade, formula test, canonical executable, version, help, and clean-install checks. An exact Go 1.24.0 Linux x86-64 container built every supported and experimental target and executed the required Linux built-binary smoke; its checksums reproduced the macOS-generated checked metadata. The signed-tag workflow reruns these checks and the Windows Scoop smoke from the immutable candidate before approval.
+On 2026-07-23, the issue #41 candidate passed the complete Go suite, frozen corpus, and then-current differential compatibility checks. A maintainer-controlled macOS ARM64 host ran the pending `0.2.0` archive through `scripts/homebrew-smoke.sh`, including install, upgrade, formula test, canonical executable, version, help, and clean-install checks. An exact Go 1.24.0 Linux x86-64 container built every supported and experimental target and executed the required Linux built-binary smoke; its checksums reproduced the macOS-generated checked metadata. The signed-tag workflow reran these checks and the Windows Scoop smoke from the immutable candidate before approval.
 
 ## Human approval and publication
 

@@ -1,170 +1,84 @@
 # AGENTS.md
 
-This file provides guidance to AI coding agents working on the `open-skills` CLI codebase.
+This file provides guidance to coding agents working on the `open-skills` CLI.
 
-## Project Overview
+## Project overview
 
-`open-skills` is the CLI for the open agent skills ecosystem.
+`open-skills` is a standalone Go CLI for the open agent skills ecosystem. The active project has no JavaScript or TypeScript implementation and no Node.js, npm, or pnpm development dependency. System Git is the CLI's only runtime dependency.
 
-## Commands
-
-| Command                            | Description                                         |
-| ---------------------------------- | --------------------------------------------------- |
-| `open-skills`                      | Show banner with available commands                 |
-| `open-skills add <pkg>`            | Install skills from git repos, URLs, or local paths |
-| `open-skills use <pkg>@<skill>`    | Use one skill without installing                    |
-| `open-skills experimental_install` | Restore skills from skills-lock.json                |
-| `open-skills experimental_sync`    | Sync skills from node_modules into agent dirs       |
-| `open-skills list`                 | List installed skills (alias: `ls`)                 |
-| `open-skills update [skills...]`   | Update skills to latest versions                    |
-| `open-skills init [name]`          | Create a new SKILL.md template                      |
-
-The installed `skills` and `add-skill` executables are compatibility aliases. `open-skills a` works for `add`. `open-skills i`, `open-skills install` (no args) restore from `skills-lock.json`. `open-skills ls` works for `list`. `open-skills experimental_install` restores from `skills-lock.json`. `open-skills experimental_sync` crawls `node_modules` for skills.
+Native distributions expose only the `open-skills` executable. The retired npm 0.1.2 implementation remains available through the protected `v0.1.2` tag and the reviewed compatibility records; it is not an active implementation.
 
 ## Architecture
 
-```
-src/
-├── cli.ts           # Main entry point, command routing, init/check/update
-├── cli.test.ts      # CLI tests
-├── add.ts           # Core add command logic
-├── add-prompt.test.ts # Add prompt behavior tests
-├── add.test.ts      # Add command tests
-├── constants.ts      # Shared constants
-├── find.ts           # Find/search command
-├── list.ts          # List installed skills command
-├── list.test.ts     # List command tests
-├── remove.ts         # Remove command implementation
-├── remove.test.ts    # Remove command tests
-├── agents.ts        # Agent definitions and detection
-├── installer.ts     # Skill installation logic (symlink/copy) + listInstalledSkills
-├── skills.ts        # Skill discovery and parsing
-├── skill-lock.ts    # Global lock file management (~/.agents/.skill-lock.json)
-├── local-lock.ts    # Local lock file management (skills-lock.json, checked in)
-├── sync.ts          # Sync command - crawl node_modules for skills
-├── source-parser.ts # Parse git URLs, GitHub shorthand, local paths
-├── git.ts           # Git clone operations
-├── types.ts         # TypeScript types
-├── mintlify.ts      # Mintlify skill fetching (legacy)
-├── plugin-manifest.ts # Plugin manifest discovery support
-├── prompts/         # Interactive prompt helpers
-│   └── search-multiselect.ts
-├── providers/       # Remote skill providers (GitHub, HuggingFace, Mintlify)
-│   ├── index.ts
-│   ├── registry.ts
-│   ├── types.ts
-│   ├── huggingface.ts
-│   ├── mintlify.ts
-│   └── wellknown.ts
-├── init.test.ts     # Init command tests
-├── use.ts           # Use command - generate a skill prompt or launch an agent
-├── use.test.ts      # Use command tests
-└── test-utils.ts    # Test utilities
-
-tests/
-├── cross-platform-paths.test.ts # Path normalization across platforms
-├── full-depth-discovery.test.ts # --full-depth skill discovery tests
-├── openclaw-paths.test.ts       # OpenClaw-specific path tests
-├── plugin-manifest-discovery.test.ts # Plugin manifest skill discovery
-├── sanitize-name.test.ts     # Tests for sanitizeName (path traversal prevention)
-├── skill-matching.test.ts    # Tests for filterSkills (multi-word skill name matching)
-├── source-parser.test.ts     # Tests for URL/path parsing
-├── installer-symlink.test.ts # Tests for symlink installation
-├── list-installed.test.ts    # Tests for listing installed skills
-├── wellknown-provider.test.ts # Tests for well-known provider
-├── xdg-config-paths.test.ts   # XDG global path handling tests
-└── dist.test.ts               # Tests for built distribution
+```text
+cmd/open-skills/          Process entry point
+internal/application/    Command routing, acquisition, install/update/remove/use flows
+internal/state/          Lock schemas, agent registry, paths, and installed-state inspection
+internal/trust/          Exact remote-instruction trust store
+internal/compatibility/  Process harness, immutable oracle tooling, and golden corpus
+internal/release/        Native archive, Homebrew, Scoop, and release verification
+compatibility/npm-0.1.2/ Immutable npm 0.1.2 artifact/source manifests
+Formula/                 Homebrew package metadata
+bucket/                  Scoop package metadata
+scripts/                 Native package smoke and signed-tag verification scripts
 ```
 
-## Update Checking System
+The supported API seam is the built `open-skills` process. Packages under `internal/` are implementation details.
 
-### How `open-skills check` and `open-skills update` Work
-
-1. Read `~/.agents/.skill-lock.json` for installed skills
-2. Filter to GitHub-backed skills that have both `skillFolderHash` and `skillPath`
-3. Group skills by source and fetch each repository tree once through `src/github-tree.ts`. Optional auth is sourced lazily from `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token` after an anonymous request is rate-limited or identifies a private-repository retry.
-4. Tree retrieval uses an explicit recorded ref when present; otherwise it tries `HEAD`, `main`, then `master`.
-5. Resolve each skill folder's tree SHA and compare it with the lock file's `skillFolderHash`; a mismatch means an update is available.
-6. `open-skills update` reinstalls changed skills by invoking the current CLI entrypoint directly (`node <repo>/bin/cli.mjs add <source-tree-url> -g -y`) to avoid nested npm exec/npx behavior.
-
-### Lock File Compatibility
-
-The lock file format is v3. Key field: `skillFolderHash` (GitHub tree SHA for the skill folder).
-
-If reading an older lock file version, it's wiped. Users must reinstall skills to populate the new format.
-
-## Key Integration Points
-
-| Feature                            | Implementation                                                  |
-| ---------------------------------- | --------------------------------------------------------------- |
-| `open-skills add`                  | `src/add.ts` - full implementation                              |
-| `open-skills experimental_sync`    | `src/sync.ts` - crawl node_modules                              |
-| `open-skills check`                | `src/cli.ts` + GitHub tree/hash helpers in `src/github-tree.ts` |
-| `open-skills update`               | `src/update.ts` hash compare + reinstall via `open-skills add`  |
+`internal/state/agents.go` is the active authority for agent identifiers, display names, detection, and installation paths. Update the README agent table in the same change and add or update Go tests when the registry changes.
 
 ## Development
 
-```bash
-# Install dependencies
-pnpm install
+Use the Go version declared by `go.mod`.
 
-# Build
-pnpm build
+```sh
+# Format
 
-# Test locally
-pnpm dev add EngBlock/open-skills --list
-pnpm dev experimental_sync
-pnpm dev check
-pnpm dev update
-pnpm dev init my-skill
+gofmt -w cmd internal
 
-# Run all tests
-pnpm test
+# Static checks and complete test suite
 
-# Run specific test file(s)
-pnpm test tests/sanitize-name.test.ts
-pnpm test tests/skill-matching.test.ts tests/source-parser.test.ts
+go vet ./...
+go test ./... -count=1
 
-# Type check
-pnpm type-check
+# Build and smoke-test the standalone executable
 
-# Format code
-pnpm format
+CGO_ENABLED=0 go build -trimpath -o build/open-skills ./cmd/open-skills
+env PATH= ./build/open-skills
 
-# Check formatting
-pnpm format:check
+# Run one package or test
 
-# Validate and sync agent metadata/docs
-pnpm run -C scripts validate-agents.ts
-pnpm run -C scripts sync-agents.ts
+go test ./internal/application -run '^TestName$' -count=1
+go test ./internal/compatibility -run '^TestNativeGoldenCorpus$' -count=1
 ```
 
-## Code Style
+Run `gofmt` before committing. CI rejects formatting drift, runs vet and the complete Go suite on Linux, runs the frozen golden corpus in a network namespace, and runs the Go suite plus a native build on Windows.
 
-This project uses oxfmt for code formatting. **Always run `pnpm format` before committing changes** to ensure consistent formatting.
+## Compatibility history
 
-```bash
-# Format all files
-pnpm format
+The reviewed corpus under `internal/compatibility/testdata/golden/v1` is immutable compatibility history. Normal CI executes only the native binary against its checked-in outcomes and rejects Node, npm, or npx subprocesses.
 
-# Check formatting without fixing
-pnpm format:check
+The opt-in oracle recorder and differential tests under `internal/compatibility` are historical maintenance tools, not normal development or CI requirements. They may materialize the integrity-pinned npm 0.1.2 oracle with an explicitly supplied Node executable. Never point them at a mutable dist-tag or overwrite the reviewed v1 corpus.
+
+Verify the live immutable artifact, source chain, and tag protection with the Go verifier:
+
+```sh
+go run ./internal/compatibility/cmd/verify-native-baseline
 ```
 
-CI will fail if code is not properly formatted.
+This online historical check requires GitHub authentication through `GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth login`; it does not invoke npm.
 
-## Publishing
+## Native packaging and release
 
-```bash
-# 1. Bump version in package.json
-# 2. Build
-pnpm build
-# 3. Publish
-npm publish
+Generate the reviewed native archives and package metadata through Go:
+
+```sh
+GOTOOLCHAIN=go1.24.0 go run ./internal/release/cmd/native-preview \
+  --version 0.2.0 \
+  --output native-dist \
+  --homebrew-formula Formula/open-skills.rb \
+  --scoop-manifest bucket/open-skills.json \
+  --skip-linux-smoke
 ```
 
-## Adding a New Agent
-
-1. Add the agent definition to `src/agents.ts`
-2. Run `pnpm run -C scripts validate-agents.ts` to validate
-3. Run `pnpm run -C scripts sync-agents.ts` to update README.md and package keywords
+Release builds are CGO-disabled archives containing only `open-skills` (`open-skills.exe` on Windows). The signed-tag workflow verifies checksums, keyless signatures, provenance, Homebrew, and Scoop before protected publication. Follow `docs/native-development.md` and `docs/native-production-gate.md`; do not publish or restore an npm workflow.

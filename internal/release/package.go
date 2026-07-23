@@ -88,7 +88,7 @@ func ReleaseNotes(version string) (string, error) {
 		return "", err
 	}
 	title := fmt.Sprintf("# open-skills v%s native preview\n\n", version)
-	introduction := "This prerelease makes self-contained native archives available for early testing. Important: prerelease availability does not satisfy the production cutover gate; the npm implementation remains the production distribution until that gate is approved.\n\n"
+	introduction := "This prerelease makes self-contained native archives available for early testing. Prerelease availability does not replace the supported stable native release or its protected publication gate.\n\n"
 	supportStatement := "Supported targets are maintainer-supported preview platforms. Experimental targets are compile-checked but are not yet represented as fully tested.\n\n"
 	if version == "0.2.0" {
 		title = "# open-skills v0.2.0 native release\n\n"

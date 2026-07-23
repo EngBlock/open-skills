@@ -23,7 +23,7 @@ body:
       label: Steps to Reproduce
       description: How can we reproduce this issue?
       placeholder: |
-        1. Run `npx open-skills ...`
+        1. Run `open-skills ...`
         2. Select ...
         3. See error
     validations:
@@ -50,16 +50,16 @@ body:
     attributes:
       label: Version
       description: What version of open-skills are you using?
-      placeholder: e.g., 0.1.0
+      placeholder: e.g., 0.2.0
     validations:
       required: false
 
   - type: input
-    id: node-version
+    id: git-version
     attributes:
-      label: Node.js Version
-      description: What version of Node.js are you using?
-      placeholder: e.g., 22.20.0
+      label: Git Version
+      description: What version of system Git is available to open-skills?
+      placeholder: Output of `git --version`
     validations:
       required: false
 

@@ -75,7 +75,7 @@ func TestPackageAllBuildsTheNativePreviewTargetSet(t *testing.T) {
 	}
 }
 
-func TestReleaseNotesDistinguishSupportAndKeepTheCutoverGateClosed(t *testing.T) {
+func TestReleaseNotesDistinguishSupportAndKeepStableNativeProduction(t *testing.T) {
 	notes, err := ReleaseNotes("0.2.0-preview.7")
 	if err != nil {
 		t.Fatal(err)
@@ -91,13 +91,13 @@ func TestReleaseNotesDistinguishSupportAndKeepTheCutoverGateClosed(t *testing.T)
 		"`checksums.txt` covers every release archive",
 		"keyless signature bundle",
 		"EngBlock/open-skills/.github/workflows/native-preview.yml",
-		"prerelease availability does not satisfy the production cutover gate",
+		"does not replace the supported stable native release",
 	} {
 		if !strings.Contains(notes, text) {
 			t.Errorf("release notes do not contain %q:\n%s", text, notes)
 		}
 	}
-	for _, forbidden := range []string{"%!", "--cert-identity"} {
+	for _, forbidden := range []string{"%!", "--cert-identity", "npm implementation remains the production distribution"} {
 		if strings.Contains(notes, forbidden) {
 			t.Errorf("preview release notes unexpectedly contain %q:\n%s", forbidden, notes)
 		}

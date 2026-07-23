@@ -1,4 +1,4 @@
-# dependencies (bun install)
+# compatibility input for experimental_sync; never vendor local packages
 node_modules
 
 # output
@@ -25,9 +25,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .env.local
 
 # caches
-.eslintcache
 .cache
-*.tsbuildinfo
 
 # IntelliJ based IDEs
 .idea
@@ -36,7 +34,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .DS_Store
 
 *.log
-package-lock.json
 .codebuddy/
 .agent/
 .agents/
@@ -51,7 +48,3 @@ package-lock.json
 .qwen/
 .trae/
 .vscode/
-
-bin/_chunks/
-bin/cli-wrapper.mjs
-bin/cli.d.mts

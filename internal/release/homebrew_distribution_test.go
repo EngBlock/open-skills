@@ -125,7 +125,7 @@ func TestProductionCutoverChecklistCoversEveryApprovalGate(t *testing.T) {
 		"Signed canonical artifacts",
 		"Homebrew availability",
 		"Scoop availability",
-		"Draft migration guidance",
+		"Migration guidance",
 		"native-production",
 		"signed `v0.2.0` tag",
 	} {
@@ -135,7 +135,7 @@ func TestProductionCutoverChecklistCoversEveryApprovalGate(t *testing.T) {
 	}
 	migration := readRepositoryFile(t, root, "docs", "native-migration.md")
 	if !strings.Contains(migration, "## D13: canonical native release supply chain") {
-		t.Error("draft migration guidance does not document D13")
+		t.Error("migration guidance does not document D13")
 	}
 }
 
