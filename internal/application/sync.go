@@ -262,7 +262,7 @@ func resolvedDirectory(path string) (string, bool) {
 func discoverPackageSkills(packageDir string) []localSkill {
 	result := []localSkill{}
 	add := func(directory string) {
-		name, ok := readSkill(directory)
+		name, ok := readDiscoverableSkill(directory, false)
 		if !ok {
 			return
 		}

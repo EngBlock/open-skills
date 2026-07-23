@@ -20,7 +20,10 @@ go test ./...
 Concurrent mutation waits are bounded to 10 seconds by default. Set
 `OPEN_SKILLS_LOCK_TIMEOUT_MS` to a non-negative decimal millisecond value when
 a development or CI scenario needs a different bound. Invalid or negative
-values fail closed before managed state is touched.
+values fail closed before managed state is touched. Git acquisition defaults to
+five minutes and reads `OPEN_SKILLS_CLONE_TIMEOUT_MS`; internal-skill discovery
+uses `OPEN_SKILLS_INSTALL_INTERNAL_SKILLS`. The complete canonical and legacy
+environment contract is documented in the [D12 migration notes](native-migration.md#d12-namespaced-configuration-and-exact-authorization).
 
 `internal/compatibility` contains the process-level differential harness. Each target gets a fresh home, project, temporary directory, local Git repositories, HTTP server, stdin, environment, and PATH command fixtures. The harness records raw process streams and status, filesystem and lock state, HTTP requests, and child-command invocations before applying only documented presentation normalization.
 

@@ -149,7 +149,7 @@ These decisions are already approved by [issue #10](https://github.com/EngBlock/
 | D09 | Preserve and safely reject malformed, older, newer, and unknown lock data rather than resetting it; retain safe unknown fields and make native migration forward-only. |
 | D10 | Gate remote `use --agent` instruction injection on sanitized source plus exact-commit trust. Provide dedicated non-interactive authorization and offline trust list/revoke/clear. |
 | D11 | Add deterministic versioned JSON for management commands, machine-only stdout, stderr diagnostics, symbolic JSON errors, and no prompts/colors in JSON mode while retaining baseline numeric exits. |
-| D12 | Prefer `OPEN_SKILLS_*`; retain baseline legacy variables through 1.x with deterministic precedence, deprecation diagnostics, and namespaced warning suppression. |
+| D12 | Prefer `OPEN_SKILLS_*`; retain baseline legacy variables through 1.x with deterministic precedence, deprecation diagnostics, and namespaced warning suppression. See the [concrete environment and authorization contract](native-migration.md#d12-namespaced-configuration-and-exact-authorization). |
 | D13 | Distribute checksummed, signed, provenanced native artifacts from immutable tags. Do not turn npm into a native downloader and do not recommend `curl | sh`. |
 
 ## Change control

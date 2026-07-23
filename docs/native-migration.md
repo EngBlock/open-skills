@@ -170,3 +170,35 @@ Approvals are stored under the platform user configuration directory at `open-sk
 JSON mode cannot prompt and does not grant ordinary or risk-specific authorization. Callers must supply explicit selection and authorization flags such as `--skill`, `--agent`, `--yes`, `--force`, `--replace`, or `--allow-insecure-transport` when the operation requires them. Existing numeric success/failure behavior is unchanged, and JSON remains unsupported for `use` so launched-agent stream and exit passthrough are preserved.
 
 The complete version 1 schemas, ordering rules, statuses, and symbolic code registry are defined in the [native JSON automation contract](json-contract.md).
+
+## D12: namespaced configuration and exact authorization
+
+Open Skills-owned environment settings use the `OPEN_SKILLS_` namespace:
+
+| Canonical variable | Purpose | Default | Legacy name supported through 1.x |
+| --- | --- | --- | --- |
+| `OPEN_SKILLS_CLONE_TIMEOUT_MS` | Positive Git subprocess timeout in decimal milliseconds | `300000` (5 minutes) | `SKILLS_CLONE_TIMEOUT_MS` |
+| `OPEN_SKILLS_INSTALL_INTERNAL_SKILLS` | Set to exactly `1` or `true` to include skills whose frontmatter has `metadata.internal: true` | Internal skills are hidden | `INSTALL_INTERNAL_SKILLS` |
+| `OPEN_SKILLS_LOCK_TIMEOUT_MS` | Non-negative advisory-lock wait in decimal milliseconds | `10000` (10 seconds) | None; this setting was introduced namespaced |
+| `OPEN_SKILLS_SUPPRESS_LEGACY_ENV_WARNINGS` | Set to exactly `1` or `true` to suppress only the migration warnings for legacy environment names | Warnings enabled | None |
+
+A present canonical variable always wins, including an empty, false, or invalid
+value; Open Skills never falls back to a conflicting legacy value. Using either
+legacy name writes a migration diagnostic to stderr and remains supported
+through every 1.x release. When both names are present, the diagnostic also says
+that the legacy value was ignored. Legacy names are removed no earlier than 2.0.
+The suppression control affects only these migration diagnostics. It never hides
+configuration errors, acquisition notices, insecure-transport warnings, or
+other operational diagnostics.
+
+Ecosystem and third-party variables keep their established names. In particular,
+`NO_COLOR`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `HOME`, `GH_HOST`,
+`GITHUB_TOKEN`, `GH_TOKEN`, `GIT_SSH_COMMAND`, platform application-data
+variables, agent-owned home overrides, and agent-runtime detection variables do
+not gain branded aliases.
+
+Non-interactive authorization follows the same exact-name rule as configuration.
+`--yes` skips only ordinary selection, scope, removal, or trust-store management
+confirmations. It never implies `--replace`, `--force`, `--trust`, or
+`--allow-insecure-transport`; when more than one risk applies, every corresponding
+flag is required independently.

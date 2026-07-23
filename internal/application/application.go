@@ -26,6 +26,7 @@ type Invocation struct {
 var Version = "0.1.2"
 
 func Run(ctx context.Context, invocation Invocation) int {
+	reportLegacyEnvironmentWarnings(invocation.Stderr)
 	if ctx == nil {
 		ctx = context.Background()
 	}

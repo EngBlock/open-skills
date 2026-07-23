@@ -216,7 +216,8 @@ func runAdd(invocation Invocation, arguments []string) int {
 		_, _ = fmt.Fprintln(invocation.Stderr, "Provide either --skill or --skill-path, not both")
 		return 1
 	}
-	skills, err := discoverLocalSkillsWithLimits(absoluteSource, options.FullDepth, options.Limits)
+	includeInternal := len(options.Skills) > 0 || len(options.SkillPaths) > 0
+	skills, err := discoverLocalSkillsWithOptions(absoluteSource, options.FullDepth, options.Limits, includeInternal)
 	if err == nil {
 		err = assignRepositoryRelativePaths(skills, repositoryRoot)
 	}
@@ -499,9 +500,13 @@ func discoverLocalSkills(root string, fullDepth bool) ([]localSkill, error) {
 }
 
 func discoverLocalSkillsWithLimits(root string, fullDepth bool, limits resourceLimits) ([]localSkill, error) {
+	return discoverLocalSkillsWithOptions(root, fullDepth, limits, false)
+}
+
+func discoverLocalSkillsWithOptions(root string, fullDepth bool, limits resourceLimits, includeInternal bool) ([]localSkill, error) {
 	result := []localSkill{}
 	add := func(directory string) {
-		name, ok := readSkill(directory)
+		name, ok := readDiscoverableSkill(directory, includeInternal)
 		if !ok {
 			return
 		}
@@ -557,16 +562,35 @@ func discoverLocalSkillsWithLimits(root string, fullDepth bool, limits resourceL
 	return result, nil
 }
 
+type skillFrontmatter struct {
+	name     string
+	internal bool
+}
+
 func readSkill(directory string) (string, bool) {
+	frontmatter, ok := readSkillFrontmatter(directory)
+	return frontmatter.name, ok
+}
+
+func readDiscoverableSkill(directory string, includeInternal bool) (string, bool) {
+	frontmatter, ok := readSkillFrontmatter(directory)
+	if !ok || frontmatter.internal && !includeInternal && !environmentBoolean(installInternalEnvironment, legacyInstallInternalEnvironment) {
+		return "", false
+	}
+	return frontmatter.name, true
+}
+
+func readSkillFrontmatter(directory string) (skillFrontmatter, bool) {
 	data, err := os.ReadFile(filepath.Join(directory, "SKILL.md"))
 	if err != nil {
-		return "", false
+		return skillFrontmatter{}, false
 	}
 	lines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
 	if len(lines) == 0 || lines[0] != "---" {
-		return "", false
+		return skillFrontmatter{}, false
 	}
 	name, description := "", ""
+	internal, inMetadata := false, false
 	for _, line := range lines[1:] {
 		if line == "---" {
 			break
@@ -575,18 +599,25 @@ func readSkill(directory string) (string, bool) {
 		if !found {
 			continue
 		}
+		indented := len(key) > 0 && (key[0] == ' ' || key[0] == '\t')
+		key = strings.TrimSpace(key)
 		value = strings.Trim(strings.TrimSpace(value), "\"'")
-		switch strings.TrimSpace(key) {
-		case "name":
+		if !indented {
+			inMetadata = key == "metadata"
+		}
+		switch {
+		case !indented && key == "name":
 			name = value
-		case "description":
+		case !indented && key == "description":
 			description = value
+		case indented && inMetadata && key == "internal":
+			internal = value == "true"
 		}
 	}
 	if name == "" || description == "" {
-		return "", false
+		return skillFrontmatter{}, false
 	}
-	return name, true
+	return skillFrontmatter{name: name, internal: internal}, true
 }
 
 func assignRepositoryRelativePaths(skills []localSkill, repositoryRoot string) error {

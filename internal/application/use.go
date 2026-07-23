@@ -164,7 +164,8 @@ func runUse(invocation Invocation, arguments []string) int {
 		isRemote = true
 	}
 
-	skills, err := discoverLocalSkillsWithLimits(root, options.FullDepth, options.Limits)
+	includeInternal := options.Skill != "" || options.SkillPath != ""
+	skills, err := discoverLocalSkillsWithOptions(root, options.FullDepth, options.Limits, includeInternal)
 	if err == nil {
 		err = assignRepositoryRelativePaths(skills, repositoryRoot)
 	}

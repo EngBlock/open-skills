@@ -513,7 +513,8 @@ func gitArchiveTransportLimit(limits resourceLimits) int {
 }
 
 func gitCloneTimeout() time.Duration {
-	if milliseconds, err := time.ParseDuration(strings.TrimSpace(os.Getenv("SKILLS_CLONE_TIMEOUT_MS")) + "ms"); err == nil && milliseconds > 0 {
+	raw := environmentValue(cloneTimeoutEnvironment, legacyCloneTimeoutEnvironment)
+	if milliseconds, err := time.ParseDuration(strings.TrimSpace(raw) + "ms"); err == nil && milliseconds > 0 {
 		return milliseconds
 	}
 	return 5 * time.Minute

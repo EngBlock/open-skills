@@ -357,9 +357,9 @@ Describe the scenarios where this skill should be used.
 
 ### Optional Fields
 
-- `metadata.internal`: Set to `true` to hide the skill from normal discovery. Internal skills are only visible and
-  installable when `INSTALL_INTERNAL_SKILLS=1` is set. Useful for work-in-progress skills or skills meant only for
-  internal tooling.
+- `metadata.internal`: Set to `true` to hide the skill from normal discovery. In the native preview, internal skills
+  are visible when `OPEN_SKILLS_INSTALL_INTERNAL_SKILLS=1` is set; the npm 0.1.x baseline and native 1.x compatibility
+  also accept `INSTALL_INTERNAL_SKILLS`. Useful for work-in-progress skills or skills meant only for internal tooling.
 
 ```markdown
 ---
@@ -493,14 +493,27 @@ Ensure you have write access to the target directory.
 
 ## Environment Variables
 
-| Variable                  | Description                                                                |
-| ------------------------- | -------------------------------------------------------------------------- |
-| `INSTALL_INTERNAL_SKILLS` | Set to `1` or `true` to show and install skills marked as `internal: true` |
+The native preview uses canonical `OPEN_SKILLS_` names for Open Skills-owned
+configuration. Legacy names remain supported through native 1.x and emit a
+migration warning on stderr; a present canonical value always wins a conflict.
+The npm 0.1.x implementation continues to use the legacy names shown below.
+
+| Native canonical variable | Description | Legacy name through 1.x |
+| --- | --- | --- |
+| `OPEN_SKILLS_CLONE_TIMEOUT_MS` | Positive Git timeout in milliseconds (default `300000`) | `SKILLS_CLONE_TIMEOUT_MS` |
+| `OPEN_SKILLS_INSTALL_INTERNAL_SKILLS` | Set to exactly `1` or `true` to show and install `metadata.internal: true` skills | `INSTALL_INTERNAL_SKILLS` |
+| `OPEN_SKILLS_LOCK_TIMEOUT_MS` | Non-negative advisory-lock wait in milliseconds (default `10000`) | None |
+| `OPEN_SKILLS_SUPPRESS_LEGACY_ENV_WARNINGS` | Set to exactly `1` or `true` to suppress only legacy-name migration warnings | None |
 
 ```bash
-# Install internal skills
-INSTALL_INTERNAL_SKILLS=1 open-skills add owner/repo --list
+# Native preview: include internal skills
+OPEN_SKILLS_INSTALL_INTERNAL_SKILLS=1 open-skills add owner/repo --list
 ```
+
+Standard ecosystem and third-party variables such as `NO_COLOR`, `XDG_*`,
+`GH_HOST`, Git credentials/configuration, and agent-owned home variables retain
+their established names. See the [native D12 migration notes](docs/native-migration.md#d12-namespaced-configuration-and-exact-authorization)
+for precedence, deprecation, and exact authorization semantics.
 
 ## Related Links
 

@@ -12,6 +12,40 @@ import (
 	"testing"
 )
 
+func TestGitCloneTimeoutEnvironmentPrecedence(t *testing.T) {
+	t.Run("canonical wins a conflict", func(t *testing.T) {
+		t.Setenv(cloneTimeoutEnvironment, "1250")
+		t.Setenv(legacyCloneTimeoutEnvironment, "9000")
+		if actual := gitCloneTimeout(); actual.String() != "1.25s" {
+			t.Fatalf("gitCloneTimeout() = %s; want 1.25s", actual)
+		}
+	})
+	t.Run("present empty canonical disables legacy fallback", func(t *testing.T) {
+		t.Setenv(cloneTimeoutEnvironment, "")
+		t.Setenv(legacyCloneTimeoutEnvironment, "9000")
+		if actual := gitCloneTimeout(); actual.String() != "5m0s" {
+			t.Fatalf("gitCloneTimeout() = %s; want 5m0s", actual)
+		}
+	})
+	t.Run("legacy remains supported", func(t *testing.T) {
+		previous, existed := os.LookupEnv(cloneTimeoutEnvironment)
+		if err := os.Unsetenv(cloneTimeoutEnvironment); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			if existed {
+				_ = os.Setenv(cloneTimeoutEnvironment, previous)
+			} else {
+				_ = os.Unsetenv(cloneTimeoutEnvironment)
+			}
+		})
+		t.Setenv(legacyCloneTimeoutEnvironment, "2250")
+		if actual := gitCloneTimeout(); actual.String() != "2.25s" {
+			t.Fatalf("gitCloneTimeout() = %s; want 2.25s", actual)
+		}
+	})
+}
+
 func TestParseGitSourceSupportsGitHubGitLabAndGenericForms(t *testing.T) {
 	t.Setenv("GH_HOST", "github.example.test")
 	cases := []struct {
