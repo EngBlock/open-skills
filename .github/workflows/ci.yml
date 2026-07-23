@@ -10,7 +10,8 @@ on:
       - '**/*.md'
 
 jobs:
-  linux:
+  go:
+    name: Go validation
     runs-on: ubuntu-latest
 
     steps:
@@ -29,9 +30,13 @@ jobs:
       - name: Vet
         run: go vet ./...
 
-      - name: Tests
+      # The release package test builds every target once and smoke-tests the
+      # production Linux executable as part of this single complete suite.
+      - name: Tests, production build, and cross-compilation
         run: go test ./... -count=1
 
+      # Linux network namespaces are the portable enforcement boundary for the
+      # corpus's explicit no-network/no-undisclosed-subprocess contract.
       - name: Network-disabled native compatibility corpus
         run: |
           GO_BIN="$(command -v go)"
@@ -45,49 +50,3 @@ jobs:
             export GOPROXY=off GOSUMDB=off GOTOOLCHAIN=local
             exec "$1" test ./internal/compatibility -run "TestNativeGoldenCorpus|TestNativeShell|TestD02OfflineShellHasNoNetworkOrSubprocessDependencies" -count=1
           ' sh "$GO_BIN" "$MOD_CACHE"
-
-      - name: Build standalone executable
-        env:
-          CGO_ENABLED: '0'
-        run: mkdir -p .native-dist && go build -trimpath -o .native-dist/open-skills ./cmd/open-skills
-
-      - name: Smoke test standalone executable
-        env:
-          PATH: ''
-        run: ./.native-dist/open-skills
-
-      - name: Verify native executable name
-        run: test "$(find .native-dist -maxdepth 1 -type f -printf '%f\n')" = open-skills
-
-  windows:
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-
-      - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Tests
-        run: go test ./... -count=1
-
-      - name: Build standalone executable
-        env:
-          CGO_ENABLED: '0'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force .native-dist | Out-Null
-          go build -trimpath -o .native-dist/open-skills.exe ./cmd/open-skills
-
-      - name: Smoke test standalone executable
-        run: ./.native-dist/open-skills.exe
-
-      - name: Verify native executable name
-        shell: pwsh
-        run: |
-          $files = @(Get-ChildItem .native-dist -File | Select-Object -ExpandProperty Name)
-          if ($files.Count -ne 1 -or $files[0] -ne 'open-skills.exe') { throw "unexpected native artifacts: $files" }

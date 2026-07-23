@@ -57,6 +57,48 @@ func TestActiveRepositoryIsGoOnly(t *testing.T) {
 	}
 }
 
+func TestOrdinaryCIHasOnePortableGoLane(t *testing.T) {
+	root := repositoryRoot(t)
+	workflowPath := filepath.Join(root, ".github", "workflows", "ci.yml")
+	data, err := os.ReadFile(workflowPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow := string(data)
+
+	_, jobsBlock, ok := strings.Cut(workflow, "\njobs:\n")
+	if !ok {
+		t.Fatal("ordinary CI has no jobs block")
+	}
+	jobPattern := regexp.MustCompile(`(?m)^  [a-zA-Z0-9_-]+:\s*$`)
+	if jobs := jobPattern.FindAllString(jobsBlock, -1); len(jobs) != 1 {
+		t.Fatalf("ordinary CI jobs = %d (%v); want one portable Go lane", len(jobs), jobs)
+	}
+	for _, forbidden := range []string{
+		"runs-on: windows", "runs-on: macos", "strategy:", "matrix:", "homebrew", "go build ",
+	} {
+		if strings.Contains(strings.ToLower(workflow), forbidden) {
+			t.Errorf("ordinary CI contains redundant native-OS, matrix, or build configuration %q", forbidden)
+		}
+	}
+
+	if count := strings.Count(workflow, "go test ./... -count=1"); count != 1 {
+		t.Errorf("ordinary CI full-suite invocations = %d; want exactly one", count)
+	}
+	for _, required := range []string{
+		"runs-on: ubuntu-latest",
+		"go-version-file: go.mod",
+		`test -z "$(gofmt -l cmd internal)"`,
+		"go vet ./...",
+		"go test ./... -count=1",
+		"sudo unshare --net",
+	} {
+		if !strings.Contains(workflow, required) {
+			t.Errorf("ordinary CI is missing required fail-closed check %q", required)
+		}
+	}
+}
+
 func TestHistoricalCompatibilityArtifactsRemainIdentityLinked(t *testing.T) {
 	root := repositoryRoot(t)
 	required := []string{

@@ -52,7 +52,7 @@ go test ./internal/application -run '^TestName$' -count=1
 go test ./internal/compatibility -run '^TestNativeGoldenCorpus$' -count=1
 ```
 
-Run `gofmt` before committing. CI rejects formatting drift, runs vet and the complete Go suite on Linux, runs the frozen golden corpus in a network namespace, and runs the Go suite plus a native build on Windows.
+Run `gofmt` before committing. Ordinary CI has one Ubuntu job: it rejects formatting drift, runs vet and the complete Go suite once, and reruns only the security-sensitive compatibility subset in a network namespace. The release package test in the complete suite builds every CGO-disabled target once and smoke-tests the Linux production executable. Native Homebrew/macOS and Scoop/Windows checks are reserved for release-artifact workflows.
 
 ## Compatibility history
 

@@ -602,6 +602,8 @@ go test ./... -count=1
 CGO_ENABLED=0 go build -trimpath -o build/open-skills ./cmd/open-skills
 ```
 
+Ordinary pull-request and `main` push CI intentionally has one Ubuntu Go validation job. It fails closed on formatting, vetting, and the complete test suite. As part of that suite, the native release test builds every CGO-disabled release target once and smoke-tests the production Linux executable; only the security-sensitive compatibility subset is rerun inside a network namespace. Native macOS ARM64 Homebrew and experimental Windows Scoop checks run only against release artifacts in the release workflows; ordinary CI does not repeat the full suite across operating systems or Go versions.
+
 See [native development](docs/native-development.md) for the compatibility corpus and signed native release process. The protected [`v0.1.2`](https://github.com/EngBlock/open-skills/tree/v0.1.2) tag and checked-in compatibility manifests preserve the retired implementation for historical inspection; they are not active development dependencies.
 
 ## Origin

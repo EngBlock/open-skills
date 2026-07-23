@@ -19,6 +19,12 @@ go test ./... -count=1
 
 `internal/repositorypolicy` guards the cutover: active tracked JavaScript/TypeScript and Node package metadata are rejected, active workflows may not set up or invoke Node/npm/pnpm, and the reviewed historical manifests must remain identity-linked.
 
+## Small CI contract
+
+Ordinary pull requests and pushes to `main` use one Ubuntu job with the Go version declared by `go.mod`. That lane checks `gofmt`, runs `go vet`, and runs the complete Go suite once. Within that suite, `TestPackageAllBuildsTheNativePreviewTargetSet` performs the single CGO-disabled production build and smoke for Linux x86-64 and cross-compiles each other release target once. Only the security-sensitive compatibility subset is rerun inside a Linux network namespace, because the no-network guarantee requires an OS isolation boundary rather than a test double.
+
+Ordinary CI has no OS or runtime matrix. It does not run duplicate full suites on Windows or macOS, and it does not repeat release compilation, package identity, or installation smoke checks. Native macOS ARM64 Homebrew and experimental Windows x86-64 Scoop jobs are reserved for the tag and recovery workflows where actual release artifacts are validated or published. A native-OS job should be added to ordinary CI only when a documented supported behavior cannot be exercised portably or in the release workflow.
+
 ## Homebrew native releases
 
 The checked-in [`Formula/open-skills.rb`](../Formula/open-skills.rb) is the tap formula for the supported macOS ARM64 target. It installs only the `open-skills` payload from the canonical `darwin_arm64.tar.gz` GitHub Release asset; it does not build from source or download through npm. Because the tap lives in this repository rather than a separately named `homebrew-*` repository, users add its explicit Git URL before installing it.
