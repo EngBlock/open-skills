@@ -11,6 +11,22 @@ Supports **OpenCode**, **Claude Code**, **Codex**, **Cursor**, and [70 more](#su
 
 ## Install
 
+### Scoop (experimental Windows x86-64 native preview)
+
+The native Windows x86-64 build is available for early testing from its checksummed, immutable GitHub Release archive. Windows x86-64 support is experimental rather than fully supported. The package places only `open-skills.exe` on PATH, requires system Git at runtime, and does not require Node.js or npm.
+
+```powershell
+scoop bucket add open-skills https://github.com/EngBlock/open-skills
+scoop install open-skills/open-skills
+```
+
+Scoop owns executable upgrades; `open-skills update` updates installed skills instead:
+
+```powershell
+scoop update
+scoop update open-skills
+```
+
 ### Homebrew (macOS ARM64 native preview)
 
 The supported macOS ARM64 native preview is installed from its checksummed, immutable GitHub Release archive. It places only `open-skills` on PATH and requires system Git at runtime.

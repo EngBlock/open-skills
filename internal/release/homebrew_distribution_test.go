@@ -71,7 +71,7 @@ func TestNativePreviewWorkflowGatesPublicationOnHomebrewSmoke(t *testing.T) {
 		"runs-on: macos-15",
 		`run: test "$(uname -m)" = arm64`,
 		`OPEN_SKILLS_HOMEBREW_ARTIFACT="$artifact" scripts/homebrew-smoke.sh homebrew/open-skills.rb`,
-		"needs: [build, homebrew]",
+		"needs: [build, homebrew, scoop]",
 		`scripts/verify-native-release-tag.sh`,
 		`gh release create "${GITHUB_REF_NAME}"`,
 		"native-dist/*",

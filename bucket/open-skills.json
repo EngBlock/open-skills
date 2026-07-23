@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0-preview.3",
+  "description": "Experimental Windows x86-64 native preview for the open agent skills ecosystem",
+  "homepage": "https://github.com/EngBlock/open-skills",
+  "license": "MIT",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/EngBlock/open-skills/releases/download/v0.2.0-preview.3/open-skills_0.2.0-preview.3_windows_amd64.zip",
+      "hash": "f9e5f4d0a2217c199ca63c069d29333cdbeb107a47cadb99e2930773f3bdc3d8"
+    }
+  },
+  "bin": "open-skills.exe",
+  "checkver": {
+    "url": "https://api.github.com/repos/EngBlock/open-skills/releases",
+    "jsonpath": "$[?(@.prerelease == true && @.draft == false)].tag_name",
+    "regex": "v(?<version>0\\.2\\.0-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)"
+  },
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/EngBlock/open-skills/releases/download/v$version/open-skills_$version_windows_amd64.zip",
+        "hash": {
+          "url": "https://github.com/EngBlock/open-skills/releases/download/v$version/checksums.txt"
+        }
+      }
+    }
+  }
+}

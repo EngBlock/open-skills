@@ -127,6 +127,53 @@ func TestHomebrewFormulaReferencesTheCanonicalMacOSARM64Artifact(t *testing.T) {
 	}
 }
 
+func TestScoopManifestReferencesTheCanonicalExperimentalWindowsArtifact(t *testing.T) {
+	manifest, err := ScoopManifest("0.2.0-preview.7", strings.NewReader(
+		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.0-preview.7_linux_amd64.tar.gz\n"+
+			"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  open-skills_0.2.0-preview.7_windows_amd64.zip\n",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, text := range []string{
+		`"description": "Experimental Windows x86-64 native preview for the open agent skills ecosystem"`,
+		`"url": "https://github.com/EngBlock/open-skills/releases/download/v0.2.0-preview.7/open-skills_0.2.0-preview.7_windows_amd64.zip"`,
+		`"hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"`,
+		`"bin": "open-skills.exe"`,
+		`"url": "https://api.github.com/repos/EngBlock/open-skills/releases"`,
+		`"regex": "v(?<version>0\\.2\\.0-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)"`,
+		`"url": "https://github.com/EngBlock/open-skills/releases/download/v$version/open-skills_$version_windows_amd64.zip"`,
+		`"url": "https://github.com/EngBlock/open-skills/releases/download/v$version/checksums.txt"`,
+	} {
+		if !strings.Contains(manifest, text) {
+			t.Errorf("Scoop manifest does not contain %q:\n%s", text, manifest)
+		}
+	}
+	for _, forbidden := range []string{"npm", "node", `"32bit"`, `"arm64"`, `"skills.exe"`, `"add-skill.exe"`} {
+		if strings.Contains(strings.ToLower(manifest), forbidden) {
+			t.Errorf("Scoop manifest unexpectedly contains %q:\n%s", forbidden, manifest)
+		}
+	}
+}
+
+func TestScoopManifestRequiresTheChecksummedCanonicalArtifact(t *testing.T) {
+	tests := []struct {
+		name      string
+		checksums string
+	}{
+		{name: "missing", checksums: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.0-preview.7_linux_amd64.tar.gz\n"},
+		{name: "malformed checksum", checksums: "not-a-sha  open-skills_0.2.0-preview.7_windows_amd64.zip\n"},
+		{name: "duplicate", checksums: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.0-preview.7_windows_amd64.zip\nbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  open-skills_0.2.0-preview.7_windows_amd64.zip\n"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := ScoopManifest("0.2.0-preview.7", strings.NewReader(test.checksums)); err == nil {
+				t.Fatal("ScoopManifest() succeeded; want checksummed canonical artifact failure")
+			}
+		})
+	}
+}
+
 func TestHomebrewFormulaRequiresTheChecksummedCanonicalArtifact(t *testing.T) {
 	tests := []struct {
 		name      string

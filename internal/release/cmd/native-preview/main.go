@@ -15,6 +15,7 @@ func main() {
 	output := flag.String("output", "dist/native-preview", "artifact output directory")
 	notes := flag.String("notes", "", "optional release-notes output path")
 	homebrewFormula := flag.String("homebrew-formula", "", "optional Homebrew formula output path")
+	scoopManifest := flag.String("scoop-manifest", "", "optional Scoop manifest output path")
 	skipLinuxSmoke := flag.Bool("skip-linux-smoke", false, "allow local cross-packaging without the Linux x86-64 built-binary smoke test")
 	flag.Parse()
 	if flag.NArg() != 0 {
@@ -52,6 +53,26 @@ func main() {
 		}
 		if err := os.WriteFile(*homebrewFormula, []byte(content), 0o644); err != nil {
 			fail("write Homebrew formula: %v", err)
+		}
+	}
+	if *scoopManifest != "" {
+		checksums, err := os.Open(filepath.Join(*output, "checksums.txt"))
+		if err != nil {
+			fail("open release checksums for Scoop manifest: %v", err)
+		}
+		content, manifestErr := nativerelease.ScoopManifest(*version, checksums)
+		closeErr := checksums.Close()
+		if manifestErr != nil {
+			fail("generate Scoop manifest: %v", manifestErr)
+		}
+		if closeErr != nil {
+			fail("close release checksums: %v", closeErr)
+		}
+		if err := os.MkdirAll(filepath.Dir(*scoopManifest), 0o755); err != nil {
+			fail("create Scoop manifest directory: %v", err)
+		}
+		if err := os.WriteFile(*scoopManifest, []byte(content), 0o644); err != nil {
+			fail("write Scoop manifest: %v", err)
 		}
 	}
 	if *notes != "" {

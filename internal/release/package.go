@@ -119,26 +119,9 @@ func HomebrewFormula(version string, checksums io.Reader) (string, error) {
 		return "", err
 	}
 	filename := fmt.Sprintf("open-skills_%s_darwin_arm64.tar.gz", version)
-	checksum := ""
-	scanner := bufio.NewScanner(checksums)
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) != 2 || fields[1] != filename {
-			continue
-		}
-		if checksum != "" {
-			return "", fmt.Errorf("checksums contain duplicate entries for %s", filename)
-		}
-		if !sha256Checksum.MatchString(fields[0]) {
-			return "", fmt.Errorf("checksum for %s is not a lowercase SHA-256 digest", filename)
-		}
-		checksum = fields[0]
-	}
-	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("read release checksums: %w", err)
-	}
-	if checksum == "" {
-		return "", fmt.Errorf("checksums do not cover canonical Homebrew artifact %s", filename)
+	checksum, err := checksumForArtifact(checksums, filename, "Homebrew")
+	if err != nil {
+		return "", err
 	}
 
 	return fmt.Sprintf(`class OpenSkills < Formula
@@ -162,6 +145,72 @@ func HomebrewFormula(version string, checksums io.Reader) (string, error) {
   end
 end
 `, version, filename, checksum), nil
+}
+
+func ScoopManifest(version string, checksums io.Reader) (string, error) {
+	if err := validateVersion(version); err != nil {
+		return "", err
+	}
+	filename := fmt.Sprintf("open-skills_%s_windows_amd64.zip", version)
+	checksum, err := checksumForArtifact(checksums, filename, "Scoop")
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf(`{
+  "version": "%[1]s",
+  "description": "Experimental Windows x86-64 native preview for the open agent skills ecosystem",
+  "homepage": "https://github.com/EngBlock/open-skills",
+  "license": "MIT",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/EngBlock/open-skills/releases/download/v%[1]s/%[2]s",
+      "hash": "%[3]s"
+    }
+  },
+  "bin": "open-skills.exe",
+  "checkver": {
+    "url": "https://api.github.com/repos/EngBlock/open-skills/releases",
+    "jsonpath": "$[?(@.prerelease == true && @.draft == false)].tag_name",
+    "regex": "v(?<version>0\\.2\\.0-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)"
+  },
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/EngBlock/open-skills/releases/download/v$version/open-skills_$version_windows_amd64.zip",
+        "hash": {
+          "url": "https://github.com/EngBlock/open-skills/releases/download/v$version/checksums.txt"
+        }
+      }
+    }
+  }
+}
+`, version, filename, checksum), nil
+}
+
+func checksumForArtifact(checksums io.Reader, filename string, distribution string) (string, error) {
+	checksum := ""
+	scanner := bufio.NewScanner(checksums)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) != 2 || fields[1] != filename {
+			continue
+		}
+		if checksum != "" {
+			return "", fmt.Errorf("checksums contain duplicate entries for %s", filename)
+		}
+		if !sha256Checksum.MatchString(fields[0]) {
+			return "", fmt.Errorf("checksum for %s is not a lowercase SHA-256 digest", filename)
+		}
+		checksum = fields[0]
+	}
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("read release checksums: %w", err)
+	}
+	if checksum == "" {
+		return "", fmt.Errorf("checksums do not cover canonical %s artifact %s", distribution, filename)
+	}
+	return checksum, nil
 }
 
 func validateOptions(options PackageOptions) error {

@@ -28,6 +28,7 @@ GOTOOLCHAIN=go1.24.0 go run ./internal/release/cmd/native-preview \
   --version 0.2.0-preview.3 \
   --output native-dist \
   --homebrew-formula Formula/open-skills.rb \
+  --scoop-manifest bucket/open-skills.json \
   --skip-linux-smoke
 ```
 
@@ -39,6 +40,14 @@ The release workflow rebuilds the artifacts, refuses to proceed unless its gener
 OPEN_SKILLS_HOMEBREW_ARTIFACT="$PWD/native-dist/open-skills_0.2.0-preview.3_darwin_arm64.tar.gz" \
   scripts/homebrew-smoke.sh Formula/open-skills.rb
 ```
+
+## Scoop preview releases
+
+The checked-in [`bucket/open-skills.json`](../bucket/open-skills.json) installs only `open-skills.exe` from the canonical checksummed `windows_amd64.zip` GitHub Release asset and never downloads through npm. The Windows x86-64 target remains experimental rather than fully supported. Users add this repository as a Scoop bucket, so the manifest must remain under `bucket/`.
+
+Regenerate it with the same native-preview command shown above by passing `--scoop-manifest bucket/open-skills.json`. The generated manifest embeds the current archive SHA-256 and canonical immutable release URL. Its `checkver` metadata selects the newest non-draft prerelease, and `autoupdate` derives the next canonical archive URL and extracts its digest from that release's `checksums.txt`.
+
+Before publication, the release workflow regenerates and compares the checked manifest, then runs `scripts/scoop-smoke.ps1` on Windows x86-64 with a commit-pinned Scoop core. The smoke check validates the manifest against Scoop's schema, exercises its upgrade metadata against the pending checksum, installs the pending ZIP through Scoop's cache, verifies version and help output, and confirms that the package exposes only `open-skills.exe`. The release job cannot run unless this experimental Windows check succeeds.
 
 Concurrent mutation waits are bounded to 10 seconds by default. Set
 `OPEN_SKILLS_LOCK_TIMEOUT_MS` to a non-negative decimal millisecond value when
