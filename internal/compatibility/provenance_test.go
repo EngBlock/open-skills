@@ -127,10 +127,10 @@ func TestNativeAddAllowsExplicitCrossSourceReplacement(t *testing.T) {
 func TestNativeAddReplaceRollsBackContentAndLockWhenPlacementFails(t *testing.T) {
 	fixtures := append(provenanceFixtures("{{temp:json}}/prior"),
 		FileFixture{Root: ProjectRoot, Path: ".claude/skills/provenance-skill/SKILL.md", Data: []byte(priorProvenanceSkill)},
-		FileFixture{Root: ProjectRoot, Path: ".pi", Data: []byte("placement obstruction")},
+		FileFixture{Root: ProjectRoot, Path: ".junie", Data: []byte("placement obstruction")},
 	)
 	observation, err := (Harness{}).Run(context.Background(), buildShellTarget(t), Scenario{
-		Args:    []string{"add", "{{temp}}/replacement", "--agent", "universal", "claude-code", "pi", "--copy", "--replace", "--force", "--yes"},
+		Args:    []string{"add", "{{temp}}/replacement", "--agent", "universal", "claude-code", "junie", "--copy", "--replace", "--force", "--yes"},
 		Files:   fixtures,
 		Offline: true,
 	})

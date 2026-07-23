@@ -9,15 +9,16 @@ import (
 )
 
 type agentConfig struct {
-	ID          string
-	DisplayName string
-	ProjectDir  string
-	GlobalDir   string
-	DetectPath  string
-	NoGlobal    bool
-	UsesXDG     bool
-	GlobalEnv   string
-	DetectEnv   string
+	ID                string
+	DisplayName       string
+	ProjectDir        string
+	GlobalDir         string
+	DetectPath        string
+	NoGlobal          bool
+	ProjectSharedOnly bool
+	UsesXDG           bool
+	GlobalEnv         string
+	DetectEnv         string
 }
 
 // agentConfigs is the immutable npm 0.1.2 agent vocabulary. Paths are kept
@@ -74,7 +75,7 @@ var agentConfigs = []agentConfig{
 	{ID: "opencode", DisplayName: "OpenCode", ProjectDir: ".agents/skills", GlobalDir: "opencode/skills", DetectPath: "opencode", UsesXDG: true},
 	{ID: "openhands", DisplayName: "OpenHands", ProjectDir: ".openhands/skills", GlobalDir: ".openhands/skills", DetectPath: ".openhands"},
 	{ID: "ona", DisplayName: "Ona", ProjectDir: ".ona/skills", GlobalDir: ".ona/skills", DetectPath: ".ona"},
-	{ID: "pi", DisplayName: "Pi", ProjectDir: ".pi/skills", GlobalDir: ".pi/agent/skills", DetectPath: ".pi/agent"},
+	{ID: "pi", DisplayName: "Pi", ProjectDir: ".agents/skills", GlobalDir: ".pi/agent/skills", DetectPath: ".pi/agent", ProjectSharedOnly: true},
 	{ID: "qoder", DisplayName: "Qoder", ProjectDir: ".qoder/skills", GlobalDir: ".qoder/skills", DetectPath: ".qoder"},
 	{ID: "qoder-cn", DisplayName: "Qoder CN", ProjectDir: ".qoder/skills", GlobalDir: ".qoder-cn/skills", DetectPath: ".qoder-cn"},
 	{ID: "qwen-code", DisplayName: "Qwen Code", ProjectDir: ".qwen/skills", GlobalDir: ".qwen/skills", DetectPath: ".qwen"},
@@ -173,7 +174,7 @@ func AgentSkillsPath(id string, scope Scope, project, home, xdgConfigHome string
 			Scope: scope, Project: project, Home: home, XDGConfigHome: xdgConfigHome,
 		}
 		path := agentSkillsDir(agent, options)
-		canonical := agent.ProjectDir == ".agents/skills"
+		canonical := agent.ProjectDir == ".agents/skills" && (scope == Project || !agent.ProjectSharedOnly)
 		return path, canonical, true
 	}
 	return "", false, false

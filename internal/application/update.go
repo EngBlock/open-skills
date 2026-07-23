@@ -683,11 +683,11 @@ func scopeBase(scope state.Scope, project, home string) string {
 
 func copiedPlacementExists(skillName string, agents []string, scope state.Scope, project, home string) bool {
 	for _, agent := range agents {
-		if agent == "eve" || contains(state.UniversalAgentIDs(scope), agent) {
+		if agent == "eve" {
 			continue
 		}
-		path, _, supported := state.AgentSkillsPath(agent, scope, project, home, os.Getenv("XDG_CONFIG_HOME"))
-		if !supported {
+		path, shared, supported := state.AgentSkillsPath(agent, scope, project, home, os.Getenv("XDG_CONFIG_HOME"))
+		if !supported || shared {
 			continue
 		}
 		entry, err := os.Lstat(filepath.Join(path, state.SanitizeName(skillName)))

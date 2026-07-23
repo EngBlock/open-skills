@@ -14,6 +14,17 @@ import (
 	"github.com/EngBlock/open-skills/internal/state"
 )
 
+func TestCopiedPlacementExistsChecksPiDedicatedGlobalPath(t *testing.T) {
+	home := t.TempDir()
+	copyPath := filepath.Join(home, ".pi", "agent", "skills", "fixture")
+	if err := os.MkdirAll(copyPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if !copiedPlacementExists("fixture", []string{"pi"}, state.Global, t.TempDir(), home) {
+		t.Fatal("Pi global copy was not detected")
+	}
+}
+
 func TestParseUpdateOptionsAcceptsResourceOverrides(t *testing.T) {
 	options := parseUpdateOptions([]string{"--project", "--yes", "--max-file-bytes", "11534336", "--max-total-bytes", "209715200", "--max-files", "6000", "--max-depth", "25"})
 	if options.ParseError != nil {

@@ -311,7 +311,7 @@ func TestRunAddInteractiveOutputReportsActualAgents(t *testing.T) {
 	}
 }
 
-func TestRunAddInteractiveOutputDistinguishesSkippedDetectedAgentsAndCompactsLargeLists(t *testing.T) {
+func TestRunAddInteractiveOutputReportsOnlyDetectedInstalledAgents(t *testing.T) {
 	project := t.TempDir()
 	source := filepath.Join(t.TempDir(), "find-skills")
 	writeAddOutputSkill(t, source, "find-skills")
@@ -326,14 +326,125 @@ func TestRunAddInteractiveOutputDistinguishesSkippedDetectedAgentsAndCompactsLar
 	if code != 0 || stderr.String() != "" {
 		t.Fatalf("runAdd = %d stdout %q stderr %q", code, stdout.String(), stderr.String())
 	}
-	prefix := "Installed find-skills\n  Agents: Amp, Antigravity, Antigravity CLI, Cline, Codex +14 more\n  Skipped: "
-	if got := stdout.String(); !strings.HasPrefix(got, prefix) {
-		t.Fatalf("stdout = %q; want prefix %q", got, prefix)
+	agents := "Pi"
+	if _, err := os.Stat("/etc/codex"); err == nil {
+		agents = "Codex, Pi"
 	}
-	// ZCode has a system-wide detector outside the isolated test home.
-	skipped := strings.TrimSuffix(strings.TrimPrefix(stdout.String(), prefix), "\n")
-	if skipped != "Pi" && skipped != "Pi, ZCode" {
-		t.Fatalf("skipped agents = %q; want Pi with only an optional system ZCode detection", skipped)
+	want := "Installed find-skills\n  Agents: " + agents + "\n"
+	// Codex and ZCode have system-wide detectors outside the isolated test home.
+	if _, err := os.Stat("/Applications/ZCode.app"); err == nil {
+		want += "  Skipped: ZCode\n"
+	}
+	if got := stdout.String(); got != want {
+		t.Fatalf("stdout = %q; want %q", got, want)
+	}
+}
+
+func TestRunAddInteractiveOutputCompactsLargeDetectedAgentLists(t *testing.T) {
+	project := t.TempDir()
+	source := filepath.Join(t.TempDir(), "compact-output")
+	writeAddOutputSkill(t, source, "compact-output")
+	home := isolateAddOutputEnvironment(t)
+	for _, path := range []string{
+		".gemini/antigravity",
+		".gemini/antigravity-cli",
+		".cline",
+		".codex",
+		".cursor",
+		".deepagents",
+	} {
+		if err := os.MkdirAll(filepath.Join(home, filepath.FromSlash(path)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Chdir(project)
+
+	var stdout, stderr bytes.Buffer
+	code := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr, Interactive: true}, []string{source, "--yes"})
+	if code != 0 || stderr.String() != "" {
+		t.Fatalf("runAdd = %d stdout %q stderr %q", code, stdout.String(), stderr.String())
+	}
+	want := "Installed compact-output\n  Agents: Antigravity, Antigravity CLI, Cline, Codex, Cursor +2 more\n"
+	if _, err := os.Stat("/Applications/ZCode.app"); err == nil {
+		want += "  Skipped: ZCode\n"
+	}
+	if got := stdout.String(); got != want {
+		t.Fatalf("stdout = %q; want %q", got, want)
+	}
+}
+
+func TestRunAddInteractiveOutputUsesPreInstallationDetectionSnapshot(t *testing.T) {
+	project := t.TempDir()
+	source := filepath.Join(t.TempDir(), "snapshot-output")
+	writeAddOutputSkill(t, source, "snapshot-output")
+	isolateAddOutputEnvironment(t)
+	t.Chdir(project)
+
+	var stdout, stderr bytes.Buffer
+	code := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr, Interactive: true}, []string{source, "--global", "--yes"})
+	if code != 0 || stderr.String() != "" {
+		t.Fatalf("runAdd = %d stdout %q stderr %q", code, stdout.String(), stderr.String())
+	}
+	detected := []string{}
+	if _, err := os.Stat("/etc/codex"); err == nil {
+		detected = append(detected, "Codex")
+	}
+	if _, err := os.Stat("/Applications/ZCode.app"); err == nil {
+		detected = append(detected, "ZCode")
+	}
+	agents := strings.Join(detected, ", ")
+	if agents == "" {
+		agents = "none"
+	}
+	want := "Installed snapshot-output\n  Agents: " + agents + "\n"
+	if got := stdout.String(); got != want {
+		t.Fatalf("stdout = %q; want %q", got, want)
+	}
+}
+
+func TestRunAddAutomaticGlobalInstallIncludesPiUniversalConsumer(t *testing.T) {
+	project := t.TempDir()
+	source := filepath.Join(t.TempDir(), "global-pi-output")
+	writeAddOutputSkill(t, source, "global-pi-output")
+	home := isolateAddOutputEnvironment(t)
+	if err := os.MkdirAll(filepath.Join(home, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(project)
+
+	var stdout, stderr bytes.Buffer
+	code := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr, Interactive: true}, []string{source, "--global", "--yes"})
+	if code != 0 || stderr.String() != "" {
+		t.Fatalf("runAdd = %d stdout %q stderr %q", code, stdout.String(), stderr.String())
+	}
+	for _, line := range strings.Split(stdout.String(), "\n") {
+		if strings.HasPrefix(line, "  Agents:") && strings.Contains(line, "Pi") {
+			t.Fatalf("undetected Pi was reported as installed: %q", stdout.String())
+		}
+	}
+	piSkill := filepath.Join(home, ".pi", "agent", "skills", "global-pi-output", "SKILL.md")
+	if _, err := os.Stat(piSkill); err != nil {
+		t.Fatalf("automatic global add did not install for Pi at %s: %v", piSkill, err)
+	}
+}
+
+func TestRunAddInteractiveOutputReportsPromptedWildcardSelection(t *testing.T) {
+	project := t.TempDir()
+	source := filepath.Join(t.TempDir(), "wildcard-output")
+	writeAddOutputSkill(t, source, "wildcard-output")
+	home := isolateAddOutputEnvironment(t)
+	if detected := state.DetectedAgentIDs(state.InspectOptions{Scope: state.Project, Project: project, Home: home, XDGConfigHome: os.Getenv("XDG_CONFIG_HOME")}); len(detected) > 0 {
+		t.Skipf("system-wide agent detection prevents the selection prompt: %v", detected)
+	}
+	t.Chdir(project)
+
+	var stdout, stderr bytes.Buffer
+	code := runAdd(Invocation{Stdin: bytes.NewBufferString("*\n"), Stdout: &stdout, Stderr: &stderr, Interactive: true}, []string{source})
+	if code != 0 || stderr.String() != "" {
+		t.Fatalf("runAdd = %d stdout %q stderr %q", code, stdout.String(), stderr.String())
+	}
+	if got := stdout.String(); strings.Contains(got, "  Agents: none\n") || !strings.Contains(got, "  Agents:") {
+		t.Fatalf("prompted wildcard selection was not reported: %q", got)
 	}
 }
 
@@ -347,12 +458,12 @@ func TestRunAddInteractiveOutputReportsNoneWhenEverySelectedAgentIsSkipped(t *te
 	t.Chdir(project)
 
 	var stdout, stderr bytes.Buffer
-	code := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr, Interactive: true}, []string{source, "--agent", "pi", "--yes"})
+	code := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr, Interactive: true}, []string{source, "--agent", "junie", "--yes"})
 	if code != 0 || stderr.String() != "" {
 		t.Fatalf("runAdd = %d stdout %q stderr %q", code, stdout.String(), stderr.String())
 	}
-	want := "Installed alpha\n  Agents: none\n  Skipped: Pi\n" +
-		"Installed beta\n  Agents: none\n  Skipped: Pi\n"
+	want := "Installed alpha\n  Agents: none\n  Skipped: Junie\n" +
+		"Installed beta\n  Agents: none\n  Skipped: Junie\n"
 	if got := stdout.String(); got != want {
 		t.Fatalf("stdout = %q; want %q", got, want)
 	}

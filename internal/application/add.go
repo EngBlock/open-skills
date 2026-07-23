@@ -309,12 +309,13 @@ func runAdd(invocation Invocation, arguments []string) int {
 		}
 	}
 	return runWithStateAndInstallationLocks(invocation, lockPath, installationBases, advisoryLockExclusive, func() int {
-		agents, err := selectInstallAgents(invocation, options, scope, project, home)
+		agentSelection, err := selectInstallAgentSelection(invocation, options, scope, project, home)
 		if err != nil {
 			recordAutomationError(invocation, err, "invalid_agent")
 			_, _ = fmt.Fprintln(invocation.Stderr, err)
 			return 1
 		}
+		agents := agentSelection.Agents
 		if _, err := authorizeSourceReplacements(invocation, selected, provenance, scope, project, home, options); err != nil {
 			recordStateOrAutomationError(invocation, err, "replacement_requires_authorization")
 			_, _ = fmt.Fprintln(invocation.Stderr, err)
@@ -394,13 +395,23 @@ func runAdd(invocation Invocation, arguments []string) int {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Read committed installation state: %v\n", err)
 			return 1
 		}
+		reportedAgents := agentSelection.Reported
+		reported := make(map[string]bool, len(reportedAgents))
+		for _, agent := range reportedAgents {
+			reported[agent] = true
+		}
 		for _, skill := range selected {
 			entry := committedState.Entry(skill.Name)
 			if entry == nil {
 				_, _ = fmt.Fprintf(invocation.Stderr, "Read committed installation state: missing entry for %s\n", skill.Name)
 				return 1
 			}
-			installedAgents := entry.Agents
+			installedAgents := make([]string, 0, len(entry.Agents))
+			for _, agent := range entry.Agents {
+				if reported[agent] {
+					installedAgents = append(installedAgents, agent)
+				}
+			}
 			agentText := formatAgentNames(displayAgentNames(installedAgents))
 			if agentText == "" {
 				agentText = "none"
@@ -411,7 +422,7 @@ func runAdd(invocation Invocation, arguments []string) int {
 				installed[agent] = true
 			}
 			skippedAgents := []string{}
-			for _, agent := range orderedAgentIDs(agents) {
+			for _, agent := range orderedAgentIDs(reportedAgents) {
 				if !installed[agent] {
 					skippedAgents = append(skippedAgents, agent)
 				}
@@ -915,18 +926,31 @@ func readInputLine(input io.Reader) (string, error) {
 	return bufio.NewReader(input).ReadString('\n')
 }
 
+type installAgentSelection struct {
+	Agents   []string
+	Reported []string
+}
+
 func selectInstallAgents(invocation Invocation, options addOptions, scope state.Scope, project, home string) ([]string, error) {
+	selection, err := selectInstallAgentSelection(invocation, options, scope, project, home)
+	return selection.Agents, err
+}
+
+func selectInstallAgentSelection(invocation Invocation, options addOptions, scope state.Scope, project, home string) (installAgentSelection, error) {
 	if scope == state.Global && len(options.Subagents) > 0 {
-		return nil, fmt.Errorf("Eve subagents do not support global installation")
+		return installAgentSelection{}, fmt.Errorf("Eve subagents do not support global installation")
 	}
+	explicit := len(options.Agents) > 0 || len(options.Subagents) > 0
 	requested := append([]string(nil), options.Agents...)
 	if len(options.Subagents) > 0 && !contains(requested, "eve") && !contains(requested, "*") {
 		requested = append(requested, "eve")
 	}
+	reported := append([]string(nil), requested...)
 	if len(requested) == 0 {
 		requested = state.DetectedAgentIDs(state.InspectOptions{
 			Scope: scope, Project: project, Home: home, XDGConfigHome: os.Getenv("XDG_CONFIG_HOME"),
 		})
+		reported = append([]string(nil), requested...)
 		detectedEve := contains(requested, "eve")
 		if len(requested) == 0 && options.Yes {
 			requested = state.AgentIDs()
@@ -935,21 +959,23 @@ func selectInstallAgents(invocation Invocation, options addOptions, scope state.
 		// than adding the shared universal directory alongside it.
 		if detectedEve {
 			requested = []string{"eve"}
+			reported = []string{"eve"}
 		} else if len(requested) > 0 {
 			// npm automatically includes all universal consumers when it detects agents.
 			requested = append(requested, state.UniversalAgentIDs(scope)...)
 		} else {
 			if invocation.JSON {
-				return nil, automationError("selection_required", "no install agent was detected; select agents with --agent")
+				return installAgentSelection{}, automationError("selection_required", "no install agent was detected; select agents with --agent")
 			}
 			_, _ = fmt.Fprint(invocation.Stdout, "Select agents to install (or * for all): ")
 			line, err := readInputLine(invocation.Stdin)
 			if err != nil && err != io.EOF {
-				return nil, err
+				return installAgentSelection{}, err
 			}
 			requested = strings.FieldsFunc(strings.TrimSpace(line), func(r rune) bool { return r == ',' || r == ' ' })
+			reported = append([]string(nil), requested...)
 			if len(requested) == 0 {
-				return nil, fmt.Errorf("installation cancelled; select agents with --agent or use --yes")
+				return installAgentSelection{}, fmt.Errorf("installation cancelled; select agents with --agent or use --yes")
 			}
 		}
 	}
@@ -961,20 +987,34 @@ func selectInstallAgents(invocation Invocation, options addOptions, scope state.
 	seen := make(map[string]bool, len(requested))
 	for _, agent := range requested {
 		if !state.IsAgentID(agent) {
-			return nil, fmt.Errorf("Invalid agents: %s", agent)
+			return installAgentSelection{}, fmt.Errorf("Invalid agents: %s", agent)
 		}
 		if !state.AgentSupportedInScope(agent, scope) {
 			if contains(options.Agents, "*") || (len(options.Agents) == 0 && options.Yes) {
 				continue
 			}
-			return nil, fmt.Errorf("agent %q does not support %s installation", agent, scope)
+			return installAgentSelection{}, fmt.Errorf("agent %q does not support %s installation", agent, scope)
 		}
 		if !seen[agent] {
 			seen[agent] = true
 			selected = append(selected, agent)
 		}
 	}
-	return selected, nil
+	if explicit || contains(reported, "*") {
+		reported = append([]string(nil), selected...)
+	} else {
+		reportable := make(map[string]bool, len(reported))
+		for _, agent := range reported {
+			reportable[agent] = true
+		}
+		reported = reported[:0]
+		for _, agent := range selected {
+			if reportable[agent] {
+				reported = append(reported, agent)
+			}
+		}
+	}
+	return installAgentSelection{Agents: selected, Reported: reported}, nil
 }
 
 func contains(values []string, want string) bool {

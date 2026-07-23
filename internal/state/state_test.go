@@ -9,6 +9,22 @@ import (
 	"testing"
 )
 
+func TestPiUsesStandardSharedProjectSkillsDirectory(t *testing.T) {
+	project := t.TempDir()
+	home := t.TempDir()
+	path, shared, supported := AgentSkillsPath("pi", Project, project, home, "")
+	if !supported || !shared || path != filepath.Join(project, ".agents", "skills") {
+		t.Fatalf("Pi project path = %q, shared %v, supported %v", path, shared, supported)
+	}
+	path, shared, supported = AgentSkillsPath("pi", Global, project, home, "")
+	if !supported || shared || path != filepath.Join(home, ".pi", "agent", "skills") {
+		t.Fatalf("Pi global path = %q, shared %v, supported %v", path, shared, supported)
+	}
+	if !containsString(UniversalAgentIDs(Global), "pi") {
+		t.Fatal("Pi is missing from global universal consumers")
+	}
+}
+
 func TestGlobalStateAcceptsEmptyFolderHashAndPreservesUnknownFields(t *testing.T) {
 	original := []byte(`{
   "version": 3,

@@ -262,11 +262,11 @@ func TestSyncTransactionFaultsLeavePriorContentAndLockUnchanged(t *testing.T) {
 
 func TestAddPreflightsEveryDestinationBeforeStaging(t *testing.T) {
 	project, source := transactionFixture(t, "first")
-	if err := os.WriteFile(filepath.Join(project, ".pi"), []byte("not a directory"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(project, ".junie"), []byte("not a directory"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	code, _, stderr := runTransactionCommand(t, project, []string{"add", source, "--agent", "universal", "pi", "--copy", "--yes"})
+	code, _, stderr := runTransactionCommand(t, project, []string{"add", source, "--agent", "universal", "junie", "--copy", "--yes"})
 	if code != 1 || !strings.Contains(stderr, "preflight installation destination") {
 		t.Fatalf("obstructed add = %d stderr %q", code, stderr)
 	}
@@ -275,10 +275,10 @@ func TestAddPreflightsEveryDestinationBeforeStaging(t *testing.T) {
 
 func TestAddPreflightIgnoresSkippedProjectAdapter(t *testing.T) {
 	project, source := transactionFixture(t, "first")
-	if err := os.WriteFile(filepath.Join(project, ".pi"), []byte("not a directory"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(project, ".junie"), []byte("not a directory"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	code, _, stderr := runTransactionCommand(t, project, []string{"add", source, "--agent", "pi", "--yes"})
+	code, _, stderr := runTransactionCommand(t, project, []string{"add", source, "--agent", "junie", "--yes"})
 	if code != 0 || stderr != "" {
 		t.Fatalf("skipped-adapter add = %d stderr %q", code, stderr)
 	}
