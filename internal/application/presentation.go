@@ -59,6 +59,7 @@ Add Options:
   -g, --global           Install skill globally (user-level) instead of project-level
   -a, --agent <agents>   Specify agents to install to (use '*' for all agents)
   -s, --skill <skills>   Specify skill names to install (use '*' for all skills)
+  --skill-path <paths>   Select exact repository-relative skill directories
   -l, --list             List available skills in the repository without installing
   -y, --yes              Skip confirmation prompts
   --copy                 Copy files instead of symlinking to agent directories
@@ -68,6 +69,7 @@ Add Options:
 
 Use Options:
   -s, --skill <skill>    Specify the skill to use
+  --skill-path <path>    Select an exact repository-relative skill directory
   -a, --agent <agent>    Start one supported agent interactively
   --full-depth           Search all subdirectories even when a root SKILL.md exists
   --trust                Approve one exact remote source commit for agent use

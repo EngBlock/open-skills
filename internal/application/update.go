@@ -302,6 +302,16 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 			byPath[filepath.ToSlash(relative)] = skill
 		}
 	}
+	selected := make([]localSkill, 0, len(names))
+	for _, name := range names {
+		if skill, found := byPath[snapshot.Lock.Skills[name].SkillPath]; found {
+			selected = append(selected, skill)
+		}
+	}
+	if err := ensureNoSelectedCollisions(selected); err != nil {
+		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", source, err)
+		return updateResult{checked: len(names), failed: len(names)}
+	}
 
 	result := updateResult{checked: len(names)}
 	for _, name := range names {
@@ -468,6 +478,16 @@ func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names
 	byName := map[string]localSkill{}
 	for _, skill := range discovered {
 		byName[skill.Name] = skill
+	}
+	selected := make([]localSkill, 0, len(names))
+	for _, name := range names {
+		if skill, found := byName[name]; found {
+			selected = append(selected, skill)
+		}
+	}
+	if err := ensureNoSelectedCollisions(selected); err != nil {
+		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", source, err)
+		return updateResult{checked: len(names), failed: len(names)}
 	}
 	result := updateResult{checked: len(names)}
 	for _, name := range names {

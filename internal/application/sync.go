@@ -43,6 +43,14 @@ func runSync(invocation Invocation, arguments []string) int {
 		_, _ = fmt.Fprintln(invocation.Stdout, "No skills found")
 		return 0
 	}
+	discovered := make([]localSkill, 0, len(skills))
+	for _, skill := range skills {
+		discovered = append(discovered, skill.localSkill)
+	}
+	if err := ensureNoSelectedCollisions(discovered); err != nil {
+		_, _ = fmt.Fprintf(invocation.Stderr, "Scan node_modules for skills: %v\n", err)
+		return 1
+	}
 	lock, err := state.Read(filepath.Join(project, "skills-lock.json"), 1)
 	if err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Read skills-lock.json: %v\n", err)
@@ -144,21 +152,20 @@ func discoverNodeModuleSkills(nodeModules string) ([]nodeModuleSkill, error) {
 		return nil, err
 	}
 	result := []nodeModuleSkill{}
-	seen := make(map[string]bool)
 	for _, packageDir := range packages {
 		for _, skill := range discoverPackageSkills(packageDir.path) {
-			if seen[skill.Name] {
-				continue
-			}
-			seen[skill.Name] = true
+			skill.RelativePath = filepath.ToSlash(filepath.Join("node_modules", filepath.FromSlash(packageDir.name), filepath.FromSlash(skill.RelativePath)))
 			result = append(result, nodeModuleSkill{localSkill: skill, Package: packageDir.name})
 		}
 	}
 	sort.Slice(result, func(i, j int) bool {
-		if result[i].Package == result[j].Package {
+		if result[i].Package != result[j].Package {
+			return result[i].Package < result[j].Package
+		}
+		if result[i].Name != result[j].Name {
 			return result[i].Name < result[j].Name
 		}
-		return result[i].Package < result[j].Package
+		return result[i].RelativePath < result[j].RelativePath
 	})
 	return result, nil
 }
@@ -215,14 +222,16 @@ func resolvedDirectory(path string) (string, bool) {
 
 func discoverPackageSkills(packageDir string) []localSkill {
 	result := []localSkill{}
-	seen := make(map[string]bool)
 	add := func(directory string) {
 		name, ok := readSkill(directory)
-		if !ok || seen[name] {
+		if !ok {
 			return
 		}
-		seen[name] = true
-		result = append(result, localSkill{Name: name, Path: directory})
+		relative, err := filepath.Rel(packageDir, directory)
+		if err != nil {
+			return
+		}
+		result = append(result, localSkill{Name: name, Path: directory, RelativePath: filepath.ToSlash(relative)})
 	}
 	add(packageDir)
 	if len(result) > 0 {
@@ -239,7 +248,12 @@ func discoverPackageSkills(packageDir string) []localSkill {
 			}
 		}
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Name != result[j].Name {
+			return result[i].Name < result[j].Name
+		}
+		return result[i].RelativePath < result[j].RelativePath
+	})
 	return result
 }
 

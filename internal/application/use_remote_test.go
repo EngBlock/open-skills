@@ -176,7 +176,7 @@ func TestInstalledApprovalDoesNotApplyToDifferentSkillPathAtSameCommit(t *testin
 	t.Cleanup(func() { useAgentConfigs["codex"] = original })
 
 	var stdout, stderr bytes.Buffer
-	exit := runUse(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{source + "#" + commit, "--agent", "codex"})
+	exit := runUse(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{source + "#" + commit, "--skill-path", "skills/a", "--agent", "codex"})
 	if exit != 1 || stdout.String() != "" || !strings.Contains(stderr.String(), "--trust") {
 		t.Fatalf("different skill path = exit %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
 	}

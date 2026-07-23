@@ -277,6 +277,50 @@ func TestCheckUsesDirectWellKnownFallbackWithoutAnIndex(t *testing.T) {
 	}
 }
 
+func TestUpdateRejectsNewNormalizedCollisionsBeforeMutation(t *testing.T) {
+	repository := filepath.Join(t.TempDir(), "repository")
+	for _, fixture := range []struct{ path, name string }{{"skills/one", "alpha"}, {"skills/two", "beta"}} {
+		directory := filepath.Join(repository, filepath.FromSlash(fixture.path))
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		contents := "---\nname: " + fixture.name + "\ndescription: update collision\n---\n# " + fixture.name + "\n"
+		if err := os.WriteFile(filepath.Join(directory, "SKILL.md"), []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	runFixtureGit(t, repository, "init", "-q", "-b", "main")
+	runFixtureGit(t, repository, "add", ".")
+	runFixtureGit(t, repository, "commit", "-q", "-m", "initial")
+	initial := strings.TrimSpace(runFixtureGit(t, repository, "rev-parse", "HEAD"))
+	project, home := updateTestDirectories(t)
+	installGitFixture(t, project, home, repository, initial, "universal")
+
+	for _, fixture := range []struct{ path, name string }{{"skills/one", "same name"}, {"skills/two", "same/name"}} {
+		contents := "---\nname: " + fixture.name + "\ndescription: update collision\n---\n# changed\n"
+		if err := os.WriteFile(filepath.Join(repository, filepath.FromSlash(fixture.path), "SKILL.md"), []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	runFixtureGit(t, repository, "add", ".")
+	runFixtureGit(t, repository, "commit", "-q", "-m", "collision")
+
+	var stdout, stderr bytes.Buffer
+	exit := Run(nil, Invocation{Args: []string{"update", "--project", "--yes"}, Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr})
+	if exit != 1 || !strings.Contains(stderr.String(), "skills/one") || !strings.Contains(stderr.String(), "skills/two") {
+		t.Fatalf("collision update = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+	for _, name := range []string{"alpha", "beta"} {
+		data, err := os.ReadFile(filepath.Join(project, ".agents", "skills", name, "SKILL.md"))
+		if err != nil || !strings.Contains(string(data), "name: "+name) {
+			t.Fatalf("installed %s changed before collision failure: %q, %v", name, data, err)
+		}
+		if got := readUpdateLock(t, filepath.Join(project, "skills-lock.json"), name).Ref; got != initial {
+			t.Fatalf("lock ref for %s = %q, want %q", name, got, initial)
+		}
+	}
+}
+
 func updateTestDirectories(t *testing.T) (string, string) {
 	t.Helper()
 	project, home := t.TempDir(), t.TempDir()

@@ -1,6 +1,6 @@
 # Native development
 
-The native preview is a standard-library-only Go module. Its supported seam is the built `open-skills` process; packages under `internal/` are implementation details and do not promise a public Go interface.
+The native preview is a Go module with one pinned dependency, `golang.org/x/text`, for Unicode normalization and case folding. Its supported seam is the built `open-skills` process; packages under `internal/` are implementation details and do not promise a public Go interface.
 
 Build and smoke-test the standalone executable without a Node runtime:
 

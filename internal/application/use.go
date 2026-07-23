@@ -19,6 +19,7 @@ import (
 
 type useOptions struct {
 	Skill                          string
+	SkillPath                      string
 	Agent                          []string
 	FullDepth                      bool
 	Trust                          bool
@@ -66,6 +67,7 @@ func runUse(invocation Invocation, arguments []string) int {
 	rawSource := source[0]
 	displaySource := rawSource
 	root := ""
+	repositoryRoot := ""
 	selector := options.Skill
 	var remote *remoteUseProvenance
 	remoteIdentity := ""
@@ -83,6 +85,7 @@ func runUse(invocation Invocation, arguments []string) int {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Local path does not exist: %s\n", root)
 			return 1
 		}
+		repositoryRoot = root
 	} else if wellKnown, matches, parseErr := parseWellKnownSource(rawSource); matches {
 		if parseErr != nil {
 			_, _ = fmt.Fprintln(invocation.Stderr, parseErr)
@@ -105,6 +108,7 @@ func runUse(invocation Invocation, arguments []string) int {
 			return 1
 		}
 		defer os.RemoveAll(root)
+		repositoryRoot = root
 		remoteIdentity = wellKnown.identity
 		displaySource = wellKnown.identity
 	} else {
@@ -130,6 +134,7 @@ func runUse(invocation Invocation, arguments []string) int {
 		}
 		defer workspace.remove()
 		root = workspace.Root
+		repositoryRoot = workspace.Root
 		if git.Subpath != "" {
 			root = filepath.Join(root, filepath.FromSlash(git.Subpath))
 			info, statErr := os.Stat(root)
@@ -144,11 +149,14 @@ func runUse(invocation Invocation, arguments []string) int {
 	}
 
 	skills, err := discoverLocalSkills(root, options.FullDepth)
+	if err == nil {
+		err = assignRepositoryRelativePaths(skills, repositoryRoot)
+	}
 	if err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Discover skills: %v\n", err)
 		return 1
 	}
-	selected, err := selectUseSkill(skills, selector, displaySource)
+	selected, err := selectUseSkill(skills, selector, options.SkillPath, displaySource)
 	if err != nil {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
@@ -225,6 +233,18 @@ func parseUseOptions(arguments []string) ([]string, useOptions, []string) {
 			}
 			index++
 			options.Skill = arguments[index]
+		case "--skill-path":
+			if index+1 >= len(arguments) || strings.HasPrefix(arguments[index+1], "-") {
+				errors = append(errors, argument+" requires a repository-relative skill path")
+				continue
+			}
+			if options.SkillPath != "" {
+				errors = append(errors, "Only one --skill-path value can be provided")
+				index++
+				continue
+			}
+			index++
+			options.SkillPath = arguments[index]
 		case "--agent", "-a":
 			start := len(options.Agent)
 			for index+1 < len(arguments) && !strings.HasPrefix(arguments[index+1], "-") {
@@ -241,6 +261,10 @@ func parseUseOptions(arguments []string) ([]string, useOptions, []string) {
 				source = append(source, argument)
 			}
 		}
+	}
+
+	if options.Skill != "" && options.SkillPath != "" {
+		errors = append(errors, "Provide either --skill or --skill-path, not both")
 	}
 
 	if len(options.Agent) > 0 {
@@ -276,31 +300,56 @@ func isOpenClawGitSource(source gitSource) bool {
 	return strings.EqualFold(owner, "openclaw")
 }
 
-func selectUseSkill(skills []localSkill, selector, source string) (localSkill, error) {
+func selectUseSkill(skills []localSkill, selector, skillPath, source string) (localSkill, error) {
 	if len(skills) == 0 {
 		return localSkill{}, errors.New("No valid skills found. Skills require a SKILL.md with name and description.")
+	}
+	if selector != "" && skillPath != "" {
+		return localSkill{}, errors.New("Provide either --skill or --skill-path, not both")
+	}
+	if skillPath != "" {
+		selected, err := selectSkillsByPath(skills, []string{skillPath})
+		if err != nil {
+			return localSkill{}, err
+		}
+		return selected[0], nil
 	}
 	if selector == "" {
 		if len(skills) == 1 {
 			return skills[0], nil
 		}
 		names := skillNamesSlice(skills)
-		return localSkill{}, fmt.Errorf("This source contains multiple skills. Specify exactly one skill:\n%s\n\nExamples:\n  open-skills use %s@%s\n  open-skills use %s --skill %s", listSkillNames(names), source, names[0], source, names[0])
+		return localSkill{}, fmt.Errorf("This source contains multiple skills. Specify exactly one skill:\n%s\n\nExamples:\n  open-skills use %s@%s\n  open-skills use %s --skill %s\n  open-skills use %s --skill-path %s", listSkillNames(skillLabelsWithCollisionPaths(skills)), source, names[0], source, names[0], source, skills[0].RelativePath)
 	}
 
 	matches := []localSkill{}
+	key := normalizedSkillName(selector)
 	for _, skill := range skills {
-		if strings.EqualFold(skill.Name, selector) {
+		if normalizedSkillName(skill.Name) == key {
 			matches = append(matches, skill)
 		}
 	}
 	if len(matches) == 0 {
-		return localSkill{}, fmt.Errorf("No matching skill found for: %s\nAvailable skills:\n%s", selector, listSkillNames(skillNamesSlice(skills)))
+		return localSkill{}, fmt.Errorf("No matching skill found for: %s\nAvailable skills:\n%s", selector, listSkillNames(skillLabelsWithCollisionPaths(skills)))
 	}
 	if len(matches) > 1 {
-		return localSkill{}, fmt.Errorf("Skill selector %q matched multiple skills.", selector)
+		return localSkill{}, formatSkillAmbiguity(selector, matches)
 	}
 	return matches[0], nil
+}
+
+func skillLabelsWithCollisionPaths(skills []localSkill) []string {
+	labels := make([]string, 0, len(skills))
+	colliding := collidingSkillPaths(skills)
+	for _, skill := range skills {
+		label := displaySkillName(skill.Name)
+		if colliding[normalizedSkillName(skill.Name)] {
+			label += " [" + displaySkillPath(skill.RelativePath) + "]"
+		}
+		labels = append(labels, label)
+	}
+	sort.Strings(labels)
+	return labels
 }
 
 func skillNamesSlice(skills []localSkill) []string {
@@ -543,6 +592,7 @@ Generate a prompt for using one skill without installing it.
 
 Options:
   -s, --skill <skill>   Select the skill to use
+  --skill-path <path>   Select an exact repository-relative skill directory
   -a, --agent <agent>   Start one supported agent interactively (claude-code, codex)
   --full-depth          Search nested directories like open-skills add --full-depth
   --trust               Approve this exact remote source commit for agent use
