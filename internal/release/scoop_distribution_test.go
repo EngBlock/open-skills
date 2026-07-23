@@ -76,6 +76,8 @@ func TestScoopSmokeValidatesManifestInstallCommandsAndUpgradeMetadata(t *testing
 		"$currentPrerelease = 'false'",
 		"Set-StrictMode -Off",
 		"New-Item (Join-Path $env:SCOOP 'shims') -ItemType Directory -Force",
+		"New-Item (Join-Path $env:SCOOP 'buckets') -ItemType Directory -Force",
+		"install --no-update-scoop $manifestFile",
 		"apps/scoop/current",
 		"-ItemType Junction",
 		"scoop.ps1",

@@ -70,6 +70,7 @@ try {
     $installedScoopCore = Join-Path $env:SCOOP 'apps/scoop/current'
     New-Item (Split-Path $installedScoopCore) -ItemType Directory -Force | Out-Null
     New-Item (Join-Path $env:SCOOP 'shims') -ItemType Directory -Force | Out-Null
+    New-Item (Join-Path $env:SCOOP 'buckets') -ItemType Directory -Force | Out-Null
     New-Item $installedScoopCore -ItemType Junction -Target $scoopCore | Out-Null
     $scoopCore = $installedScoopCore
 
@@ -109,7 +110,7 @@ try {
     New-Item (Split-Path $cacheFile) -ItemType Directory -Force | Out-Null
     Copy-Item $artifactFile $cacheFile
 
-    & (Join-Path $scoopCore 'bin/scoop.ps1') install $manifestFile
+    & (Join-Path $scoopCore 'bin/scoop.ps1') install --no-update-scoop $manifestFile
     if ($LASTEXITCODE -ne 0) {
         throw 'Scoop install failed'
     }
