@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -120,47 +119,6 @@ func installationLockLocation(scope state.Scope, project, home string) (string, 
 	return filepath.Join(home, ".agents", ".skill-lock.json"), 3
 }
 
-func withReplacementRollback(destinations []string, operation func() error) error {
-	backupRoot, err := os.MkdirTemp("", "open-skills-replacement-")
-	if err != nil {
-		return fmt.Errorf("prepare replacement rollback: %w", err)
-	}
-	defer os.RemoveAll(backupRoot)
-
-	destinations, err = uniqueReplacementPaths(destinations)
-	if err != nil {
-		return err
-	}
-	snapshots := make([]replacementSnapshot, 0, len(destinations))
-	for index, destination := range destinations {
-		snapshot := replacementSnapshot{destination: destination, backup: filepath.Join(backupRoot, fmt.Sprintf("%d", index))}
-		if _, statErr := os.Lstat(destination); statErr == nil {
-			snapshot.existed = true
-			if err := copyReplacementPath(destination, snapshot.backup); err != nil {
-				return fmt.Errorf("snapshot existing placement %s: %w", destination, err)
-			}
-		} else if !errors.Is(statErr, fs.ErrNotExist) && !hasNonDirectoryAncestor(destination) {
-			return fmt.Errorf("inspect existing placement %s: %w", destination, statErr)
-		}
-		snapshots = append(snapshots, snapshot)
-	}
-
-	operationErr := operation()
-	if operationErr == nil {
-		return nil
-	}
-	if rollbackErr := restoreReplacementSnapshots(snapshots); rollbackErr != nil {
-		return fmt.Errorf("%w; replacement rollback failed: %v", operationErr, rollbackErr)
-	}
-	return operationErr
-}
-
-type replacementSnapshot struct {
-	destination string
-	backup      string
-	existed     bool
-}
-
 func hasNonDirectoryAncestor(path string) bool {
 	for current := filepath.Dir(path); current != filepath.Dir(current); current = filepath.Dir(current) {
 		info, err := os.Lstat(current)
@@ -171,11 +129,18 @@ func hasNonDirectoryAncestor(path string) bool {
 	return false
 }
 
-func replacementPathsForSkills(skills []localSkill, scope state.Scope, base, project, home string, agents, subagents []string) ([]string, error) {
+func replacementPathsForSkills(skills []localSkill, scope state.Scope, base, project, home string, agents, subagents []string, copyMode bool) ([]string, error) {
 	result := []string{}
+	allEve := len(agents) > 0
+	for _, agent := range agents {
+		allEve = allEve && agent == "eve"
+	}
+	needsCanonical := (!copyMode && !allEve) || len(agents) == 0 || contains(agents, "universal")
 	for _, skill := range skills {
 		canonical := filepath.Join(base, ".agents", "skills", state.SanitizeName(skill.Name))
-		result = append(result, canonical)
+		if needsCanonical {
+			result = append(result, canonical)
+		}
 		for _, agent := range agents {
 			if agent == "eve" {
 				for _, subagent := range eveTargets(subagents) {
@@ -189,9 +154,12 @@ func replacementPathsForSkills(skills []localSkill, scope state.Scope, base, pro
 			}
 			if universal {
 				result = append(result, canonical)
-			} else {
-				result = append(result, filepath.Join(directory, state.SanitizeName(skill.Name)))
+				continue
 			}
+			if !copyMode && scope == state.Project && agent != "claude-code" && !state.ProjectAgentRootExists(agent, project) {
+				continue
+			}
+			result = append(result, filepath.Join(directory, state.SanitizeName(skill.Name)))
 		}
 	}
 	return uniqueReplacementPaths(result)
@@ -212,28 +180,6 @@ func uniqueReplacementPaths(paths []string) ([]string, error) {
 		}
 	}
 	return unique, nil
-}
-
-func restoreReplacementSnapshots(snapshots []replacementSnapshot) error {
-	var failures []string
-	for index := len(snapshots) - 1; index >= 0; index-- {
-		snapshot := snapshots[index]
-		if _, err := os.Lstat(snapshot.destination); err == nil {
-			if err := os.RemoveAll(snapshot.destination); err != nil {
-				failures = append(failures, fmt.Sprintf("remove %s: %v", snapshot.destination, err))
-				continue
-			}
-		}
-		if snapshot.existed {
-			if err := copyReplacementPath(snapshot.backup, snapshot.destination); err != nil {
-				failures = append(failures, fmt.Sprintf("restore %s: %v", snapshot.destination, err))
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return errors.New(strings.Join(failures, "; "))
-	}
-	return nil
 }
 
 func copyReplacementPath(source, destination string) error {
@@ -282,6 +228,10 @@ func copyReplacementPath(source, destination string) error {
 		return err
 	}
 	if _, err := io.Copy(output, input); err != nil {
+		_ = output.Close()
+		return err
+	}
+	if err := output.Chmod(info.Mode().Perm()); err != nil {
 		_ = output.Close()
 		return err
 	}

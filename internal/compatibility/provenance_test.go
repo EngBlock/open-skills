@@ -128,8 +128,8 @@ func TestNativeAddReplaceRollsBackContentAndLockWhenPlacementFails(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if observation.ExitCode != 1 || !strings.Contains(observation.Stderr, "Install provenance-skill") {
-		t.Fatalf("failed replacement = exit %d stdout %q stderr %q", observation.ExitCode, observation.Stdout, observation.Stderr)
+	if observation.ExitCode != 1 || !strings.Contains(observation.Stderr, "preflight installation destination") {
+		t.Fatalf("failed replacement preflight = exit %d stdout %q stderr %q", observation.ExitCode, observation.Stdout, observation.Stderr)
 	}
 	assertPriorProvenanceState(t, observation)
 	placement, ok := fileAt(observation, filepath.Join(observation.Paths.Project, ".claude", "skills", "provenance-skill", "SKILL.md"))

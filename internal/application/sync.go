@@ -78,16 +78,13 @@ func runSync(invocation Invocation, arguments []string) int {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
 	}
-	hasReplacement := false
 	localChanges := []localChange{}
 	for _, skill := range toInstall {
 		provenance := installationProvenance{Identity: skill.Package, URL: skill.Package, Type: "node_modules"}
-		replacement, err := authorizeSourceReplacement(invocation, skill.Name, lock.Entry(skill.Name), provenance, project, options.Replace)
-		if err != nil {
+		if _, err := authorizeSourceReplacement(invocation, skill.Name, lock.Entry(skill.Name), provenance, project, options.Replace); err != nil {
 			_, _ = fmt.Fprintln(invocation.Stderr, err)
 			return 1
 		}
-		hasReplacement = hasReplacement || replacement
 		changes, changeErr := installationLocalChanges(skill.Name, lock.Entry(skill.Name), state.Project, project, "", agents, false, nil, skill.Path)
 		if changeErr != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Inspect installed %s: %v\n", skill.Name, changeErr)
@@ -99,27 +96,21 @@ func runSync(invocation Invocation, arguments []string) int {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
 	}
-	syncSelected := func() error {
-		for _, skill := range toInstall {
-			if err := installRecordedSkill(skill.localSkill, skill.Package, "node_modules", project, agents, nil); err != nil {
-				return fmt.Errorf("Sync %s: %w", skill.Name, err)
-			}
-		}
-		return nil
+	selected := make([]localSkill, 0, len(toInstall))
+	for _, skill := range toInstall {
+		selected = append(selected, skill.localSkill)
 	}
-	if hasReplacement {
-		selected := make([]localSkill, 0, len(toInstall))
-		for _, skill := range toInstall {
-			selected = append(selected, skill.localSkill)
-		}
-		destinations, pathErr := replacementPathsForSkills(selected, state.Project, project, project, "", agents, nil)
-		if pathErr == nil {
-			destinations = append(destinations, filepath.Join(project, "skills-lock.json"))
-			pathErr = withReplacementRollback(destinations, syncSelected)
-		}
-		err = pathErr
-	} else {
-		err = syncSelected()
+	lockPath := filepath.Join(project, "skills-lock.json")
+	destinations, err := replacementPathsForSkills(selected, state.Project, project, project, "", agents, nil, false)
+	if err == nil {
+		err = withInstallationTransaction(lockPath, destinations, func(transaction *installationTransaction) error {
+			for _, skill := range toInstall {
+				if err := installRecordedSkillTransaction(skill.localSkill, skill.Package, "node_modules", project, agents, nil, transaction); err != nil {
+					return fmt.Errorf("Sync %s: %w", skill.Name, err)
+				}
+			}
+			return nil
+		})
 	}
 	if err != nil {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
@@ -399,8 +390,12 @@ func localSkillNamed(source, name string) (localSkill, bool) {
 }
 
 func installRecordedSkill(skill localSkill, source, sourceType, project string, agents, subagents []string) error {
+	return installRecordedSkillTransaction(skill, source, sourceType, project, agents, subagents, nil)
+}
+
+func installRecordedSkillTransaction(skill localSkill, source, sourceType, project string, agents, subagents []string, transaction *installationTransaction) error {
 	provenance := installationProvenance{Identity: source, URL: source, Type: sourceType}
-	if err := installLocalSkill(skill, provenance, state.Project, project, project, "", agents, false, subagents); err != nil {
+	if err := installLocalSkillTransaction(skill, provenance, state.Project, project, project, "", agents, false, subagents, transaction); err != nil {
 		return err
 	}
 	hash, owned, err := contentIdentity(skill.Path)
@@ -408,7 +403,12 @@ func installRecordedSkill(skill localSkill, source, sourceType, project string, 
 		return err
 	}
 	lockPath := filepath.Join(project, "skills-lock.json")
-	lock, err := state.Read(lockPath, 1)
+	var lock *state.Document
+	if transaction != nil {
+		lock, err = transaction.readState(lockPath, 1)
+	} else {
+		lock, err = state.Read(lockPath, 1)
+	}
 	if err != nil {
 		return err
 	}
@@ -416,15 +416,22 @@ func installRecordedSkill(skill localSkill, source, sourceType, project string, 
 	if actual == nil {
 		return fmt.Errorf("installation did not record %s", skill.Name)
 	}
-	return recordAndWrite(lock, lockPath, skill.Name, state.InstallationRecord{
+	return recordAndWriteTransaction(lock, lockPath, skill.Name, state.InstallationRecord{
 		Source: source, SourceType: sourceType, InstalledContentHash: hash, OwnedFiles: owned,
 		InstalledPlacements: actual.InstalledPlacements, Agents: actual.Agents, Subagents: recordedEveTargets(actual.Agents, subagents),
-	})
+	}, transaction)
 }
 
 func recordAndWrite(lock *state.Document, path, name string, record state.InstallationRecord) error {
+	return recordAndWriteTransaction(lock, path, name, record, nil)
+}
+
+func recordAndWriteTransaction(lock *state.Document, path, name string, record state.InstallationRecord, transaction *installationTransaction) error {
 	if err := lock.RecordInstallation(name, record); err != nil {
 		return err
+	}
+	if transaction != nil {
+		return transaction.writeState(lock, path)
 	}
 	return lock.Write(path)
 }

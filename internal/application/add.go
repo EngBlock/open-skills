@@ -254,8 +254,7 @@ func runAdd(invocation Invocation, arguments []string) int {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
 	}
-	replacements, err := authorizeSourceReplacements(invocation, selected, provenance, scope, project, home, options)
-	if err != nil {
+	if _, err := authorizeSourceReplacements(invocation, selected, provenance, scope, project, home, options); err != nil {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
 	}
@@ -278,28 +277,20 @@ func runAdd(invocation Invocation, arguments []string) int {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
 	}
-	installSelected := func() error {
-		for _, skill := range selected {
-			skillProvenance := provenance
-			if sourceURL, ok := wellKnownURLs[skill.Name]; ok {
-				skillProvenance.URL = sourceURL
+	destinations, err := replacementPathsForSkills(selected, scope, base, project, home, agents, options.Subagents, options.Copy)
+	if err == nil {
+		err = withInstallationTransaction(lockPath, destinations, func(transaction *installationTransaction) error {
+			for _, skill := range selected {
+				skillProvenance := provenance
+				if sourceURL, ok := wellKnownURLs[skill.Name]; ok {
+					skillProvenance.URL = sourceURL
+				}
+				if err := installLocalSkillTransaction(skill, skillProvenance, scope, base, project, home, agents, options.Copy, options.Subagents, transaction); err != nil {
+					return fmt.Errorf("Install %s: %w", skill.Name, err)
+				}
 			}
-			if err := installLocalSkill(skill, skillProvenance, scope, base, project, home, agents, options.Copy, options.Subagents); err != nil {
-				return fmt.Errorf("Install %s: %w", skill.Name, err)
-			}
-		}
-		return nil
-	}
-	if len(replacements) > 0 {
-		destinations, pathErr := replacementPathsForSkills(selected, scope, base, project, home, agents, options.Subagents)
-		if pathErr == nil {
-			lockPath, _ := installationLockLocation(scope, project, home)
-			destinations = append(destinations, lockPath)
-			pathErr = withReplacementRollback(destinations, installSelected)
-		}
-		err = pathErr
-	} else {
-		err = installSelected()
+			return nil
+		})
 	}
 	if err != nil {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
@@ -842,6 +833,10 @@ type installationProvenance struct {
 }
 
 func installLocalSkill(skill localSkill, provenance installationProvenance, scope state.Scope, base, project, home string, agents []string, copyMode bool, subagents []string) error {
+	return installLocalSkillTransaction(skill, provenance, scope, base, project, home, agents, copyMode, subagents, nil)
+}
+
+func installLocalSkillTransaction(skill localSkill, provenance installationProvenance, scope state.Scope, base, project, home string, agents []string, copyMode bool, subagents []string, transaction *installationTransaction) error {
 	if provenance.Type != "local" {
 		provenance.Identity = credentialFreeSource(provenance.Identity)
 		provenance.URL = credentialFreeSource(provenance.URL)
@@ -864,7 +859,7 @@ func installLocalSkill(skill localSkill, provenance installationProvenance, scop
 	}
 	needsCanonical := (!copyMode && !allEve) || len(agents) == 0 || contains(agents, "universal")
 	if needsCanonical && !pathsOverlap(skill.Path, canonical) {
-		if err := content.replaceDirectory(canonical); err != nil {
+		if _, err := installSkillDirectory(transaction, content, canonical); err != nil {
 			return err
 		}
 	}
@@ -876,7 +871,7 @@ func installLocalSkill(skill localSkill, provenance installationProvenance, scop
 				if pathsOverlap(skill.Path, destination) {
 					continue
 				}
-				if err := replaceEveDirectoryFromContent(content, destination); err != nil {
+				if err := replaceEveDirectoryFromContent(transaction, content, destination); err != nil {
 					return err
 				}
 			}
@@ -892,7 +887,7 @@ func installLocalSkill(skill localSkill, provenance installationProvenance, scop
 			// Universal adapters share canonical content in both project and global scope.
 			destination = canonical
 			if !pathsOverlap(skill.Path, destination) {
-				if err := content.replaceDirectory(destination); err != nil {
+				if _, err := installSkillDirectory(transaction, content, destination); err != nil {
 					return err
 				}
 			}
@@ -907,11 +902,15 @@ func installLocalSkill(skill localSkill, provenance installationProvenance, scop
 			continue
 		}
 		if copyMode {
-			if err := content.replaceDirectory(destination); err != nil {
+			if _, err := installSkillDirectory(transaction, content, destination); err != nil {
 				return err
 			}
 		} else if !sameLocalPath(canonical, destination) {
-			if err := replaceWithSymlink(canonical, destination); err != nil {
+			if transaction != nil {
+				if err := transaction.stageSymlink(canonical, destination); err != nil {
+					return err
+				}
+			} else if err := replaceWithSymlink(canonical, destination); err != nil {
 				return err
 			}
 		}
@@ -928,7 +927,12 @@ func installLocalSkill(skill localSkill, provenance installationProvenance, scop
 		}
 	}
 	lockPath, version := installationLockLocation(scope, project, home)
-	document, err := state.Read(lockPath, version)
+	var document *state.Document
+	if transaction != nil {
+		document, err = transaction.readState(lockPath, version)
+	} else {
+		document, err = state.Read(lockPath, version)
+	}
 	if err != nil {
 		return err
 	}
@@ -952,7 +956,7 @@ func installLocalSkill(skill localSkill, provenance installationProvenance, scop
 		skillPath = filepath.ToSlash(relative)
 	}
 	recordedSubagents := recordedEveTargets(installedAgents, subagents)
-	placements, err := captureInstalledPlacements(skill.Name, scope, project, home, installedAgents, copyMode, recordedSubagents, needsCanonical)
+	placements, err := captureInstalledPlacementsTransaction(skill.Name, scope, project, home, installedAgents, copyMode, recordedSubagents, needsCanonical, transaction)
 	if err != nil {
 		return err
 	}
@@ -963,7 +967,17 @@ func installLocalSkill(skill localSkill, provenance installationProvenance, scop
 	}); err != nil {
 		return err
 	}
+	if transaction != nil {
+		return transaction.writeState(document, lockPath)
+	}
 	return document.Write(lockPath)
+}
+
+func installSkillDirectory(transaction *installationTransaction, content *skillContent, destination string) (string, error) {
+	if transaction != nil {
+		return transaction.stageDirectory(content, destination)
+	}
+	return destination, content.replaceDirectory(destination)
 }
 
 func eveTargets(subagents []string) []string {
@@ -995,11 +1009,12 @@ func recordedEveTargets(agents, subagents []string) []string {
 	return targets
 }
 
-func replaceEveDirectoryFromContent(content *skillContent, destination string) error {
-	if err := content.replaceDirectory(destination); err != nil {
+func replaceEveDirectoryFromContent(transaction *installationTransaction, content *skillContent, destination string) error {
+	installed, err := installSkillDirectory(transaction, content, destination)
+	if err != nil {
 		return err
 	}
-	skillPath := filepath.Join(destination, "SKILL.md")
+	skillPath := filepath.Join(installed, "SKILL.md")
 	contents, err := os.ReadFile(skillPath)
 	if err != nil {
 		return err

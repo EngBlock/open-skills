@@ -81,9 +81,34 @@ their current content cannot be verified.
 
 Rejected replacements leave content, placements, and lock state unchanged.
 Authorized replacements snapshot affected placements and restore them when a
-placement or atomic lock write fails. The broader crash-recovery, durable journal,
-and advisory-lock guarantees remain assigned to the later D08 transaction
-milestone.
+placement or lock write fails.
+
+## D08: crash-recoverable installation transactions
+
+Add, sync, and update finish source, content, destination, provenance, and
+local-change preflight before committing an installation placement. They stage
+every selected placement and the final lock beside its destination, then commit
+the declared write set in a deterministic order with the lock last. Fresh
+installs, same-source reinstalls, authorized cross-source replacements, and
+updates use the same transaction path.
+
+Before staging, the executable writes a durable journal under
+`$XDG_STATE_HOME/open-skills/transactions` (or
+`~/.local/state/open-skills/transactions`). The journal includes durable backups,
+the current commit step, and the exact destination/stage paths. An ordinary
+failure rolls back completed steps. After interruption, the next invocation in
+the affected project automatically restores the prior placements and lock before
+running its command; a completed transaction only needs journal cleanup.
+
+If recovery cannot restore a recorded backup, the journal and remaining backups
+are preserved and the command stops with deterministic manual cleanup
+instructions. Each destination is staged beside itself so its final rename stays
+on that destination's filesystem. A transaction spanning several filesystems is
+therefore crash-recoverable through its journal and ordered rollback, but is
+**not atomic across filesystems**; the journal records that commit model
+explicitly. On Windows, Go cannot flush directory handles, so process-interruption
+recovery is journaled but power-loss persistence retains the guarantees of the
+underlying Windows filesystem rather than a portable directory-`fsync` claim.
 
 ## D09: safe existing-state inspection
 

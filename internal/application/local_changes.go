@@ -28,6 +28,10 @@ type actualInstalledPath struct {
 }
 
 func captureInstalledPlacements(skillName string, scope state.Scope, project, home string, agents []string, copyMode bool, subagents []string, canonicalOwned bool) (map[string]state.InstalledPlacement, error) {
+	return captureInstalledPlacementsTransaction(skillName, scope, project, home, agents, copyMode, subagents, canonicalOwned, nil)
+}
+
+func captureInstalledPlacementsTransaction(skillName string, scope state.Scope, project, home string, agents []string, copyMode bool, subagents []string, canonicalOwned bool, transaction *installationTransaction) (map[string]state.InstalledPlacement, error) {
 	kinds, err := installationPlacementKinds(scope, agents, copyMode, subagents)
 	if err != nil {
 		return nil, err
@@ -46,6 +50,9 @@ func captureInstalledPlacements(skillName string, scope state.Scope, project, ho
 			path, err := logicalPlacementPath(id, skillName, scope, project, home)
 			if err != nil {
 				return nil, err
+			}
+			if transaction != nil {
+				path = transaction.readPath(path)
 			}
 			paths, err := snapshotInstalledDirectory(path)
 			if err != nil {

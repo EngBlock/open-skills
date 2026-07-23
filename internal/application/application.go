@@ -24,6 +24,10 @@ var Version = "0.1.2"
 
 func Run(ctx context.Context, invocation Invocation) int {
 	_ = ctx
+	if err := recoverPendingInstallations(); err != nil {
+		_, _ = fmt.Fprintf(invocation.Stderr, "Recover installation state: %v\n", err)
+		return 1
+	}
 	if len(invocation.Args) == 0 {
 		if !runningInAgent() {
 			_, _ = fmt.Fprint(invocation.Stdout, banner)

@@ -404,6 +404,7 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 		result.failed++
 		return result
 	}
+	updates := make([]updatedSkillInstallation, 0, len(actions))
 	for _, action := range actions {
 		if action.remove {
 			if err := removeInstalledSkill(action.name, snapshot.Lock, scope, project, home); err != nil {
@@ -412,12 +413,23 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 			}
 			continue
 		}
-		if err := refreshCheckedSkill(action.skill, action.entry, git, workspace, snapshot, scope, project, home); err != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Update %s: %v\n", action.name, err)
-			result.failed++
-			continue
+		agents := append([]string(nil), action.entry.Agents...)
+		if len(agents) == 0 {
+			agents = installedAgents(snapshot, action.skill.Name)
 		}
-		result.updated++
+		updates = append(updates, updatedSkillInstallation{
+			skill:      action.skill,
+			provenance: installationProvenance{Identity: git.Identity, URL: git.URL, Type: action.entry.SourceType, Ref: workspace.Commit, Workspace: &workspace},
+			agents:     agents, copyMode: copiedPlacementExists(action.skill.Name, agents, scope, project, home), subagents: action.entry.Subagents,
+		})
+	}
+	if len(updates) > 0 {
+		if err := installUpdatedSkills(updates, scope, project, home); err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Update %s: %v\n", displaySource, err)
+			result.failed += len(updates)
+		} else {
+			result.updated += len(updates)
+		}
 	}
 	return result
 }
@@ -468,19 +480,33 @@ func updateActionLocalChanges(action gitUpdateAction, snapshot state.Snapshot, s
 	return installationLocalChanges(action.name, &action.entry, scope, project, home, agents, copyMode, action.entry.Subagents, "")
 }
 
-func refreshCheckedSkill(skill localSkill, entry state.LockEntry, source gitSource, workspace gitWorkspace, snapshot state.Snapshot, scope state.Scope, project, home string) error {
-	agents := append([]string(nil), entry.Agents...)
-	if len(agents) == 0 {
-		agents = installedAgents(snapshot, skill.Name)
+type updatedSkillInstallation struct {
+	skill      localSkill
+	provenance installationProvenance
+	agents     []string
+	copyMode   bool
+	subagents  []string
+}
+
+func installUpdatedSkills(updates []updatedSkillInstallation, scope state.Scope, project, home string) error {
+	base := scopeBase(scope, project, home)
+	lockPath, _ := installationLockLocation(scope, project, home)
+	destinations := []string{}
+	for _, update := range updates {
+		paths, err := replacementPathsForSkills([]localSkill{update.skill}, scope, base, project, home, update.agents, update.subagents, update.copyMode)
+		if err != nil {
+			return err
+		}
+		destinations = append(destinations, paths...)
 	}
-	provenance := installationProvenance{Identity: source.Identity, URL: source.URL, Type: entry.SourceType, Ref: workspace.Commit, Workspace: &workspace}
-	if len(agents) == 0 {
-		// Older compatible locks did not record placements. Updating canonical
-		// content is still useful and avoids inventing ownership of adapters.
-		return installLocalSkill(skill, provenance, scope, scopeBase(scope, project, home), project, home, nil, false, nil)
-	}
-	copyMode := copiedPlacementExists(skill.Name, agents, scope, project, home)
-	return installLocalSkill(skill, provenance, scope, scopeBase(scope, project, home), project, home, agents, copyMode, entry.Subagents)
+	return withInstallationTransaction(lockPath, destinations, func(transaction *installationTransaction) error {
+		for _, update := range updates {
+			if err := installLocalSkillTransaction(update.skill, update.provenance, scope, base, project, home, update.agents, update.copyMode, update.subagents, transaction); err != nil {
+				return fmt.Errorf("install %s: %w", update.skill.Name, err)
+			}
+		}
+		return nil
+	})
 }
 
 func installedAgents(snapshot state.Snapshot, skillName string) []string {
@@ -628,17 +654,23 @@ func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names
 		result.failed++
 		return result
 	}
+	updates := make([]updatedSkillInstallation, 0, len(actions))
 	for _, action := range actions {
-		agents := action.entry.Agents
+		agents := append([]string(nil), action.entry.Agents...)
 		if len(agents) == 0 {
 			agents = installedAgents(snapshot, action.skill.Name)
 		}
-		if err := installLocalSkill(action.skill, installationProvenance{Identity: provider.identity, URL: credentialFreeSource(urls[action.name]), Type: action.entry.SourceType}, scope, scopeBase(scope, project, home), project, home, agents, copiedPlacementExists(action.skill.Name, agents, scope, project, home), action.entry.Subagents); err != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Update %s: %v\n", action.name, err)
-			result.failed++
-			continue
-		}
-		result.updated++
+		updates = append(updates, updatedSkillInstallation{
+			skill:      action.skill,
+			provenance: installationProvenance{Identity: provider.identity, URL: credentialFreeSource(urls[action.name]), Type: action.entry.SourceType},
+			agents:     agents, copyMode: copiedPlacementExists(action.skill.Name, agents, scope, project, home), subagents: action.entry.Subagents,
+		})
+	}
+	if err := installUpdatedSkills(updates, scope, project, home); err != nil {
+		_, _ = fmt.Fprintf(invocation.Stderr, "Update %s: %v\n", displaySource, err)
+		result.failed += len(updates)
+	} else {
+		result.updated += len(updates)
 	}
 	return result
 }

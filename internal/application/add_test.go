@@ -2,7 +2,6 @@ package application
 
 import (
 	"bytes"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -265,54 +264,6 @@ func TestRunAddInteractiveReplacementDisplaysSanitizedSourcesAndCanReject(t *tes
 	}
 	if installedLock, err := os.ReadFile(lockPath); err != nil || !bytes.Equal(installedLock, lock) {
 		t.Fatalf("rejected replacement changed prior lock: %q, %v", installedLock, err)
-	}
-}
-
-func TestReplacementRollbackRestoresEveryPlacementAndLock(t *testing.T) {
-	root := t.TempDir()
-	first := filepath.Join(root, "first")
-	second := filepath.Join(root, "second")
-	lock := filepath.Join(root, "skills-lock.json")
-	for _, directory := range []string{first, second} {
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(directory, "SKILL.md"), []byte("prior"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.WriteFile(lock, []byte("prior lock"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	failure := errors.New("injected post-write failure")
-	err := withReplacementRollback([]string{first, second, lock}, func() error {
-		for _, directory := range []string{first, second} {
-			if err := os.RemoveAll(directory); err != nil {
-				return err
-			}
-			if err := os.MkdirAll(directory, 0o755); err != nil {
-				return err
-			}
-			if err := os.WriteFile(filepath.Join(directory, "SKILL.md"), []byte("replacement"), 0o644); err != nil {
-				return err
-			}
-		}
-		if err := os.WriteFile(lock, []byte("replacement lock"), 0o600); err != nil {
-			return err
-		}
-		return failure
-	})
-	if !errors.Is(err, failure) {
-		t.Fatalf("replacement failure = %v; want %v", err, failure)
-	}
-	for _, directory := range []string{first, second} {
-		data, err := os.ReadFile(filepath.Join(directory, "SKILL.md"))
-		if err != nil || string(data) != "prior" {
-			t.Fatalf("placement %s was not restored: %q, %v", directory, data, err)
-		}
-	}
-	if data, err := os.ReadFile(lock); err != nil || string(data) != "prior lock" {
-		t.Fatalf("lock was not restored: %q, %v", data, err)
 	}
 }
 
