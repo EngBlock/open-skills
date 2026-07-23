@@ -1,8 +1,9 @@
-name: Native preview
+name: Native release
 
 on:
   push:
     tags:
+      - 'v0.2.0'
       - 'v0.2.0-*'
 
 concurrency:
@@ -16,7 +17,7 @@ permissions:
 
 jobs:
   build:
-    name: Build canonical native preview
+    name: Build canonical native release
     runs-on: ubuntu-latest
 
     steps:
@@ -37,8 +38,11 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Test native release packaging and verification
-        run: go test ./internal/release
+      - name: Pass native cutover checks
+        run: |
+          test -z "$(gofmt -l cmd internal)"
+          go vet ./...
+          go test ./... -count=1
 
       - name: Build CGO-disabled archives and smoke-test Linux x86-64
         env:
@@ -51,7 +55,8 @@ jobs:
           --homebrew-formula homebrew/open-skills.rb
           --scoop-manifest scoop/open-skills.json
 
-      - name: Verify checked package metadata
+      - name: Verify checked production package metadata
+        if: github.ref_name == 'v0.2.0'
         run: |
           cmp Formula/open-skills.rb homebrew/open-skills.rb
           cmp bucket/open-skills.json scoop/open-skills.json
@@ -186,9 +191,28 @@ jobs:
           $artifact = "native-dist/open-skills_${env:GITHUB_REF_NAME.Substring(1)}_windows_amd64.zip"
           scripts/scoop-smoke.ps1 scoop/open-skills.json $artifact scoop-core
 
-  release:
-    name: Publish canonical native preview
+  production-approval:
+    name: Approve production native cutover
+    if: github.ref_name == 'v0.2.0'
     needs: [build, homebrew, scoop]
+    runs-on: ubuntu-latest
+    environment: native-production
+    permissions:
+      contents: read
+
+    steps:
+      - name: Record protected maintainer approval
+        run: echo "Production cutover approved after canonical artifact, Homebrew, Scoop, and platform verification."
+
+  release:
+    name: Publish canonical native release
+    if: >-
+      always() &&
+      needs.build.result == 'success' &&
+      needs.homebrew.result == 'success' &&
+      needs.scoop.result == 'success' &&
+      (needs['production-approval'].result == 'success' || needs['production-approval'].result == 'skipped')
+    needs: [build, homebrew, scoop, production-approval]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -221,7 +245,7 @@ jobs:
             sha256sum --check checksums.txt
           )
 
-      - name: Revalidate tag and publish GitHub prerelease
+      - name: Revalidate tag and publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -231,9 +255,15 @@ jobs:
             echo "release ${GITHUB_REF_NAME} already exists; refusing to replace immutable artifacts" >&2
             exit 1
           fi
+          release_title="open-skills ${GITHUB_REF_NAME} native release"
+          release_args=()
+          if [[ "${GITHUB_REF_NAME}" != "v0.2.0" ]]; then
+            release_title="open-skills ${GITHUB_REF_NAME} native preview"
+            release_args+=(--prerelease)
+          fi
           gh release create "${GITHUB_REF_NAME}" \
             native-dist/* \
-            --prerelease \
             --verify-tag \
-            --title "open-skills ${GITHUB_REF_NAME} native preview" \
-            --notes-file native-preview-notes.md
+            --title "${release_title}" \
+            --notes-file native-preview-notes.md \
+            "${release_args[@]}"

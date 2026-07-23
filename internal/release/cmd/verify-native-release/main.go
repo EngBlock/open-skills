@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	tag := flag.String("tag", "", "signed release tag (for example, v0.2.0-preview.1)")
+	tag := flag.String("tag", "", "signed release tag (for example, v0.2.0 or v0.2.0-preview.1)")
 	output := flag.String("output", "native-dist", "release artifact directory")
 	flag.Parse()
 	if flag.NArg() != 0 {

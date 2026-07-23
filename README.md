@@ -11,9 +11,9 @@ Supports **OpenCode**, **Claude Code**, **Codex**, **Cursor**, and [70 more](#su
 
 ## Install
 
-### Scoop (experimental Windows x86-64 native preview)
+### Scoop (experimental Windows x86-64 native)
 
-The native Windows x86-64 build is available for early testing from its checksummed, immutable GitHub Release archive. Windows x86-64 support is experimental rather than fully supported. The package places only `open-skills.exe` on PATH, requires system Git at runtime, and does not require Node.js or npm.
+The native Windows x86-64 build is distributed from its checksummed, immutable GitHub Release archive. Windows x86-64 support remains experimental rather than fully supported. The package places only `open-skills.exe` on PATH, requires system Git at runtime, and does not require Node.js or npm.
 
 ```powershell
 scoop bucket add open-skills https://github.com/EngBlock/open-skills
@@ -27,9 +27,9 @@ scoop update
 scoop update open-skills
 ```
 
-### Homebrew (macOS ARM64 native preview)
+### Homebrew (macOS ARM64 native)
 
-The supported macOS ARM64 native preview is installed from its checksummed, immutable GitHub Release archive. It places only `open-skills` on PATH and requires system Git at runtime.
+The supported macOS ARM64 native release is installed from its checksummed, immutable GitHub Release archive. It places only `open-skills` on PATH and requires system Git at runtime.
 
 ```bash
 brew tap EngBlock/open-skills https://github.com/EngBlock/open-skills
@@ -43,7 +43,11 @@ brew update
 brew upgrade EngBlock/open-skills/open-skills
 ```
 
-The native build remains a prerelease until the production cutover gate is approved. The npm implementation remains the production distribution during the preview.
+Native 0.2.0 is the production release. The npm implementation remains available until the separate deprecation step described by the draft [native migration guidance](docs/native-migration.md).
+
+### Verified direct archives
+
+GitHub Releases are the canonical source for supported and experimental archives. Each release includes `checksums.txt`, an adjacent keyless Sigstore bundle for every archive and the checksum file, and GitHub build provenance. Follow the exact checksum, Cosign identity, and `gh attestation verify` commands in the release notes before installing a direct download. Direct archives contain only `open-skills` (`open-skills.exe` on Windows) and require system Git.
 
 ### npm
 
@@ -393,7 +397,7 @@ Describe the scenarios where this skill should be used.
 
 ### Optional Fields
 
-- `metadata.internal`: Set to `true` to hide the skill from normal discovery. In the native preview, internal skills
+- `metadata.internal`: Set to `true` to hide the skill from normal discovery. In the native release, internal skills
   are visible when `OPEN_SKILLS_INSTALL_INTERNAL_SKILLS=1` is set; the npm 0.1.x baseline and native 1.x compatibility
   also accept `INSTALL_INTERNAL_SKILLS`. Useful for work-in-progress skills or skills meant only for internal tooling.
 
@@ -529,7 +533,7 @@ Ensure you have write access to the target directory.
 
 ## Environment Variables
 
-The native preview uses canonical `OPEN_SKILLS_` names for Open Skills-owned
+The native release uses canonical `OPEN_SKILLS_` names for Open Skills-owned
 configuration. Legacy names remain supported through native 1.x and emit a
 migration warning on stderr; a present canonical value always wins a conflict.
 The npm 0.1.x implementation continues to use the legacy names shown below.
@@ -542,7 +546,7 @@ The npm 0.1.x implementation continues to use the legacy names shown below.
 | `OPEN_SKILLS_SUPPRESS_LEGACY_ENV_WARNINGS` | Set to exactly `1` or `true` to suppress only legacy-name migration warnings | None |
 
 ```bash
-# Native preview: include internal skills
+# Native release: include internal skills
 OPEN_SKILLS_INSTALL_INTERNAL_SKILLS=1 open-skills add owner/repo --list
 ```
 

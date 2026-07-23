@@ -1,4 +1,4 @@
-// Package release builds the self-contained archives used for native previews.
+// Package release builds the self-contained native release archives.
 package release
 
 import (
@@ -47,7 +47,7 @@ type target struct {
 	smoke       bool
 }
 
-var previewVersion = regexp.MustCompile(`^0\.2\.0-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*$`)
+var nativeReleaseVersion = regexp.MustCompile(`^0\.2\.0(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$`)
 var sha256Checksum = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 var previewTargets = []target{
@@ -87,9 +87,17 @@ func ReleaseNotes(version string) (string, error) {
 	if err := validateVersion(version); err != nil {
 		return "", err
 	}
+	title := fmt.Sprintf("# open-skills v%s native preview\n\n", version)
+	introduction := "This prerelease makes self-contained native archives available for early testing. Important: prerelease availability does not satisfy the production cutover gate; the npm implementation remains the production distribution until that gate is approved.\n\n"
+	supportStatement := "Supported targets are maintainer-supported preview platforms. Experimental targets are compile-checked but are not yet represented as fully tested.\n\n"
+	if version == "0.2.0" {
+		title = "# open-skills v0.2.0 native release\n\n"
+		introduction = "This is the approved production-ready native release of open-skills. It passed the reviewed compatibility, security, state-safety, platform, and release-supply-chain cutover gate. Migration guidance for npm users is available in `docs/native-migration.md`.\n\n"
+		supportStatement = "macOS ARM64 and Linux x86-64 are supported production platforms. Experimental targets are compile-checked but are not represented as fully tested.\n\n"
+	}
 	return fmt.Sprintf(
-		"# open-skills v%s native preview\n\n"+
-			"This prerelease makes self-contained native archives available for early testing. Important: prerelease availability does not satisfy the production cutover gate; the npm implementation remains the production distribution until that gate is approved.\n\n"+
+		title+
+			introduction+
 			"## Target support\n\n"+
 			"| Archive suffix | Target | Status |\n"+
 			"| --- | --- | --- |\n"+
@@ -98,7 +106,7 @@ func ReleaseNotes(version string) (string, error) {
 			"| `darwin_amd64.tar.gz` | macOS x86-64 | Experimental |\n"+
 			"| `linux_arm64.tar.gz` | Linux ARM64 | Experimental |\n"+
 			"| `windows_amd64.zip` | Windows x86-64 | Experimental |\n\n"+
-			"Supported targets are maintainer-supported preview platforms. Experimental targets are compile-checked but are not yet represented as fully tested.\n\n"+
+			supportStatement+
 			"Each archive contains only `open-skills` (`open-skills.exe` on Windows). The only runtime dependency is system Git; Node.js and npm are not required.\n\n"+
 			"## Verification\n\n"+
 			"`checksums.txt` covers every release archive. Each archive and the checksum file has an adjacent keyless signature bundle named `<file>.sigstore.json`; `provenance.sigstore.json` covers every archive.\n\n"+
@@ -106,10 +114,8 @@ func ReleaseNotes(version string) (string, error) {
 			"```sh\n"+
 			"sha256sum --check checksums.txt\n"+
 			"cosign verify-blob --bundle <archive>.sigstore.json --certificate-identity 'https://github.com/EngBlock/open-skills/.github/workflows/native-preview.yml@refs/tags/v%s' --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' <archive>\n"+
-			"gh attestation verify <archive> --bundle provenance.sigstore.json --repo EngBlock/open-skills --signer-workflow EngBlock/open-skills/.github/workflows/native-preview.yml --cert-identity 'https://github.com/EngBlock/open-skills/.github/workflows/native-preview.yml@refs/tags/v%s'\n"+
+			"gh attestation verify <archive> --bundle provenance.sigstore.json --repo EngBlock/open-skills --signer-workflow EngBlock/open-skills/.github/workflows/native-preview.yml\n"+
 			"```\n",
-		version,
-		version,
 		version,
 	), nil
 }
@@ -156,10 +162,18 @@ func ScoopManifest(version string, checksums io.Reader) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	description := "Experimental Windows x86-64 native preview for the open agent skills ecosystem"
+	jsonpath := "$[?(@.prerelease == true && @.draft == false)].tag_name"
+	versionPattern := `0\\.2\\.0-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*`
+	if version == "0.2.0" {
+		description = "Experimental Windows x86-64 native release for the open agent skills ecosystem"
+		jsonpath = "$[?(@.prerelease == false && @.draft == false)].tag_name"
+		versionPattern = `[0-9]+\\.[0-9]+\\.[0-9]+`
+	}
 
 	return fmt.Sprintf(`{
   "version": "%[1]s",
-  "description": "Experimental Windows x86-64 native preview for the open agent skills ecosystem",
+  "description": "%[4]s",
   "homepage": "https://github.com/EngBlock/open-skills",
   "license": "MIT",
   "architecture": {
@@ -171,8 +185,8 @@ func ScoopManifest(version string, checksums io.Reader) (string, error) {
   "bin": "open-skills.exe",
   "checkver": {
     "url": "https://api.github.com/repos/EngBlock/open-skills/releases",
-    "jsonpath": "$[?(@.prerelease == true && @.draft == false)].tag_name",
-    "regex": "v(?<version>0\\.2\\.0-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)"
+    "jsonpath": "%[5]s",
+    "regex": "v(?<version>%[6]s)"
   },
   "autoupdate": {
     "architecture": {
@@ -185,7 +199,7 @@ func ScoopManifest(version string, checksums io.Reader) (string, error) {
     }
   }
 }
-`, version, filename, checksum), nil
+`, version, filename, checksum, description, jsonpath, versionPattern), nil
 }
 
 func checksumForArtifact(checksums io.Reader, filename string, distribution string) (string, error) {
@@ -230,8 +244,8 @@ func validateOptions(options PackageOptions) error {
 }
 
 func validateVersion(version string) error {
-	if !previewVersion.MatchString(version) {
-		return fmt.Errorf("native preview version %q must be a 0.2.0 prerelease such as 0.2.0-preview.1", version)
+	if !nativeReleaseVersion.MatchString(version) {
+		return fmt.Errorf("native release version %q must be 0.2.0 or a 0.2.0 prerelease such as 0.2.0-preview.1", version)
 	}
 	return nil
 }

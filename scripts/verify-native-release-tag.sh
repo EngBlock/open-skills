@@ -11,8 +11,8 @@ if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
   echo "native releases must run from a tag, got ${GITHUB_REF_TYPE}" >&2
   exit 1
 fi
-if [[ ! "${GITHUB_REF_NAME}" =~ ^v0\.2\.0-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*$ ]]; then
-  echo "native release tag ${GITHUB_REF_NAME} is not a canonical 0.2.0 prerelease tag" >&2
+if [[ ! "${GITHUB_REF_NAME}" =~ ^v0\.2\.0(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+  echo "native release tag ${GITHUB_REF_NAME} is not canonical v0.2.0 or a v0.2.0 prerelease tag" >&2
   exit 1
 fi
 

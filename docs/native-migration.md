@@ -1,10 +1,10 @@
-# Native preview migration notes
+# Draft native 0.2.0 migration guidance
 
-The native preview preserves the npm 0.1.2 command contract except for the approved divergences in the [native compatibility baseline](native-compatibility-baseline.md#intentional-divergences).
+The native release preserves the npm 0.1.2 command contract except for the approved divergences in the [native compatibility baseline](native-compatibility-baseline.md#intentional-divergences). This guidance remains a draft until the npm deprecation work in issue #42 publishes the final user-facing cutover instructions.
 
 ## D01: one native executable name
 
-Native distributions contain only `open-skills`. They do not install the npm compatibility aliases `skills` or `add-skill`. The npm package keeps its existing aliases until the later production cutover; installing a native preview does not claim those names.
+Native distributions contain only `open-skills`. They do not install the npm compatibility aliases `skills` or `add-skill`. The npm package keeps its existing aliases until its separate deprecation step; installing the native release does not claim those names.
 
 ## D02: offline command shell
 
@@ -202,3 +202,9 @@ Non-interactive authorization follows the same exact-name rule as configuration.
 confirmations. It never implies `--replace`, `--force`, `--trust`, or
 `--allow-insecure-transport`; when more than one risk applies, every corresponding
 flag is required independently.
+
+## D13: canonical native release supply chain
+
+Native releases come from immutable signed Git tags through the reviewed GitHub Actions workflow. Every supported and experimental archive is CGO-disabled, contains only the canonical `open-skills` executable, and is covered by SHA-256 checksums, keyless Sigstore signatures, and GitHub build provenance tied to the repository, tag, and workflow identity. Homebrew and Scoop metadata reference the same immutable GitHub Release artifacts; Windows remains explicitly experimental.
+
+The npm package is never used to download or bootstrap a native executable. Package managers or manually verified direct archives own executable installation and upgrades, while `open-skills update` continues to update installed skills. Documentation does not recommend `curl | sh` or any other mutable network-to-shell installer.

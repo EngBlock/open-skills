@@ -54,11 +54,13 @@ func TestNativePreviewWorkflowGatesPublicationOnHomebrewSmoke(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
 	workflow := readRepositoryFile(t, root, ".github", "workflows", "native-preview.yml")
 	for _, text := range []string{
-		"tags:\n      - 'v0.2.0-*'",
+		"tags:\n      - 'v0.2.0'\n      - 'v0.2.0-*'",
 		"permissions:\n  contents: read\n  id-token: write\n  attestations: write",
 		`go run ./internal/release/cmd/native-preview`,
 		`--version "${GITHUB_REF_NAME#v}"`,
 		"--homebrew-formula homebrew/open-skills.rb",
+		"name: Verify checked production package metadata",
+		"if: github.ref_name == 'v0.2.0'",
 		"cmp Formula/open-skills.rb homebrew/open-skills.rb",
 		"subject-checksums: native-dist/checksums.txt",
 		"cosign sign-blob --yes --bundle",
@@ -71,11 +73,15 @@ func TestNativePreviewWorkflowGatesPublicationOnHomebrewSmoke(t *testing.T) {
 		"runs-on: macos-15",
 		`run: test "$(uname -m)" = arm64`,
 		`OPEN_SKILLS_HOMEBREW_ARTIFACT="$artifact" scripts/homebrew-smoke.sh homebrew/open-skills.rb`,
+		"name: Approve production native cutover",
 		"needs: [build, homebrew, scoop]",
+		"environment: native-production",
+		"needs: [build, homebrew, scoop, production-approval]",
+		`needs['production-approval'].result == 'success' || needs['production-approval'].result == 'skipped'`,
 		`scripts/verify-native-release-tag.sh`,
 		`gh release create "${GITHUB_REF_NAME}"`,
 		"native-dist/*",
-		"--prerelease",
+		`release_args+=(--prerelease)`,
 		"--verify-tag",
 		`--signer-workflow "${workflow}"`,
 	} {
@@ -100,9 +106,36 @@ func TestNativePreviewWorkflowGatesPublicationOnHomebrewSmoke(t *testing.T) {
 	}
 
 	homebrewIndex := strings.Index(workflow, "  homebrew:")
+	approvalIndex := strings.Index(workflow, "  production-approval:")
 	releaseIndex := strings.Index(workflow, "  release:")
-	if homebrewIndex < 0 || releaseIndex < 0 || homebrewIndex >= releaseIndex {
-		t.Fatal("Homebrew verification must precede release publication")
+	if homebrewIndex < 0 || approvalIndex < 0 || releaseIndex < 0 || homebrewIndex >= approvalIndex || approvalIndex >= releaseIndex {
+		t.Fatal("Homebrew verification and human production approval must precede release publication")
+	}
+}
+
+func TestProductionCutoverChecklistCoversEveryApprovalGate(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	checklist := readRepositoryFile(t, root, "docs", "native-production-gate.md")
+	for _, text := range []string{
+		"Reviewed compatibility corpus",
+		"Security and state safety",
+		"macOS ARM64 maintainer validation",
+		"Linux x86-64 built-binary smoke",
+		"Experimental artifacts",
+		"Signed canonical artifacts",
+		"Homebrew availability",
+		"Scoop availability",
+		"Draft migration guidance",
+		"native-production",
+		"signed `v0.2.0` tag",
+	} {
+		if !strings.Contains(checklist, text) {
+			t.Errorf("production cutover checklist does not contain %q", text)
+		}
+	}
+	migration := readRepositoryFile(t, root, "docs", "native-migration.md")
+	if !strings.Contains(migration, "## D13: canonical native release supply chain") {
+		t.Error("draft migration guidance does not document D13")
 	}
 }
 

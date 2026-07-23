@@ -35,11 +35,11 @@ func TestScoopDocumentationLabelsWindowsX8664Experimental(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
 	readme := readRepositoryFile(t, root, "README.md")
 	for _, text := range []string{
-		"Scoop (experimental Windows x86-64 native preview)",
+		"Scoop (experimental Windows x86-64 native)",
 		"scoop bucket add open-skills https://github.com/EngBlock/open-skills",
 		"scoop install open-skills/open-skills",
 		"scoop update open-skills",
-		"Windows x86-64 support is experimental",
+		"Windows x86-64 support remains experimental",
 		"does not require Node.js or npm",
 	} {
 		if !strings.Contains(readme, text) {
@@ -49,7 +49,7 @@ func TestScoopDocumentationLabelsWindowsX8664Experimental(t *testing.T) {
 
 	development := readRepositoryFile(t, root, "docs", "native-development.md")
 	for _, text := range []string{
-		"## Scoop preview releases",
+		"## Scoop native releases",
 		"Windows x86-64 target remains experimental",
 		"--scoop-manifest bucket/open-skills.json",
 		"scripts/scoop-smoke.ps1",
@@ -71,6 +71,9 @@ func TestScoopSmokeValidatesManifestInstallCommandsAndUpgradeMetadata(t *testing
 		"-ForceUpdate",
 		"releases.json",
 		"v0.2.0-preview.2",
+		"$olderVersion = '0.1.9'",
+		"$isProduction",
+		"$currentPrerelease = 'false'",
 		"apps/scoop/current",
 		"-ItemType Junction",
 		"scoop.ps1",

@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	version := flag.String("version", "", "0.2.0 prerelease version without the v prefix")
+	version := flag.String("version", "", "0.2.0 release or prerelease version without the v prefix")
 	output := flag.String("output", "dist/native-preview", "artifact output directory")
 	notes := flag.String("notes", "", "optional release-notes output path")
 	homebrewFormula := flag.String("homebrew-formula", "", "optional Homebrew formula output path")
@@ -33,7 +33,7 @@ func main() {
 		RequireSmoke: !*skipLinuxSmoke,
 	})
 	if err != nil {
-		fail("package native preview: %v", err)
+		fail("package native release: %v", err)
 	}
 	if *homebrewFormula != "" {
 		checksums, err := os.Open(filepath.Join(*output, "checksums.txt"))

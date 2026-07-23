@@ -97,6 +97,36 @@ func TestReleaseNotesDistinguishSupportAndKeepTheCutoverGateClosed(t *testing.T)
 			t.Errorf("release notes do not contain %q:\n%s", text, notes)
 		}
 	}
+	for _, forbidden := range []string{"%!", "--cert-identity"} {
+		if strings.Contains(notes, forbidden) {
+			t.Errorf("preview release notes unexpectedly contain %q:\n%s", forbidden, notes)
+		}
+	}
+}
+
+func TestProductionReleaseNotesRecordTheApprovedCutover(t *testing.T) {
+	notes, err := ReleaseNotes("0.2.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, text := range []string{
+		"# open-skills v0.2.0 native release",
+		"production-ready native release",
+		"macOS ARM64 | Supported",
+		"Linux x86-64 | Supported",
+		"Windows x86-64 | Experimental",
+		"macOS ARM64 and Linux x86-64 are supported production platforms",
+		"Migration guidance",
+	} {
+		if !strings.Contains(notes, text) {
+			t.Errorf("production release notes do not contain %q:\n%s", text, notes)
+		}
+	}
+	for _, forbidden := range []string{"native preview", "prerelease availability", "remains the production distribution", "preview platforms", "%!", "--cert-identity"} {
+		if strings.Contains(notes, forbidden) {
+			t.Errorf("production release notes unexpectedly contain %q:\n%s", forbidden, notes)
+		}
+	}
 }
 
 func TestHomebrewFormulaReferencesTheCanonicalMacOSARM64Artifact(t *testing.T) {
@@ -156,6 +186,28 @@ func TestScoopManifestReferencesTheCanonicalExperimentalWindowsArtifact(t *testi
 	}
 }
 
+func TestProductionScoopManifestTracksStableCanonicalReleases(t *testing.T) {
+	manifest, err := ScoopManifest("0.2.0", strings.NewReader(
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  open-skills_0.2.0_windows_amd64.zip\n",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, text := range []string{
+		`"description": "Experimental Windows x86-64 native release for the open agent skills ecosystem"`,
+		`"url": "https://github.com/EngBlock/open-skills/releases/download/v0.2.0/open-skills_0.2.0_windows_amd64.zip"`,
+		`"jsonpath": "$[?(@.prerelease == false && @.draft == false)].tag_name"`,
+		`"regex": "v(?<version>[0-9]+\\.[0-9]+\\.[0-9]+)"`,
+	} {
+		if !strings.Contains(manifest, text) {
+			t.Errorf("production Scoop manifest does not contain %q:\n%s", text, manifest)
+		}
+	}
+	if strings.Contains(manifest, "native preview") || strings.Contains(manifest, "prerelease == true") {
+		t.Errorf("production Scoop manifest still tracks previews:\n%s", manifest)
+	}
+}
+
 func TestScoopManifestRequiresTheChecksummedCanonicalArtifact(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -192,20 +244,30 @@ func TestHomebrewFormulaRequiresTheChecksummedCanonicalArtifact(t *testing.T) {
 	}
 }
 
-func TestPackageAllRejectsAProductionVersion(t *testing.T) {
-	_, err := PackageAll(context.Background(), PackageOptions{
-		Root:    filepath.Clean(filepath.Join("..", "..")),
-		Output:  t.TempDir(),
-		Version: "0.2.0",
-	})
-	if err == nil || !strings.Contains(err.Error(), "0.2.0 prerelease") {
-		t.Fatalf("PackageAll() error = %v; want 0.2.0 prerelease validation", err)
+func TestPackageAllAcceptsTheProductionVersion(t *testing.T) {
+	if err := validateVersion("0.2.0"); err != nil {
+		t.Fatalf("validateVersion(0.2.0) = %v; want production release accepted", err)
+	}
+}
+
+func TestPackageAllRejectsVersionsOutsideTheNativeReleaseLine(t *testing.T) {
+	for _, version := range []string{"0.1.2", "0.2.1", "0.2.0+metadata"} {
+		if err := validateVersion(version); err == nil {
+			t.Errorf("validateVersion(%q) succeeded; want canonical 0.2.0 release validation", version)
+		}
 	}
 }
 
 func TestVerifyReleaseBundleAcceptsCanonicalArtifacts(t *testing.T) {
 	output := releaseBundleFixture(t, "0.2.0-preview.1")
 	if err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.0-preview.1"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestVerifyReleaseBundleAcceptsCanonicalProductionArtifacts(t *testing.T) {
+	output := releaseBundleFixture(t, "0.2.0")
+	if err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.0"}); err != nil {
 		t.Fatal(err)
 	}
 }
