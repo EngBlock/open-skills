@@ -26,8 +26,16 @@ extracts that commit with `git archive`. It does not run repository hooks,
 submodules, filters, or scripts. Git LFS pointer content is rejected before
 installation. Acquisition uses a temporary workspace that is removed on both
 success and failure; it keeps no repository cache. Archive extraction accepts
-only regular files and directories and is bounded to 32 MiB, 10,000 entries,
-and 20 path components.
+only regular files, directories, and confined repository links. Remote processing
+defaults to 10 MiB per file, 100 MiB of total content, 5,000 files, and 20
+directory levels. `--max-file-bytes`,
+`--max-total-bytes`, `--max-files`, and `--max-depth` accept positive decimal
+values as deliberate finite overrides. The same limits cover well-known HTTPS
+content, remote `use`, and checked updates. Selected add content is validated
+as one aggregate before any installation or lock mutation; each update source
+is likewise preflighted before that source is changed. Local file/byte/count
+behavior stays compatible, while full-depth traversal always retains its finite
+ceiling.
 
 ## D09: safe existing-state inspection
 

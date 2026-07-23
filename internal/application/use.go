@@ -25,6 +25,7 @@ type useOptions struct {
 	Trust                          bool
 	DangerouslyAcceptOpenClawRisks bool
 	Help                           bool
+	Limits                         resourceLimits
 }
 
 type useAgentConfig struct {
@@ -73,19 +74,23 @@ func runUse(invocation Invocation, arguments []string) int {
 	remoteIdentity := ""
 	remoteGitRoot := ""
 	isRemoteGit := false
-	if isClearlyLocalPath(rawSource) {
-		var err error
-		root, err = filepath.Abs(rawSource)
-		if err != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Invalid local path: %v\n", err)
-			return 1
-		}
-		info, err := os.Stat(root)
-		if err != nil || !info.IsDir() {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Local path does not exist: %s\n", root)
-			return 1
-		}
+	isRemote := false
+	localPath, localPathErr := filepath.Abs(rawSource)
+	localInfo, localStatErr := os.Stat(localPath)
+	if localPathErr == nil && localStatErr == nil && localInfo.IsDir() {
+		root = localPath
 		repositoryRoot = root
+		if options.Limits.hasRemoteOverrides() {
+			_, _ = fmt.Fprintln(invocation.Stderr, "--max-file-bytes, --max-total-bytes, and --max-files apply only to remote sources")
+			return 1
+		}
+	} else if isClearlyLocalPath(rawSource) {
+		if localPathErr != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Invalid local path: %v\n", localPathErr)
+			return 1
+		}
+		_, _ = fmt.Fprintf(invocation.Stderr, "Local path does not exist: %s\n", localPath)
+		return 1
 	} else if wellKnown, matches, parseErr := parseWellKnownSource(rawSource); matches {
 		if parseErr != nil {
 			_, _ = fmt.Fprintln(invocation.Stderr, parseErr)
@@ -97,7 +102,11 @@ func runUse(invocation Invocation, arguments []string) int {
 			_, _ = fmt.Fprintln(invocation.Stderr, err)
 			return 1
 		}
-		fetched, err := fetchWellKnownSkills(wellKnown)
+		selectors := []string{}
+		if selector != "" {
+			selectors = []string{selector}
+		}
+		fetched, err := fetchWellKnownSkills(wellKnown, options.Limits, selectors)
 		if err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Discover well-known skills: %v\n", err)
 			return 1
@@ -111,6 +120,7 @@ func runUse(invocation Invocation, arguments []string) int {
 		repositoryRoot = root
 		remoteIdentity = wellKnown.identity
 		displaySource = wellKnown.identity
+		isRemote = true
 	} else {
 		git, err := parseGitSource(rawSource)
 		if err != nil {
@@ -127,7 +137,7 @@ func runUse(invocation Invocation, arguments []string) int {
 			_, _ = fmt.Fprintln(invocation.Stderr, err)
 			return 1
 		}
-		workspace, err := materializeGitSource(git)
+		workspace, err := materializeGitSource(git, options.Limits)
 		if err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Acquire Git source: %v\n", err)
 			return 1
@@ -146,9 +156,10 @@ func runUse(invocation Invocation, arguments []string) int {
 		remote = &remoteUseProvenance{source: git.Identity, commit: workspace.Commit}
 		remoteGitRoot = workspace.Root
 		isRemoteGit = true
+		isRemote = true
 	}
 
-	skills, err := discoverLocalSkills(root, options.FullDepth)
+	skills, err := discoverLocalSkillsWithLimits(root, options.FullDepth, options.Limits)
 	if err == nil {
 		err = assignRepositoryRelativePaths(skills, repositoryRoot)
 	}
@@ -160,6 +171,13 @@ func runUse(invocation Invocation, arguments []string) int {
 	if err != nil {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
+	}
+	if isRemote {
+		selected.content, err = prepareSkillContentWithBudget(selected.Path, newResourceBudget(options.Limits))
+		if err != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Use %s: %v\n", selected.Name, err)
+			return 1
+		}
 	}
 	if isRemoteGit {
 		if err := rejectLFSPointers(selected.Path); err != nil {
@@ -206,7 +224,7 @@ func runUse(invocation Invocation, arguments []string) int {
 
 func parseUseOptions(arguments []string) ([]string, useOptions, []string) {
 	source := []string{}
-	options := useOptions{}
+	options := useOptions{Limits: defaultResourceLimits()}
 	errors := []string{}
 	for index := 0; index < len(arguments); index++ {
 		argument := arguments[index]
@@ -255,6 +273,15 @@ func parseUseOptions(arguments []string) ([]string, useOptions, []string) {
 				errors = append(errors, argument+" requires an agent name")
 			}
 		default:
+			matched, next, limitErr := parseResourceLimitOption(arguments, index, &options.Limits)
+			if limitErr != nil {
+				errors = append(errors, limitErr.Error())
+				continue
+			}
+			if matched {
+				index = next
+				continue
+			}
 			if strings.HasPrefix(argument, "-") {
 				errors = append(errors, "Unknown option: "+argument)
 			} else {
@@ -387,7 +414,15 @@ func materializeUseSkill(skill localSkill) (materializedUseSkill, error) {
 		return materializedUseSkill{}, err
 	}
 	directory := filepath.Join(root, state.SanitizeName(skill.Name))
-	if err := copyUseSkillDirectory(skill.Path, directory); err != nil {
+	content := skill.content
+	if content == nil {
+		content, err = prepareSkillContent(skill.Path)
+		if err != nil {
+			_ = os.RemoveAll(root)
+			return materializedUseSkill{}, err
+		}
+	}
+	if err := writeUseSkillContent(content, directory); err != nil {
 		_ = os.RemoveAll(root)
 		return materializedUseSkill{}, err
 	}
@@ -404,44 +439,48 @@ func materializeUseSkill(skill localSkill) (materializedUseSkill, error) {
 	return materializedUseSkill{directory: directory, skillMD: string(skillMD), hasSupportingFiles: hasSupportingFiles}, nil
 }
 
-func copyUseSkillDirectory(source, destination string) error {
-	return filepath.WalkDir(source, func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
+func writeUseSkillContent(content *skillContent, destination string) error {
+	if err := os.RemoveAll(destination); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(destination, 0o755); err != nil {
+		return err
+	}
+	for _, relative := range content.directories {
+		if useContentPathExcluded(relative, true) {
+			continue
 		}
-		relative, err := filepath.Rel(source, path)
-		if err != nil {
+		if err := os.MkdirAll(filepath.Join(destination, relative), 0o755); err != nil {
 			return err
 		}
-		if relative == "." {
-			return os.MkdirAll(destination, 0o755)
+	}
+	for _, file := range content.files {
+		if useContentPathExcluded(file.relative, false) {
+			continue
 		}
-		if entry.IsDir() && (entry.Name() == ".git" || entry.Name() == "__pycache__" || entry.Name() == "__pypackages__") {
-			return filepath.SkipDir
-		}
-		if !entry.IsDir() && entry.Name() == "metadata.json" {
-			return nil
-		}
-		target := filepath.Join(destination, relative)
-		if entry.IsDir() {
-			return os.MkdirAll(target, 0o755)
-		}
-		if !entry.Type().IsRegular() {
-			return fmt.Errorf("unsupported non-regular skill file: %s", path)
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
+		target := filepath.Join(destination, file.relative)
 		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 			return err
 		}
-		return os.WriteFile(target, data, info.Mode().Perm())
-	})
+		if err := os.WriteFile(target, file.data, file.mode); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func useContentPathExcluded(relative string, directory bool) bool {
+	parts := strings.Split(filepath.ToSlash(relative), "/")
+	for index, part := range parts {
+		isDirectory := index < len(parts)-1 || directory
+		if isDirectory && (part == ".git" || part == "__pycache__" || part == "__pypackages__") {
+			return true
+		}
+		if !isDirectory && part == "metadata.json" {
+			return true
+		}
+	}
+	return false
 }
 
 func useSkillHasSupportingFiles(root string) (bool, error) {
@@ -595,6 +634,10 @@ Options:
   --skill-path <path>   Select an exact repository-relative skill directory
   -a, --agent <agent>   Start one supported agent interactively (claude-code, codex)
   --full-depth          Search nested directories like open-skills add --full-depth
+  --max-file-bytes <n>  Remote per-file limit (default: 10485760)
+  --max-total-bytes <n> Remote total-content limit (default: 104857600)
+  --max-files <n>       Remote file-count limit (default: 5000)
+  --max-depth <n>       Full-depth traversal ceiling (default: 20)
   --trust               Approve this exact remote source commit for agent use
   --dangerously-accept-openclaw-risks
                          Allow unverified OpenClaw community skills

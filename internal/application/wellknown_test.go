@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -112,6 +113,81 @@ func TestWellKnownV2ArchiveInstallsMultifileSkill(t *testing.T) {
 	}
 	if data, err := os.ReadFile(filepath.Join(project, ".agents", "skills", "v2-archive", "references", "guide.md")); err != nil || string(data) != "v2 reference\n" {
 		t.Fatalf("v2 multifile payload = %q, %v", data, err)
+	}
+}
+
+func TestWellKnownSelectedContentLimitsIgnoreUnselectedSkillSize(t *testing.T) {
+	var largeRequested atomic.Bool
+	small := []byte("---\nname: small\ndescription: small skill\n---\n")
+	large := append([]byte("---\nname: large\ndescription: unselected large skill\n---\n"), bytes.Repeat([]byte{'x'}, int(defaultMaxFileBytes))...)
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/.well-known/agent-skills/index.json":
+			_, _ = response.Write([]byte(`{"skills":[{"name":"small","description":"small skill","files":["SKILL.md"]},{"name":"large","description":"unselected large skill","files":["SKILL.md"]}]}`))
+		case "/.well-known/agent-skills/small/SKILL.md":
+			_, _ = response.Write(small)
+		case "/.well-known/agent-skills/large/SKILL.md":
+			largeRequested.Store(true)
+			_, _ = response.Write(large)
+		default:
+			http.NotFound(response, request)
+		}
+	}))
+	defer server.Close()
+
+	project := t.TempDir()
+	withWorkingDirectory(t, project)
+	var stdout, stderr bytes.Buffer
+	arguments := []string{server.URL, "--skill", "small", "--agent", "universal", "--yes"}
+	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, arguments); exit != 0 {
+		t.Fatalf("selected install = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(project, ".agents", "skills", "small", "SKILL.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(project, ".agents", "skills", "large")); !os.IsNotExist(err) {
+		t.Fatalf("unselected large skill was installed: %v", err)
+	}
+	if largeRequested.Load() {
+		t.Fatal("unselected large skill content was fetched")
+	}
+}
+
+func TestWellKnownResourceFailureIsActionableAndLeavesNoState(t *testing.T) {
+	skillMD := []byte("---\nname: bounded\ndescription: bounded skill\n---\n")
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/.well-known/agent-skills/index.json":
+			_, _ = response.Write([]byte(`{"skills":[{"name":"bounded","description":"bounded skill","files":["SKILL.md"]}]}`))
+		case "/.well-known/agent-skills/bounded/SKILL.md":
+			_, _ = response.Write(skillMD)
+		default:
+			http.NotFound(response, request)
+		}
+	}))
+	defer server.Close()
+
+	project := t.TempDir()
+	withWorkingDirectory(t, project)
+	var stdout, stderr bytes.Buffer
+	tooSmall := fmt.Sprintf("%d", len(skillMD)-1)
+	arguments := []string{server.URL, "--agent", "universal", "--yes", "--max-file-bytes", tooSmall}
+	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, arguments); exit != 1 || !strings.Contains(stderr.String(), "--max-file-bytes") {
+		t.Fatalf("bounded install = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(project, ".agents", "skills", "bounded")); !os.IsNotExist(err) {
+		t.Fatalf("resource failure left installed content: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(project, "skills-lock.json")); !os.IsNotExist(err) {
+		t.Fatalf("resource failure left a lock: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	exact := fmt.Sprintf("%d", len(skillMD))
+	arguments = []string{server.URL, "--agent", "universal", "--yes", "--max-file-bytes", exact, "--max-total-bytes", exact, "--max-files", "1"}
+	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, arguments); exit != 0 {
+		t.Fatalf("exact-boundary install = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
 	}
 }
 

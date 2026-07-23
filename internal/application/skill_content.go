@@ -28,6 +28,10 @@ type skillContentFile struct {
 }
 
 func prepareSkillContent(source string) (*skillContent, error) {
+	return prepareSkillContentWithBudget(source, newResourceBudget(unlimitedContentResourceLimits()))
+}
+
+func prepareSkillContentWithBudget(source string, budget *resourceBudget) (*skillContent, error) {
 	absolute, err := filepath.Abs(source)
 	if err != nil {
 		return nil, fmt.Errorf("resolve selected skill directory: %w", err)
@@ -54,7 +58,7 @@ func prepareSkillContent(source string) (*skillContent, error) {
 		return nil, fmt.Errorf("selected skill directory changed while resolving: %s", source)
 	}
 	content := &skillContent{rootIdentity: info}
-	if err := content.scanDirectory(root, ".", nil); err != nil {
+	if err := content.scanDirectory(root, ".", nil, budget); err != nil {
 		return nil, err
 	}
 	sort.Strings(content.directories)
@@ -64,7 +68,14 @@ func prepareSkillContent(source string) (*skillContent, error) {
 	return content, nil
 }
 
-func (content *skillContent) scanDirectory(directory, destination string, active []fs.FileInfo) error {
+func (content *skillContent) scanDirectory(directory, destination string, active []fs.FileInfo, budget *resourceBudget) error {
+	depth := 0
+	if destination != "." {
+		depth = len(strings.Split(filepath.ToSlash(destination), "/"))
+	}
+	if err := budget.limits.checkDepth(filepath.ToSlash(destination), depth); err != nil {
+		return err
+	}
 	resolved, err := filepath.EvalSymlinks(directory)
 	if err != nil {
 		return classifySymlinkResolutionError(destination, err)
@@ -101,13 +112,13 @@ func (content *skillContent) scanDirectory(directory, destination string, active
 			relative = filepath.Join(destination, entry.Name())
 		}
 		if entry.Type()&os.ModeSymlink != 0 {
-			if err := content.scanSymlink(sourcePath, relative, active); err != nil {
+			if err := content.scanSymlink(sourcePath, relative, active, budget); err != nil {
 				return err
 			}
 			continue
 		}
 		if entry.IsDir() {
-			if err := content.scanDirectory(sourcePath, relative, active); err != nil {
+			if err := content.scanDirectory(sourcePath, relative, active, budget); err != nil {
 				return err
 			}
 			continue
@@ -115,14 +126,14 @@ func (content *skillContent) scanDirectory(directory, destination string, active
 		if !entry.Type().IsRegular() {
 			return fmt.Errorf("unsupported non-regular source file: %s", sourcePath)
 		}
-		if err := content.captureFile(sourcePath, relative); err != nil {
+		if err := content.captureFile(sourcePath, relative, budget); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (content *skillContent) scanSymlink(linkPath, destination string, active []fs.FileInfo) error {
+func (content *skillContent) scanSymlink(linkPath, destination string, active []fs.FileInfo, budget *resourceBudget) error {
 	target, err := os.Readlink(linkPath)
 	if err != nil {
 		return fmt.Errorf("read repository symlink %q: %w", filepath.ToSlash(destination), err)
@@ -144,15 +155,15 @@ func (content *skillContent) scanSymlink(linkPath, destination string, active []
 	}
 	switch {
 	case info.IsDir():
-		return content.scanDirectory(resolved, destination, active)
+		return content.scanDirectory(resolved, destination, active, budget)
 	case info.Mode().IsRegular():
-		return content.captureFile(linkPath, destination)
+		return content.captureFile(linkPath, destination, budget)
 	default:
 		return fmt.Errorf("repository symlink %q resolves to unsupported non-regular content", filepath.ToSlash(destination))
 	}
 }
 
-func (content *skillContent) captureFile(source, destination string) error {
+func (content *skillContent) captureFile(source, destination string, budget *resourceBudget) error {
 	resolved, err := filepath.EvalSymlinks(source)
 	if err != nil {
 		return classifySymlinkResolutionError(destination, err)
@@ -172,9 +183,20 @@ func (content *skillContent) captureFile(source, destination string) error {
 	if !openedInfo.Mode().IsRegular() {
 		return fmt.Errorf("confined source path %q is no longer a regular file", filepath.ToSlash(destination))
 	}
-	data, err := io.ReadAll(file)
+	if openedInfo.Size() > budget.limits.MaxFileBytes {
+		return budget.addFile(filepath.ToSlash(destination), openedInfo.Size())
+	}
+	remaining := budget.limits.MaxTotalBytes - budget.bytes
+	readLimit := budget.limits.MaxFileBytes
+	if remaining < readLimit {
+		readLimit = remaining
+	}
+	data, err := io.ReadAll(io.LimitReader(file, readLimit+1))
 	if err != nil {
 		return fmt.Errorf("read confined source file %q: %w", filepath.ToSlash(destination), err)
+	}
+	if err := budget.addFile(filepath.ToSlash(destination), int64(len(data))); err != nil {
+		return err
 	}
 	finalResolved, err := filepath.EvalSymlinks(source)
 	if err != nil {

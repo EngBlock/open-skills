@@ -49,6 +49,10 @@ Update Options:
   -g, --global           Update global skills only
   -p, --project          Update project skills only
   -y, --yes              Skip scope prompt (auto-detect: project if in a project, else global)
+  --max-file-bytes <n>   Remote per-file limit (default: 10485760)
+  --max-total-bytes <n>  Remote total-content limit (default: 104857600)
+  --max-files <n>        Remote file-count limit (default: 5000)
+  --max-depth <n>        Full-depth traversal ceiling (default: 20)
 
 Project:
   experimental_install Restore skills from skills-lock.json
@@ -66,12 +70,20 @@ Add Options:
   --subagent <names>     Install to Eve subagents (use 'root' for the root agent)
   --all                  Shorthand for --skill '*' --agent '*' -y
   --full-depth           Search all subdirectories even when a root SKILL.md exists
+  --max-file-bytes <n>   Remote per-file limit (default: 10485760)
+  --max-total-bytes <n>  Remote total-content limit (default: 104857600)
+  --max-files <n>        Remote file-count limit (default: 5000)
+  --max-depth <n>        Full-depth traversal ceiling (default: 20)
 
 Use Options:
   -s, --skill <skill>    Specify the skill to use
   --skill-path <path>    Select an exact repository-relative skill directory
   -a, --agent <agent>    Start one supported agent interactively
   --full-depth           Search all subdirectories even when a root SKILL.md exists
+  --max-file-bytes <n>   Remote per-file limit (default: 10485760)
+  --max-total-bytes <n>  Remote total-content limit (default: 104857600)
+  --max-files <n>        Remote file-count limit (default: 5000)
+  --max-depth <n>        Full-depth traversal ceiling (default: 20)
   --trust                Approve one exact remote source commit for agent use
   --dangerously-accept-openclaw-risks
                          Allow unverified OpenClaw community skills

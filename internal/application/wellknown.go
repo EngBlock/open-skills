@@ -25,9 +25,6 @@ const (
 	wellKnownIndexFile      = "index.json"
 	wellKnownSchemaV2       = "https://schemas.agentskills.io/discovery/0.2.0/schema.json"
 	maxWellKnownIndexBytes  = 1 << 20
-	maxWellKnownFileBytes   = 16 << 20
-	maxWellKnownTotalBytes  = 50 << 20
-	maxWellKnownFiles       = 1_000
 	wellKnownRequestTimeout = 30 * time.Second
 )
 
@@ -209,21 +206,32 @@ func validWellKnownFilePath(file string) bool {
 	return true
 }
 
-func fetchWellKnownSkills(source wellKnownSource) ([]wellKnownFetchedSkill, error) {
+func fetchWellKnownSkills(source wellKnownSource, selectedLimits resourceLimits, selectors []string) ([]wellKnownFetchedSkill, error) {
+	limits := acquisitionResourceLimits(selectedLimits)
 	// A candidate may be stale, malformed, or unavailable while another
 	// namespace remains valid. Preserve the provider's current-to-legacy
 	// fallback behavior instead of treating an unusable candidate as terminal.
 	for _, indexURL := range source.indexes {
 		index, found, err := fetchWellKnownIndex(source, indexURL)
 		if err != nil || !found {
+			if isResourceLimitError(err) {
+				return nil, err
+			}
 			continue
 		}
 		if index.Schema == wellKnownSchemaV2 {
-			entries, err := validWellKnownV2Entries(index)
+			entries, err := validWellKnownV2Entries(index, limits)
 			if err != nil {
+				if isResourceLimitError(err) {
+					return nil, err
+				}
 				continue
 			}
-			if result := fetchWellKnownEntries(source, indexURL, entries, fetchWellKnownV2Entry); len(result) > 0 {
+			result, fetchErr := fetchWellKnownEntries(source, indexURL, entries, selectors, limits, fetchWellKnownV2Entry)
+			if fetchErr != nil {
+				return nil, fetchErr
+			}
+			if len(result) > 0 {
 				return result, nil
 			}
 			continue
@@ -231,18 +239,29 @@ func fetchWellKnownSkills(source wellKnownSource) ([]wellKnownFetchedSkill, erro
 		if index.Schema != "" {
 			continue
 		}
-		entries, err := validWellKnownEntries(index)
+		entries, err := validWellKnownEntries(index, limits)
 		if err != nil {
+			if isResourceLimitError(err) {
+				return nil, err
+			}
 			continue
 		}
-		if result := fetchWellKnownEntries(source, indexURL, entries, fetchWellKnownEntry); len(result) > 0 {
+		result, fetchErr := fetchWellKnownEntries(source, indexURL, entries, selectors, limits, fetchWellKnownEntry)
+		if fetchErr != nil {
+			return nil, fetchErr
+		}
+		if len(result) > 0 {
 			return result, nil
 		}
 	}
 
 	if source.directName != "" && source.directURL != nil {
-		data, err := fetchWellKnownURL(source, source.directURL, maxWellKnownFileBytes)
+		data, err := fetchWellKnownURL(source, source.directURL, limits.MaxFileBytes)
 		if err != nil {
+			return nil, err
+		}
+		budget := newResourceBudget(limits)
+		if err := budget.addFile("SKILL.md", int64(len(data))); err != nil {
 			return nil, err
 		}
 		return []wellKnownFetchedSkill{{Name: source.directName, Files: map[string][]byte{"SKILL.md": data}, SourceURL: source.directURL.String()}}, nil
@@ -268,30 +287,66 @@ func fetchWellKnownIndex(source wellKnownSource, indexURL *url.URL) (wellKnownIn
 	return index, true, nil
 }
 
-type fetchWellKnownEntryFunc func(wellKnownSource, *url.URL, wellKnownIndexEntry) (wellKnownFetchedSkill, error)
+type fetchWellKnownEntryFunc func(wellKnownSource, *url.URL, wellKnownIndexEntry, resourceLimits) (wellKnownFetchedSkill, error)
 
-func fetchWellKnownEntries(source wellKnownSource, indexURL *url.URL, entries []wellKnownIndexEntry, fetchEntry fetchWellKnownEntryFunc) []wellKnownFetchedSkill {
+func fetchWellKnownEntries(source wellKnownSource, indexURL *url.URL, entries []wellKnownIndexEntry, selectors []string, limits resourceLimits, fetchEntry fetchWellKnownEntryFunc) ([]wellKnownFetchedSkill, error) {
 	result := make([]wellKnownFetchedSkill, 0, len(entries))
+	budget := newResourceBudget(limits)
 	for _, entry := range entries {
-		if source.directName != "" && entry.Name != source.directName {
+		if !wellKnownEntryRequested(source, entry.Name, selectors) {
 			continue
 		}
-		skill, err := fetchEntry(source, indexURL, entry)
-		if err == nil {
-			result = append(result, skill)
+		skill, err := fetchEntry(source, indexURL, entry, limits)
+		if err != nil {
+			if isResourceLimitError(err) {
+				return nil, err
+			}
+			continue
 		}
+		files := make([]string, 0, len(skill.Files))
+		for name := range skill.Files {
+			files = append(files, name)
+		}
+		sort.Strings(files)
+		for _, name := range files {
+			if err := budget.addFile(path.Join(skill.Name, name), int64(len(skill.Files[name]))); err != nil {
+				return nil, err
+			}
+		}
+		result = append(result, skill)
 	}
-	return result
+	return result, nil
 }
 
-func validWellKnownEntries(index wellKnownIndex) ([]wellKnownIndexEntry, error) {
-	if len(index.Skills) == 0 || len(index.Skills) > maxWellKnownFiles {
-		return nil, errors.New("skills must contain at least one and at most the maximum number of entries")
+func wellKnownEntryRequested(source wellKnownSource, name string, selectors []string) bool {
+	if source.directName != "" {
+		return name == source.directName
+	}
+	if len(selectors) == 0 || contains(selectors, "*") {
+		return true
+	}
+	for _, selector := range selectors {
+		if strings.EqualFold(selector, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func validWellKnownEntries(index wellKnownIndex, limits resourceLimits) ([]wellKnownIndexEntry, error) {
+	if len(index.Skills) == 0 {
+		return nil, errors.New("skills must contain at least one entry")
+	}
+	if len(index.Skills) > limits.MaxFiles {
+		return nil, resourceError("well-known index exceeds the %d-file limit; raise it with --max-files", limits.MaxFiles)
 	}
 	seen := map[string]bool{}
 	result := make([]wellKnownIndexEntry, 0, len(index.Skills))
 	for _, entry := range index.Skills {
-		if !validWellKnownSkillName(entry.Name) || strings.TrimSpace(entry.Description) == "" || len(entry.Files) == 0 || len(entry.Files) > maxWellKnownFiles || seen[entry.Name] {
+		if len(entry.Files) > limits.MaxFiles {
+			return nil, resourceError("well-known skill %q exceeds the %d-file limit; raise it with --max-files", entry.Name, limits.MaxFiles)
+		}
+		if !validWellKnownSkillName(entry.Name) || strings.TrimSpace(entry.Description) == "" || len(entry.Files) == 0 || seen[entry.Name] {
 			return nil, errors.New("skill entries require unique valid names, descriptions, and files")
 		}
 		seen[entry.Name] = true
@@ -301,6 +356,9 @@ func validWellKnownEntries(index wellKnownIndex) ([]wellKnownIndexEntry, error) 
 			normalized := strings.ToLower(file)
 			if !validWellKnownFilePath(file) || fileSeen[normalized] {
 				return nil, fmt.Errorf("skill %q has an unsafe file path", entry.Name)
+			}
+			if err := limits.checkDepth(file, pathDirectoryDepth(file)); err != nil {
+				return nil, err
 			}
 			fileSeen[normalized] = true
 			if strings.EqualFold(file, "SKILL.md") {
@@ -316,9 +374,12 @@ func validWellKnownEntries(index wellKnownIndex) ([]wellKnownIndexEntry, error) 
 	return result, nil
 }
 
-func validWellKnownV2Entries(index wellKnownIndex) ([]wellKnownIndexEntry, error) {
-	if len(index.Skills) == 0 || len(index.Skills) > maxWellKnownFiles {
-		return nil, errors.New("skills must contain at least one and at most the maximum number of entries")
+func validWellKnownV2Entries(index wellKnownIndex, limits resourceLimits) ([]wellKnownIndexEntry, error) {
+	if len(index.Skills) == 0 {
+		return nil, errors.New("skills must contain at least one entry")
+	}
+	if len(index.Skills) > limits.MaxFiles {
+		return nil, resourceError("well-known index exceeds the %d-file limit; raise it with --max-files", limits.MaxFiles)
 	}
 	seen := map[string]bool{}
 	result := make([]wellKnownIndexEntry, 0, len(index.Skills))
@@ -336,7 +397,7 @@ func validWellKnownV2Entries(index wellKnownIndex) ([]wellKnownIndexEntry, error
 	return result, nil
 }
 
-func fetchWellKnownV2Entry(source wellKnownSource, indexURL *url.URL, entry wellKnownIndexEntry) (wellKnownFetchedSkill, error) {
+func fetchWellKnownV2Entry(source wellKnownSource, indexURL *url.URL, entry wellKnownIndexEntry, limits resourceLimits) (wellKnownFetchedSkill, error) {
 	artifact, err := url.Parse(entry.URL)
 	if err != nil {
 		return wellKnownFetchedSkill{}, err
@@ -344,7 +405,11 @@ func fetchWellKnownV2Entry(source wellKnownSource, indexURL *url.URL, entry well
 	artifact = indexURL.ResolveReference(artifact)
 	artifact.RawQuery = ""
 	artifact.Fragment = ""
-	data, err := fetchWellKnownURL(source, artifact, maxWellKnownTotalBytes)
+	downloadLimit := limits.MaxTotalBytes
+	if entry.Type == "skill-md" {
+		downloadLimit = limits.MaxFileBytes
+	}
+	data, err := fetchWellKnownURL(source, artifact, downloadLimit)
 	if err != nil {
 		return wellKnownFetchedSkill{}, err
 	}
@@ -353,7 +418,7 @@ func fetchWellKnownV2Entry(source wellKnownSource, indexURL *url.URL, entry well
 	}
 	files := map[string][]byte{"SKILL.md": data}
 	if entry.Type == "archive" {
-		files, err = extractWellKnownArchive(data, artifact.Path)
+		files, err = extractWellKnownArchive(data, artifact.Path, limits)
 		if err != nil {
 			return wellKnownFetchedSkill{}, err
 		}
@@ -361,28 +426,30 @@ func fetchWellKnownV2Entry(source wellKnownSource, indexURL *url.URL, entry well
 	return wellKnownFetchedSkill{Name: entry.Name, Files: files, SourceURL: artifact.String()}, nil
 }
 
-func extractWellKnownArchive(data []byte, artifactPath string) (map[string][]byte, error) {
+func extractWellKnownArchive(data []byte, artifactPath string, limits resourceLimits) (map[string][]byte, error) {
 	if strings.HasSuffix(strings.ToLower(artifactPath), ".zip") || (len(data) >= 2 && data[0] == 'P' && data[1] == 'K') {
-		return extractWellKnownZIP(data)
+		return extractWellKnownZIP(data, limits)
 	}
 	if strings.HasSuffix(strings.ToLower(artifactPath), ".tar.gz") || strings.HasSuffix(strings.ToLower(artifactPath), ".tgz") || (len(data) >= 2 && data[0] == 0x1f && data[1] == 0x8b) {
-		return extractWellKnownTarGz(data)
+		return extractWellKnownTarGz(data, limits)
 	}
 	return nil, errors.New("unsupported well-known archive format")
 }
 
-func addWellKnownArchiveFile(files map[string][]byte, name string, contents []byte, total *int) error {
-	if !validWellKnownFilePath(name) || len(files) >= maxWellKnownFiles {
+func addWellKnownArchiveFile(files map[string][]byte, name string, contents []byte, budget *resourceBudget) error {
+	if !validWellKnownFilePath(name) {
 		return fmt.Errorf("unsafe archive path %q", name)
+	}
+	if err := budget.limits.checkDepth(name, pathDirectoryDepth(name)); err != nil {
+		return err
 	}
 	for existing := range files {
 		if strings.EqualFold(existing, name) {
 			return fmt.Errorf("duplicate archive path %q", name)
 		}
 	}
-	*total += len(contents)
-	if *total > maxWellKnownTotalBytes {
-		return errors.New("well-known archive exceeds maximum unpacked size")
+	if err := budget.addFile(name, int64(len(contents))); err != nil {
+		return err
 	}
 	if strings.EqualFold(name, "SKILL.md") {
 		name = "SKILL.md"
@@ -391,7 +458,7 @@ func addWellKnownArchiveFile(files map[string][]byte, name string, contents []by
 	return nil
 }
 
-func extractWellKnownTarGz(data []byte) (map[string][]byte, error) {
+func extractWellKnownTarGz(data []byte, limits resourceLimits) (map[string][]byte, error) {
 	gzipReader, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
@@ -399,7 +466,7 @@ func extractWellKnownTarGz(data []byte) (map[string][]byte, error) {
 	defer gzipReader.Close()
 	reader := tar.NewReader(gzipReader)
 	files := map[string][]byte{}
-	total := 0
+	budget := newResourceBudget(limits)
 	for {
 		header, err := reader.Next()
 		if errors.Is(err, io.EOF) {
@@ -410,10 +477,18 @@ func extractWellKnownTarGz(data []byte) (map[string][]byte, error) {
 		}
 		switch header.Typeflag {
 		case tar.TypeDir:
+			directory := strings.TrimSuffix(header.Name, "/")
+			if !validWellKnownFilePath(directory) {
+				return nil, fmt.Errorf("unsafe archive path %q", header.Name)
+			}
+			depth := len(strings.Split(directory, "/"))
+			if err := limits.checkDepth(directory, depth); err != nil {
+				return nil, err
+			}
 			continue
 		case tar.TypeReg, tar.TypeRegA:
-			if header.Size < 0 || header.Size > maxWellKnownFileBytes {
-				return nil, fmt.Errorf("archive entry %q exceeds byte limit", header.Name)
+			if header.Size < 0 || header.Size > limits.MaxFileBytes {
+				return nil, resourceError("file %q exceeds the %d-byte per-file limit (%d bytes); raise it with --max-file-bytes", header.Name, limits.MaxFileBytes, header.Size)
 			}
 			contents, err := io.ReadAll(io.LimitReader(reader, header.Size+1))
 			if err != nil {
@@ -422,7 +497,7 @@ func extractWellKnownTarGz(data []byte) (map[string][]byte, error) {
 			if int64(len(contents)) > header.Size {
 				return nil, fmt.Errorf("archive entry %q exceeds declared size", header.Name)
 			}
-			if err := addWellKnownArchiveFile(files, header.Name, contents, &total); err != nil {
+			if err := addWellKnownArchiveFile(files, header.Name, contents, budget); err != nil {
 				return nil, err
 			}
 		default:
@@ -435,28 +510,36 @@ func extractWellKnownTarGz(data []byte) (map[string][]byte, error) {
 	return files, nil
 }
 
-func extractWellKnownZIP(data []byte) (map[string][]byte, error) {
+func extractWellKnownZIP(data []byte, limits resourceLimits) (map[string][]byte, error) {
 	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return nil, err
 	}
-	if len(reader.File) > maxWellKnownFiles {
-		return nil, errors.New("archive contains too many files")
-	}
 	files := map[string][]byte{}
-	total := 0
+	budget := newResourceBudget(limits)
 	for _, file := range reader.File {
 		if file.FileInfo().IsDir() {
+			directory := strings.TrimSuffix(file.Name, "/")
+			if !validWellKnownFilePath(directory) {
+				return nil, fmt.Errorf("unsafe archive path %q", file.Name)
+			}
+			depth := len(strings.Split(directory, "/"))
+			if err := limits.checkDepth(directory, depth); err != nil {
+				return nil, err
+			}
 			continue
 		}
-		if file.Mode()&os.ModeSymlink != 0 || file.UncompressedSize64 > maxWellKnownFileBytes {
+		if file.Mode()&os.ModeSymlink != 0 {
 			return nil, fmt.Errorf("unsupported archive entry %q", file.Name)
 		}
-		contents, err := readWellKnownZIPFile(file)
+		if file.UncompressedSize64 > uint64(limits.MaxFileBytes) {
+			return nil, resourceError("file %q exceeds the %d-byte per-file limit (%d bytes); raise it with --max-file-bytes", file.Name, limits.MaxFileBytes, file.UncompressedSize64)
+		}
+		contents, err := readWellKnownZIPFile(file, limits)
 		if err != nil {
 			return nil, err
 		}
-		if err := addWellKnownArchiveFile(files, file.Name, contents, &total); err != nil {
+		if err := addWellKnownArchiveFile(files, file.Name, contents, budget); err != nil {
 			return nil, err
 		}
 	}
@@ -466,37 +549,39 @@ func extractWellKnownZIP(data []byte) (map[string][]byte, error) {
 	return files, nil
 }
 
-func readWellKnownZIPFile(file *zip.File) ([]byte, error) {
+func readWellKnownZIPFile(file *zip.File, limits resourceLimits) ([]byte, error) {
 	reader, err := file.Open()
 	if err != nil {
 		return nil, err
 	}
 	defer reader.Close()
-	contents, err := io.ReadAll(io.LimitReader(reader, maxWellKnownFileBytes+1))
+	contents, err := io.ReadAll(io.LimitReader(reader, limits.MaxFileBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("read archive entry %q: %w", file.Name, err)
 	}
-	if len(contents) > maxWellKnownFileBytes {
-		return nil, fmt.Errorf("archive entry %q exceeds byte limit", file.Name)
+	if int64(len(contents)) > limits.MaxFileBytes {
+		return nil, resourceError("file %q exceeds the %d-byte per-file limit; raise it with --max-file-bytes", file.Name, limits.MaxFileBytes)
 	}
 	return contents, nil
 }
 
-func fetchWellKnownEntry(source wellKnownSource, indexURL *url.URL, entry wellKnownIndexEntry) (wellKnownFetchedSkill, error) {
+func fetchWellKnownEntry(source wellKnownSource, indexURL *url.URL, entry wellKnownIndexEntry, limits resourceLimits) (wellKnownFetchedSkill, error) {
 	files := make(map[string][]byte, len(entry.Files))
-	total := 0
+	budget := newResourceBudget(limits)
 	var skillURL string
 	for _, file := range entry.Files {
 		fileURL := cloneURL(indexURL)
 		fileURL.Path = path.Join(strings.TrimSuffix(indexURL.Path, "/"+wellKnownIndexFile), entry.Name, file)
 		fileURL.RawPath = ""
-		data, err := fetchWellKnownURL(source, fileURL, maxWellKnownFileBytes)
+		data, err := fetchWellKnownURL(source, fileURL, limits.MaxFileBytes)
 		if err != nil {
 			return wellKnownFetchedSkill{}, err
 		}
-		total += len(data)
-		if total > maxWellKnownTotalBytes {
-			return wellKnownFetchedSkill{}, errors.New("well-known skill exceeds maximum unpacked size")
+		if err := limits.checkDepth(file, pathDirectoryDepth(file)); err != nil {
+			return wellKnownFetchedSkill{}, err
+		}
+		if err := budget.addFile(file, int64(len(data))); err != nil {
+			return wellKnownFetchedSkill{}, err
 		}
 		files[file] = data
 		if strings.EqualFold(file, "SKILL.md") {
@@ -538,7 +623,10 @@ func fetchWellKnownURLStatus(source wellKnownSource, target *url.URL, limit int6
 		return nil, response.StatusCode, err
 	}
 	if int64(len(data)) > limit {
-		return nil, response.StatusCode, fmt.Errorf("response from %s exceeds %d byte limit", target, limit)
+		if strings.HasSuffix(target.Path, "/"+wellKnownIndexFile) {
+			return nil, response.StatusCode, fmt.Errorf("well-known index response from %s exceeds the fixed %d-byte limit", target, limit)
+		}
+		return nil, response.StatusCode, resourceError("response from %s exceeds the %d-byte limit; raise it with --max-file-bytes or --max-total-bytes", target, limit)
 	}
 	return data, response.StatusCode, nil
 }

@@ -4,11 +4,76 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestParseUseOptionsAcceptsResourceOverrides(t *testing.T) {
+	sources, options, parseErrors := parseUseOptions([]string{"owner/repository", "--max-file-bytes", "11534336", "--max-total-bytes", "209715200", "--max-files", "6000", "--max-depth", "25"})
+	if len(parseErrors) != 0 {
+		t.Fatalf("parse errors = %#v", parseErrors)
+	}
+	if len(sources) != 1 || sources[0] != "owner/repository" || options.Limits.MaxFileBytes != 11534336 || options.Limits.MaxTotalBytes != 209715200 || options.Limits.MaxFiles != 6000 || options.Limits.MaxDepth != 25 {
+		t.Fatalf("parsed use options = sources %#v options %#v", sources, options)
+	}
+}
+
+func TestRemoteUseEnforcesAndOverridesResourceLimits(t *testing.T) {
+	skillMD := []byte("---\nname: bounded-use\ndescription: bounded use skill\n---\n")
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/.well-known/agent-skills/index.json":
+			_, _ = response.Write([]byte(`{"skills":[{"name":"bounded-use","description":"bounded use skill","files":["SKILL.md"]}]}`))
+		case "/.well-known/agent-skills/bounded-use/SKILL.md":
+			_, _ = response.Write(skillMD)
+		default:
+			http.NotFound(response, request)
+		}
+	}))
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	tooSmall := fmt.Sprintf("%d", len(skillMD)-1)
+	if exit := runUse(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{server.URL, "--max-file-bytes", tooSmall}); exit != 1 || stdout.String() != "" || !strings.Contains(stderr.String(), "--max-file-bytes") {
+		t.Fatalf("limited use = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	exact := fmt.Sprintf("%d", len(skillMD))
+	arguments := []string{server.URL, "--max-file-bytes", exact, "--max-total-bytes", exact, "--max-files", "1"}
+	if exit := runUse(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, arguments); exit != 0 || stderr.String() != "" || !strings.Contains(stdout.String(), string(skillMD)) {
+		t.Fatalf("exact-boundary use = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+}
+
+func TestUseTreatsExistingAmbiguousRelativeDirectoryAsLocal(t *testing.T) {
+	project := t.TempDir()
+	directory := filepath.Join(project, "owner", "repository")
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	skillMD := "---\nname: local-ambiguous\ndescription: local ambiguous skill\n---\n"
+	if err := os.WriteFile(filepath.Join(directory, "SKILL.md"), []byte(skillMD), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previous) })
+	if err := os.Chdir(project); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if exit := runUse(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{"owner/repository"}); exit != 0 || stderr.String() != "" || !strings.Contains(stdout.String(), skillMD) {
+		t.Fatalf("ambiguous local use = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+}
 
 func TestRemoteContentRevisionFramesPathsAndContents(t *testing.T) {
 	first, second := t.TempDir(), t.TempDir()

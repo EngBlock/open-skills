@@ -29,6 +29,7 @@ type addOptions struct {
 	FullDepth  bool
 	Copy       bool
 	Subagents  []string
+	Limits     resourceLimits
 }
 
 type localSkill struct {
@@ -108,9 +109,14 @@ func runAdd(invocation Invocation, arguments []string) int {
 	var workspace gitWorkspace
 	isGit := false
 	wellKnownURLs := map[string]string{}
+	remoteSource := false
 	if info, statErr := os.Stat(absoluteSource); statErr == nil && info.IsDir() {
 		// Existing directories always retain local-source behavior, even when a
 		// directory happens to resemble an owner/repository shorthand.
+		if options.Limits.hasRemoteOverrides() {
+			_, _ = fmt.Fprintln(invocation.Stderr, "--max-file-bytes, --max-total-bytes, and --max-files apply only to remote sources")
+			return 1
+		}
 	} else if isClearlyLocalPath(source) {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Local path does not exist or is not a directory: %s\n", source)
 		return 1
@@ -119,7 +125,7 @@ func runAdd(invocation Invocation, arguments []string) int {
 			_, _ = fmt.Fprintln(invocation.Stderr, parseErr)
 			return 1
 		}
-		fetched, fetchErr := fetchWellKnownSkills(wellKnown)
+		fetched, fetchErr := fetchWellKnownSkills(wellKnown, options.Limits, options.Skills)
 		if fetchErr != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Discover well-known skills: %v\n", fetchErr)
 			return 1
@@ -132,13 +138,14 @@ func runAdd(invocation Invocation, arguments []string) int {
 		}
 		defer os.RemoveAll(absoluteSource)
 		provenance = installationProvenance{Identity: wellKnown.identity, Type: "well-known"}
+		remoteSource = true
 	} else {
 		git, parseErr := parseGitSource(source)
 		if parseErr != nil {
 			_, _ = fmt.Fprintln(invocation.Stderr, parseErr)
 			return 1
 		}
-		workspace, err = materializeGitSource(git)
+		workspace, err = materializeGitSource(git, options.Limits)
 		if err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Acquire Git source: %v\n", err)
 			return 1
@@ -163,13 +170,14 @@ func runAdd(invocation Invocation, arguments []string) int {
 		}
 		provenance = installationProvenance{Identity: git.Identity, URL: git.URL, Type: git.Type, Ref: workspace.Commit, Workspace: &workspace}
 		isGit = true
+		remoteSource = true
 	}
 
 	if len(options.Skills) > 0 && len(options.SkillPaths) > 0 {
 		_, _ = fmt.Fprintln(invocation.Stderr, "Provide either --skill or --skill-path, not both")
 		return 1
 	}
-	skills, err := discoverLocalSkills(absoluteSource, options.FullDepth)
+	skills, err := discoverLocalSkillsWithLimits(absoluteSource, options.FullDepth, options.Limits)
 	if err == nil {
 		err = assignRepositoryRelativePaths(skills, repositoryRoot)
 	}
@@ -213,8 +221,13 @@ func runAdd(invocation Invocation, arguments []string) int {
 	// Validate every selected tree before mutating any installation. This makes
 	// an unsafe link in one selection fail the whole command without installing
 	// an earlier selection first.
+	contentLimits := unlimitedContentResourceLimits()
+	if remoteSource {
+		contentLimits = options.Limits
+	}
+	budget := newResourceBudget(contentLimits)
 	for index := range selected {
-		selected[index].content, err = prepareSkillContent(selected[index].Path)
+		selected[index].content, err = prepareSkillContentWithBudget(selected[index].Path, budget)
 		if err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Install %s: %v\n", selected[index].Name, err)
 			return 1
@@ -265,7 +278,7 @@ func isClearlyLocalPath(source string) bool {
 }
 
 func parseAddOptions(arguments []string) (string, addOptions, error) {
-	options := addOptions{}
+	options := addOptions{Limits: defaultResourceLimits()}
 	var source string
 	for index := 0; index < len(arguments); index++ {
 		argument := arguments[index]
@@ -312,6 +325,14 @@ func parseAddOptions(arguments []string) (string, addOptions, error) {
 			options.SkillPaths = append(options.SkillPaths, values...)
 			index = next
 		default:
+			matched, next, limitErr := parseResourceLimitOption(arguments, index, &options.Limits)
+			if limitErr != nil {
+				return "", options, limitErr
+			}
+			if matched {
+				index = next
+				continue
+			}
 			if strings.HasPrefix(argument, "-") {
 				return "", options, fmt.Errorf("Unknown option: %s", argument)
 			}
@@ -347,6 +368,10 @@ func optionValues(arguments []string, index int) ([]string, int) {
 }
 
 func discoverLocalSkills(root string, fullDepth bool) ([]localSkill, error) {
+	return discoverLocalSkillsWithLimits(root, fullDepth, defaultResourceLimits())
+}
+
+func discoverLocalSkillsWithLimits(root string, fullDepth bool, limits resourceLimits) ([]localSkill, error) {
 	result := []localSkill{}
 	add := func(directory string) {
 		name, ok := readSkill(directory)
@@ -379,6 +404,11 @@ func discoverLocalSkills(root string, fullDepth bool) ([]localSkill, error) {
 		depth := len(strings.Split(normalized, "/"))
 		if entry.Name() == ".git" || entry.Name() == "node_modules" || entry.Name() == "dist" || entry.Name() == "build" || entry.Name() == "__pycache__" || (!fullDepth && depth > maxDepth) {
 			return filepath.SkipDir
+		}
+		if fullDepth {
+			if err := limits.checkDepth(normalized, depth); err != nil {
+				return err
+			}
 		}
 		// Without --full-depth only conventional skills catalogs get a second
 		// nested level; unrelated root folders remain shallow.

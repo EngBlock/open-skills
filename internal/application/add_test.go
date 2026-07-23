@@ -26,6 +26,55 @@ func TestNormalizedSkillNameCombinesUnicodeCaseAndInstallSanitization(t *testing
 	}
 }
 
+func TestParseAddOptionsAcceptsDeterministicResourceOverrides(t *testing.T) {
+	source, options, err := parseAddOptions([]string{"owner/repository", "--yes", "--max-file-bytes", "11534336", "--max-total-bytes", "209715200", "--max-files", "6000", "--max-depth", "25"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if source != "owner/repository" || !options.Yes || options.Limits.MaxFileBytes != 11534336 || options.Limits.MaxTotalBytes != 209715200 || options.Limits.MaxFiles != 6000 || options.Limits.MaxDepth != 25 {
+		t.Fatalf("parsed add options = source %q options %#v", source, options)
+	}
+}
+
+func TestFullDepthDiscoveryResourceBoundary(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		depth     int
+		wantError bool
+	}{
+		{"immediately below", 4, false},
+		{"exactly at", 5, false},
+		{"above", 6, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			parts := []string{root}
+			for depth := 0; depth < test.depth; depth++ {
+				parts = append(parts, "nested")
+			}
+			directory := filepath.Join(parts...)
+			if err := os.MkdirAll(directory, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(directory, "SKILL.md"), []byte("---\nname: depth\ndescription: depth\n---\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			limits := defaultResourceLimits()
+			limits.MaxDepth = 5
+			skills, err := discoverLocalSkillsWithLimits(root, true, limits)
+			if test.wantError {
+				if !isResourceLimitError(err) {
+					t.Fatalf("discovery error = %v; want resource limit error", err)
+				}
+				return
+			}
+			if err != nil || len(skills) != 1 {
+				t.Fatalf("discovery = %#v, %v", skills, err)
+			}
+		})
+	}
+}
+
 func TestRepositoryRelativePathsRemainRootedAboveASearchSubpath(t *testing.T) {
 	repository := t.TempDir()
 	directory := filepath.Join(repository, "catalog", "selected")

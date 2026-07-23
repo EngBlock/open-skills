@@ -43,9 +43,8 @@ type archiveSymlink struct {
 }
 
 const (
-	maxGitArchiveBytes   = 32 << 20
-	maxGitArchiveEntries = 10_000
-	maxGitArchiveDepth   = 20
+	gitArchiveFramingAllowance    = 1 << 20
+	maxGitArchiveFramingAllowance = 256 << 20
 )
 
 var githubShorthand = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*(?:/.*)?$`)
@@ -220,7 +219,8 @@ func firstNonempty(values ...string) string {
 	return ""
 }
 
-func materializeGitSource(source gitSource) (gitWorkspace, error) {
+func materializeGitSource(source gitSource, selectedLimits resourceLimits) (gitWorkspace, error) {
+	limits := acquisitionResourceLimits(selectedLimits)
 	cloneURL := source.CloneURL
 	if cloneURL == "" {
 		cloneURL = source.URL
@@ -263,10 +263,10 @@ func materializeGitSource(source gitSource) (gitWorkspace, error) {
 		return fail(fmt.Errorf("resolve Git commit: %w: %s", err, strings.TrimSpace(string(output))))
 	}
 	workspace.Commit = strings.TrimSpace(string(output))
-	if output, err = runGitArchive("-C", workspace.Repository, "archive", "--format=tar", workspace.Commit); err != nil {
+	if output, err = runGitArchive(limits, "-C", workspace.Repository, "archive", "--format=tar", workspace.Commit); err != nil {
 		return fail(fmt.Errorf("archive resolved Git commit: %w: %s", err, strings.TrimSpace(string(output))))
 	}
-	if err := extractGitArchive(output, workspace.Root, &workspace.FallbackLinks); err != nil {
+	if err := extractGitArchiveWithLimits(output, workspace.Root, limits, &workspace.FallbackLinks); err != nil {
 		return fail(fmt.Errorf("extract resolved Git commit: %w", err))
 	}
 	return workspace, nil
@@ -332,13 +332,13 @@ func (buffer *limitedBuffer) Write(data []byte) (int, error) {
 	return buffer.Buffer.Write(data)
 }
 
-func runGitArchive(arguments ...string) ([]byte, error) {
+func runGitArchive(limits resourceLimits, arguments ...string) ([]byte, error) {
 	context, cancel := context.WithTimeout(context.Background(), gitCloneTimeout())
 	defer cancel()
 	command := exec.CommandContext(context, "git", arguments...)
 	command.Env = gitEnvironment()
 	var stdout limitedBuffer
-	stdout.limit = maxGitArchiveBytes
+	stdout.limit = gitArchiveTransportLimit(limits)
 	var stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
@@ -347,12 +347,28 @@ func runGitArchive(arguments ...string) ([]byte, error) {
 		return stdout.Bytes(), fmt.Errorf("Git command timed out after %s", gitCloneTimeout())
 	}
 	if stdout.exceeded {
-		return stdout.Bytes(), fmt.Errorf("Git archive exceeds %d byte limit", maxGitArchiveBytes)
+		return stdout.Bytes(), resourceError("Git archive exceeds its bounded transport limit; raise content limits with --max-file-bytes, --max-total-bytes, or --max-files")
 	}
 	if err != nil {
 		return stdout.Bytes(), fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	return stdout.Bytes(), nil
+}
+
+func gitArchiveTransportLimit(limits resourceLimits) int {
+	maximum := int64(^uint(0) >> 1)
+	// Git's uncompressed tar adds headers, padding, and directory entries. Keep
+	// that framing allowance finite even when a user deliberately raises depth
+	// or file-count limits; extraction enforces the exact content budget.
+	overhead := int64(maxGitArchiveFramingAllowance)
+	if limits.MaxFiles <= maxGitArchiveFramingAllowance/2048 {
+		overhead = int64(limits.MaxFiles) * 2048
+	}
+	overhead += gitArchiveFramingAllowance
+	if limits.MaxTotalBytes > maximum-overhead {
+		return int(maximum)
+	}
+	return int(limits.MaxTotalBytes + overhead)
 }
 
 func gitCloneTimeout() time.Duration {
@@ -394,8 +410,12 @@ func gitTreeHash(workspace gitWorkspace, skillDirectory string) (string, error) 
 }
 
 func extractGitArchive(data []byte, destination string, fallbackOutput ...*[]archiveSymlink) error {
+	return extractGitArchiveWithLimits(data, destination, defaultResourceLimits(), fallbackOutput...)
+}
+
+func extractGitArchiveWithLimits(data []byte, destination string, limits resourceLimits, fallbackOutput ...*[]archiveSymlink) error {
 	reader := tar.NewReader(bytes.NewReader(data))
-	entries := 0
+	budget := newResourceBudget(limits)
 	links := []archiveSymlink{}
 	for {
 		header, err := reader.Next()
@@ -405,12 +425,8 @@ func extractGitArchive(data []byte, destination string, fallbackOutput ...*[]arc
 		if err != nil {
 			return err
 		}
-		entries++
-		if entries > maxGitArchiveEntries {
-			return fmt.Errorf("Git archive exceeds %d entry limit", maxGitArchiveEntries)
-		}
-		if header.Size < 0 || header.Size > maxGitArchiveBytes {
-			return fmt.Errorf("Git archive entry %q exceeds byte limit", header.Name)
+		if header.Size < 0 {
+			return fmt.Errorf("Git archive entry %q has a negative size", header.Name)
 		}
 		if header.Name == "" || filepath.IsAbs(header.Name) {
 			return fmt.Errorf("invalid archive path %q", header.Name)
@@ -420,8 +436,15 @@ func extractGitArchive(data []byte, destination string, fallbackOutput ...*[]arc
 		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 			return fmt.Errorf("archive path escapes checkout: %q", header.Name)
 		}
-		if len(strings.Split(filepath.ToSlash(relative), "/")) > maxGitArchiveDepth {
-			return fmt.Errorf("Git archive entry %q exceeds depth limit", header.Name)
+		depth := len(strings.Split(filepath.ToSlash(filepath.Dir(relative)), "/"))
+		if filepath.Dir(relative) == "." {
+			depth = 0
+		}
+		if header.Typeflag == tar.TypeDir {
+			depth = len(strings.Split(strings.Trim(filepath.ToSlash(relative), "/"), "/"))
+		}
+		if err := limits.checkDepth(header.Name, depth); err != nil {
+			return err
 		}
 		switch header.Typeflag {
 		case tar.TypeXGlobalHeader, tar.TypeXHeader:
@@ -431,6 +454,9 @@ func extractGitArchive(data []byte, destination string, fallbackOutput ...*[]arc
 				return err
 			}
 		case tar.TypeReg, tar.TypeRegA:
+			if err := budget.addFile(header.Name, header.Size); err != nil {
+				return err
+			}
 			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 				return err
 			}
@@ -447,6 +473,9 @@ func extractGitArchive(data []byte, destination string, fallbackOutput ...*[]arc
 				return closeErr
 			}
 		case tar.TypeSymlink:
+			if err := budget.addFile(header.Name, int64(len(header.Linkname))); err != nil {
+				return err
+			}
 			links = append(links, archiveSymlink{path: target, target: header.Linkname})
 		default:
 			return fmt.Errorf("unsupported archive entry %q", header.Name)

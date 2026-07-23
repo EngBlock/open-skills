@@ -21,10 +21,12 @@ const (
 )
 
 type updateOptions struct {
-	Global  bool
-	Project bool
-	Yes     bool
-	Skills  []string
+	Global     bool
+	Project    bool
+	Yes        bool
+	Skills     []string
+	Limits     resourceLimits
+	ParseError error
 }
 
 type updateResult struct {
@@ -50,6 +52,10 @@ func runUpdate(invocation Invocation, arguments []string, apply bool) int {
 	interactive := interactiveInput(invocation.Stdin)
 	invocation.Stdin = bufio.NewReader(invocation.Stdin)
 	options := parseUpdateOptions(arguments)
+	if options.ParseError != nil {
+		_, _ = fmt.Fprintln(invocation.Stderr, options.ParseError)
+		return 1
+	}
 	scope, cancelled, err := resolveUpdateScope(invocation, options, interactive)
 	if err != nil {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
@@ -109,8 +115,9 @@ func runUpdate(invocation Invocation, arguments []string, apply bool) int {
 }
 
 func parseUpdateOptions(arguments []string) updateOptions {
-	options := updateOptions{}
-	for _, argument := range arguments {
+	options := updateOptions{Limits: defaultResourceLimits()}
+	for index := 0; index < len(arguments); index++ {
+		argument := arguments[index]
 		switch argument {
 		case "-g", "--global":
 			options.Global = true
@@ -119,6 +126,15 @@ func parseUpdateOptions(arguments []string) updateOptions {
 		case "-y", "--yes":
 			options.Yes = true
 		default:
+			matched, next, err := parseResourceLimitOption(arguments, index, &options.Limits)
+			if err != nil {
+				options.ParseError = err
+				return options
+			}
+			if matched {
+				index = next
+				continue
+			}
 			if !strings.HasPrefix(argument, "-") {
 				options.Skills = append(options.Skills, argument)
 			}
@@ -283,14 +299,14 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", source, err)
 		return updateResult{checked: len(names), failed: len(names)}
 	}
-	workspace, err := materializeUpdateSource(git)
+	workspace, err := materializeUpdateSource(git, options.Limits)
 	if err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", source, err)
 		return updateResult{checked: len(names), failed: len(names)}
 	}
 	defer func() { _ = workspace.remove() }()
 
-	discovered, err := discoverLocalSkills(workspace.Root, true)
+	discovered, err := discoverLocalSkillsWithLimits(workspace.Root, true, options.Limits)
 	if err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Discover skills from %s: %v\n", source, err)
 		return updateResult{checked: len(names), failed: len(names)}
@@ -311,6 +327,16 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 	if err := ensureNoSelectedCollisions(selected); err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", source, err)
 		return updateResult{checked: len(names), failed: len(names)}
+	}
+	budget := newResourceBudget(options.Limits)
+	for _, skill := range selected {
+		content, contentErr := prepareSkillContentWithBudget(skill.Path, budget)
+		if contentErr != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", skill.Name, contentErr)
+			return updateResult{checked: len(names), failed: len(names)}
+		}
+		skill.content = content
+		byPath[filepath.ToSlash(filepath.Join(skill.RelativePath, "SKILL.md"))] = skill
 	}
 
 	result := updateResult{checked: len(names)}
@@ -459,7 +485,7 @@ func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names
 		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", source, err)
 		return updateResult{checked: len(names), failed: len(names)}
 	}
-	fetched, err := fetchWellKnownSkills(provider)
+	fetched, err := fetchWellKnownSkills(provider, options.Limits, names)
 	if err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", source, err)
 		return updateResult{checked: len(names), failed: len(names)}
@@ -470,7 +496,7 @@ func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names
 		return updateResult{checked: len(names), failed: len(names)}
 	}
 	defer os.RemoveAll(root)
-	discovered, err := discoverLocalSkills(root, true)
+	discovered, err := discoverLocalSkillsWithLimits(root, true, options.Limits)
 	if err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Discover skills from %s: %v\n", source, err)
 		return updateResult{checked: len(names), failed: len(names)}
@@ -488,6 +514,16 @@ func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names
 	if err := ensureNoSelectedCollisions(selected); err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", source, err)
 		return updateResult{checked: len(names), failed: len(names)}
+	}
+	budget := newResourceBudget(options.Limits)
+	for _, skill := range selected {
+		content, contentErr := prepareSkillContentWithBudget(skill.Path, budget)
+		if contentErr != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", skill.Name, contentErr)
+			return updateResult{checked: len(names), failed: len(names)}
+		}
+		skill.content = content
+		byName[skill.Name] = skill
 	}
 	result := updateResult{checked: len(names)}
 	for _, name := range names {

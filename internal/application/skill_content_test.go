@@ -52,6 +52,45 @@ func TestPreparedSkillContentDoesNotReopenMutableSourcePaths(t *testing.T) {
 	}
 }
 
+func TestPrepareSkillContentSharesLimitsAcrossSelectedSkills(t *testing.T) {
+	root := t.TempDir()
+	first := filepath.Join(root, "first")
+	second := filepath.Join(root, "second")
+	for _, directory := range []string{first, second} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(first, "payload"), []byte("12345"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(second, "payload"), []byte("123456"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	limits := resourceLimits{MaxFileBytes: 10, MaxTotalBytes: 10, MaxFiles: 2, MaxDepth: 2}
+	budget := newResourceBudget(limits)
+	if _, err := prepareSkillContentWithBudget(first, budget); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := prepareSkillContentWithBudget(second, budget); !isResourceLimitError(err) || !strings.Contains(err.Error(), "total limit") {
+		t.Fatalf("second selected skill error = %v", err)
+	}
+}
+
+func TestPrepareSkillContentCountsDereferencedAliasesAsInstalledFiles(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "payload"), []byte("12345"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("payload", filepath.Join(root, "alias")); err != nil {
+		t.Skipf("symlink creation is unavailable: %v", err)
+	}
+	limits := resourceLimits{MaxFileBytes: 5, MaxTotalBytes: 9, MaxFiles: 2, MaxDepth: 2}
+	if _, err := prepareSkillContentWithBudget(root, newResourceBudget(limits)); !isResourceLimitError(err) || !strings.Contains(err.Error(), "total limit") {
+		t.Fatalf("dereferenced alias error = %v", err)
+	}
+}
+
 func TestContentIdentityRetainsNodeModulesExclusion(t *testing.T) {
 	root := t.TempDir()
 	dependencies := []string{

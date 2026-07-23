@@ -198,9 +198,134 @@ func TestGitSourceInstallsConfinedRepositorySymlink(t *testing.T) {
 	}
 }
 
+func TestGitSelectedContentLimitsIgnoreUnselectedRepositoryFile(t *testing.T) {
+	repository := filepath.Join(t.TempDir(), "repository")
+	skill := filepath.Join(repository, "skills", "small")
+	if err := os.MkdirAll(skill, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skill, "SKILL.md"), []byte("---\nname: small\ndescription: small skill\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repository, "unselected.bin"), bytes.Repeat([]byte{'x'}, int(defaultMaxFileBytes+1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deepIgnored := filepath.Join(repository, "node_modules")
+	for depth := 0; depth < defaultMaxDepth+1; depth++ {
+		deepIgnored = filepath.Join(deepIgnored, "nested")
+	}
+	if err := os.MkdirAll(deepIgnored, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(deepIgnored, "ignored.txt"), []byte("ignored"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runFixtureGit(t, repository, "init", "-q", "-b", "main")
+	runFixtureGit(t, repository, "add", ".")
+	runFixtureGit(t, repository, "commit", "-q", "-m", "fixture")
+
+	project, home := t.TempDir(), t.TempDir()
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previous) })
+	if err := os.Chdir(project); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_STATE_HOME", filepath.Join(home, "state"))
+	var stdout, stderr bytes.Buffer
+	source := "file://" + filepath.ToSlash(repository)
+	arguments := []string{source, "--skill", "small", "--agent", "universal", "--yes"}
+	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, arguments); exit != 0 {
+		t.Fatalf("selected Git install = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(project, ".agents", "skills", "small", "SKILL.md")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRemoteResourceOverrideRaisesGitAcquisitionLimitsNonInteractively(t *testing.T) {
+	repository := filepath.Join(t.TempDir(), "repository")
+	if err := os.MkdirAll(repository, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repository, "SKILL.md"), []byte("---\nname: large\ndescription: large Git skill\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	const payloadSize = 33<<20 + 1
+	if err := os.WriteFile(filepath.Join(repository, "payload.bin"), bytes.Repeat([]byte{'x'}, payloadSize), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runFixtureGit(t, repository, "init", "-q", "-b", "main")
+	runFixtureGit(t, repository, "add", ".")
+	runFixtureGit(t, repository, "commit", "-q", "-m", "fixture")
+	commit := strings.TrimSpace(runFixtureGit(t, repository, "rev-parse", "HEAD"))
+
+	project, home := t.TempDir(), t.TempDir()
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previous) })
+	if err := os.Chdir(project); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_STATE_HOME", filepath.Join(home, "state"))
+	source := "file://" + filepath.ToSlash(repository) + "#" + commit
+	var stdout, stderr bytes.Buffer
+	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, []string{source, "--yes", "--agent", "universal"}); exit != 1 || !strings.Contains(stderr.String(), "--max-file-bytes") {
+		t.Fatalf("default runAdd = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(project, ".agents", "skills", "large")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("default resource failure left installed content: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(project, "skills-lock.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("default resource failure left a lock: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	arguments := []string{source, "--yes", "--agent", "universal", "--max-file-bytes", "35651585", "--max-total-bytes", "36700160"}
+	if exit := runAdd(Invocation{Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}, arguments); exit != 0 {
+		t.Fatalf("override runAdd = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+	if info, err := os.Stat(filepath.Join(project, ".agents", "skills", "large", "payload.bin")); err != nil || info.Size() != payloadSize {
+		t.Fatalf("overridden payload = size %v error %v", func() int64 {
+			if info == nil {
+				return -1
+			}
+			return info.Size()
+		}(), err)
+	}
+
+	if err := os.WriteFile(filepath.Join(repository, "payload.bin"), bytes.Repeat([]byte{'y'}, payloadSize), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runFixtureGit(t, repository, "add", ".")
+	runFixtureGit(t, repository, "commit", "-q", "-m", "update large payload")
+	stdout.Reset()
+	stderr.Reset()
+	updateArguments := []string{"update", "--project", "--yes", "--max-file-bytes", "35651585", "--max-total-bytes", "36700160"}
+	if exit := Run(nil, Invocation{Args: updateArguments, Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr}); exit != 0 || !strings.Contains(stdout.String(), "Updated 1 skill(s)") {
+		t.Fatalf("override update = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+	installed, err := os.ReadFile(filepath.Join(project, ".agents", "skills", "large", "payload.bin"))
+	if err != nil || len(installed) != payloadSize || installed[0] != 'y' {
+		t.Fatalf("updated payload = length %d first byte %q error %v", len(installed), func() byte {
+			if len(installed) == 0 {
+				return 0
+			}
+			return installed[0]
+		}(), err)
+	}
+}
+
 func TestD03MaterializeGitSourceRejectsPlaintextTransportBeforeGitRuns(t *testing.T) {
 	for _, source := range []gitSource{{URL: "http://example.test/repository.git"}, {URL: "git://example.test/repository.git"}, {URL: "ext::command"}} {
-		if _, err := materializeGitSource(source); err == nil {
+		if _, err := materializeGitSource(source, defaultResourceLimits()); err == nil {
 			t.Errorf("materializeGitSource(%q) succeeded", source.URL)
 		}
 	}
@@ -211,7 +336,7 @@ func TestMaterializeGitSourceRedactsQueryCredentialsFromErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := materializeGitSource(source); err == nil || strings.Contains(err.Error(), "review-secret") {
+	if _, err := materializeGitSource(source, defaultResourceLimits()); err == nil || strings.Contains(err.Error(), "review-secret") {
 		t.Fatalf("Git acquisition error was not credential-safe: %v", err)
 	}
 }
@@ -219,7 +344,7 @@ func TestMaterializeGitSourceRedactsQueryCredentialsFromErrors(t *testing.T) {
 func TestD06MaterializeGitSourceCleansFailedWorkspace(t *testing.T) {
 	workspaceRoot := t.TempDir()
 	t.Setenv("TMPDIR", workspaceRoot)
-	if _, err := materializeGitSource(gitSource{URL: "file:///missing/repository.git"}); err == nil {
+	if _, err := materializeGitSource(gitSource{URL: "file:///missing/repository.git"}, defaultResourceLimits()); err == nil {
 		t.Fatal("materializeGitSource succeeded for a missing repository")
 	}
 	entries, err := os.ReadDir(workspaceRoot)
@@ -383,7 +508,7 @@ func TestD06ExtractGitArchiveRejectsEscapingEntries(t *testing.T) {
 	}
 	archive.Reset()
 	writer = tar.NewWriter(&archive)
-	if err := writer.WriteHeader(&tar.Header{Name: "large", Mode: 0o644, Size: maxGitArchiveBytes + 1}); err != nil {
+	if err := writer.WriteHeader(&tar.Header{Name: "large", Mode: 0o644, Size: defaultMaxFileBytes + 1}); err != nil {
 		t.Fatal(err)
 	}
 	if err := extractGitArchive(archive.Bytes(), t.TempDir()); err == nil {

@@ -14,6 +14,16 @@ import (
 	"github.com/EngBlock/open-skills/internal/state"
 )
 
+func TestParseUpdateOptionsAcceptsResourceOverrides(t *testing.T) {
+	options := parseUpdateOptions([]string{"--project", "--yes", "--max-file-bytes", "11534336", "--max-total-bytes", "209715200", "--max-files", "6000", "--max-depth", "25"})
+	if options.ParseError != nil {
+		t.Fatal(options.ParseError)
+	}
+	if !options.Project || !options.Yes || len(options.Skills) != 0 || options.Limits.MaxFileBytes != 11534336 || options.Limits.MaxTotalBytes != 209715200 || options.Limits.MaxFiles != 6000 || options.Limits.MaxDepth != 25 {
+		t.Fatalf("parsed update options = %#v", options)
+	}
+}
+
 func TestCheckReportsUpdateWithoutChangingInstalledSkill(t *testing.T) {
 	repository, first, _ := createGitFixture(t)
 	project, home := updateTestDirectories(t)
@@ -42,8 +52,8 @@ func TestUpdateInstallsExactlyCheckedCommitWhenBranchMoves(t *testing.T) {
 
 	original := materializeUpdateSource
 	t.Cleanup(func() { materializeUpdateSource = original })
-	materializeUpdateSource = func(source gitSource) (gitWorkspace, error) {
-		workspace, err := materializeGitSource(source)
+	materializeUpdateSource = func(source gitSource, limits resourceLimits) (gitWorkspace, error) {
+		workspace, err := materializeGitSource(source, limits)
 		if err != nil {
 			return workspace, err
 		}
