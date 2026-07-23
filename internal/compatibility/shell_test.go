@@ -108,6 +108,7 @@ func TestNativeShellHelpIsCanonicalAndOffline(t *testing.T) {
 		"find, search, f, s",
 		"update [skills...]",
 		"init [name]",
+		"--replace",
 		"--help, -h",
 		"--version, -v",
 	} {

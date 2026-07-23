@@ -25,6 +25,7 @@ type addOptions struct {
 	SkillPaths             []string
 	List                   bool
 	Yes                    bool
+	Replace                bool
 	All                    bool
 	FullDepth              bool
 	Copy                   bool
@@ -106,7 +107,7 @@ func runAdd(invocation Invocation, arguments []string) int {
 		return 1
 	}
 	repositoryRoot := absoluteSource
-	provenance := installationProvenance{Identity: source, URL: source, Type: "local"}
+	provenance := installationProvenance{Identity: absoluteSource, URL: absoluteSource, Type: "local"}
 	var workspace gitWorkspace
 	isGit := false
 	wellKnownURLs := map[string]string{}
@@ -252,15 +253,39 @@ func runAdd(invocation Invocation, arguments []string) int {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
 	}
+	replacements, err := authorizeSourceReplacements(invocation, selected, provenance, scope, project, home, options)
+	if err != nil {
+		_, _ = fmt.Fprintln(invocation.Stderr, err)
+		return 1
+	}
+	installSelected := func() error {
+		for _, skill := range selected {
+			skillProvenance := provenance
+			if sourceURL, ok := wellKnownURLs[skill.Name]; ok {
+				skillProvenance.URL = sourceURL
+			}
+			if err := installLocalSkill(skill, skillProvenance, scope, base, project, home, agents, options.Copy, options.Subagents); err != nil {
+				return fmt.Errorf("Install %s: %w", skill.Name, err)
+			}
+		}
+		return nil
+	}
+	if len(replacements) > 0 {
+		destinations, pathErr := replacementPathsForSkills(selected, scope, base, project, home, agents, options.Subagents)
+		if pathErr == nil {
+			lockPath, _ := installationLockLocation(scope, project, home)
+			destinations = append(destinations, lockPath)
+			pathErr = withReplacementRollback(destinations, installSelected)
+		}
+		err = pathErr
+	} else {
+		err = installSelected()
+	}
+	if err != nil {
+		_, _ = fmt.Fprintln(invocation.Stderr, err)
+		return 1
+	}
 	for _, skill := range selected {
-		skillProvenance := provenance
-		if sourceURL, ok := wellKnownURLs[skill.Name]; ok {
-			skillProvenance.URL = sourceURL
-		}
-		if err := installLocalSkill(skill, skillProvenance, scope, base, project, home, agents, options.Copy, options.Subagents); err != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Install %s: %v\n", skill.Name, err)
-			return 1
-		}
 		_, _ = fmt.Fprintf(invocation.Stdout, "Installed %s\n", skill.Name)
 	}
 	return 0
@@ -285,6 +310,8 @@ func parseAddOptions(arguments []string) (string, addOptions, error) {
 			options.Global = true
 		case "-y", "--yes":
 			options.Yes = true
+		case "--replace":
+			options.Replace = true
 		case "-l", "--list":
 			options.List = true
 		case "--all":
@@ -878,15 +905,7 @@ func installLocalSkill(skill localSkill, provenance installationProvenance, scop
 			return err
 		}
 	}
-	lockPath := filepath.Join(project, "skills-lock.json")
-	version := 1
-	if scope == state.Global {
-		lockPath = filepath.Join(os.Getenv("XDG_STATE_HOME"), "skills", ".skill-lock.json")
-		if os.Getenv("XDG_STATE_HOME") == "" {
-			lockPath = filepath.Join(home, ".agents", ".skill-lock.json")
-		}
-		version = 3
-	}
+	lockPath, version := installationLockLocation(scope, project, home)
 	document, err := state.Read(lockPath, version)
 	if err != nil {
 		return err

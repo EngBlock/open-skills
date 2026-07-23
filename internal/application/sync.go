@@ -12,9 +12,10 @@ import (
 )
 
 type syncOptions struct {
-	Agents []string
-	Yes    bool
-	Force  bool
+	Agents  []string
+	Yes     bool
+	Force   bool
+	Replace bool
 }
 
 type nodeModuleSkill struct {
@@ -77,11 +78,43 @@ func runSync(invocation Invocation, arguments []string) int {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
 	}
+	hasReplacement := false
 	for _, skill := range toInstall {
-		if err := installRecordedSkill(skill.localSkill, skill.Package, "node_modules", project, agents, nil); err != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Sync %s: %v\n", skill.Name, err)
+		provenance := installationProvenance{Identity: skill.Package, URL: skill.Package, Type: "node_modules"}
+		replacement, err := authorizeSourceReplacement(invocation, skill.Name, lock.Entry(skill.Name), provenance, project, options.Replace)
+		if err != nil {
+			_, _ = fmt.Fprintln(invocation.Stderr, err)
 			return 1
 		}
+		hasReplacement = hasReplacement || replacement
+	}
+	syncSelected := func() error {
+		for _, skill := range toInstall {
+			if err := installRecordedSkill(skill.localSkill, skill.Package, "node_modules", project, agents, nil); err != nil {
+				return fmt.Errorf("Sync %s: %w", skill.Name, err)
+			}
+		}
+		return nil
+	}
+	if hasReplacement {
+		selected := make([]localSkill, 0, len(toInstall))
+		for _, skill := range toInstall {
+			selected = append(selected, skill.localSkill)
+		}
+		destinations, pathErr := replacementPathsForSkills(selected, state.Project, project, project, "", agents, nil)
+		if pathErr == nil {
+			destinations = append(destinations, filepath.Join(project, "skills-lock.json"))
+			pathErr = withReplacementRollback(destinations, syncSelected)
+		}
+		err = pathErr
+	} else {
+		err = syncSelected()
+	}
+	if err != nil {
+		_, _ = fmt.Fprintln(invocation.Stderr, err)
+		return 1
+	}
+	for _, skill := range toInstall {
 		_, _ = fmt.Fprintf(invocation.Stdout, "Synced %s from %s\n", skill.Name, skill.Package)
 	}
 	return 0
@@ -95,6 +128,8 @@ func parseSyncOptions(arguments []string) (syncOptions, error) {
 			options.Yes = true
 		case "-f", "--force":
 			options.Force = true
+		case "--replace":
+			options.Replace = true
 		case "-a", "--agent":
 			values, next := optionValues(arguments, index)
 			if len(values) == 0 {
@@ -353,7 +388,8 @@ func localSkillNamed(source, name string) (localSkill, bool) {
 }
 
 func installRecordedSkill(skill localSkill, source, sourceType, project string, agents, subagents []string) error {
-	if err := installLocalSkill(skill, installationProvenance{Identity: source, URL: source, Type: sourceType}, state.Project, project, project, "", agents, false, subagents); err != nil {
+	provenance := installationProvenance{Identity: source, URL: source, Type: sourceType}
+	if err := installLocalSkill(skill, provenance, state.Project, project, project, "", agents, false, subagents); err != nil {
 		return err
 	}
 	hash, owned, err := contentIdentity(skill.Path)

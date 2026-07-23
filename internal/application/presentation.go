@@ -67,7 +67,8 @@ Add Options:
   -s, --skill <skills>   Specify skill names to install (use '*' for all skills)
   --skill-path <paths>   Select exact repository-relative skill directories
   -l, --list             List available skills in the repository without installing
-  -y, --yes              Skip confirmation prompts
+  -y, --yes              Skip ordinary confirmation prompts
+  --replace              Authorize replacing a skill installed from another source
   --copy                 Copy files instead of symlinking to agent directories
   --subagent <names>     Install to Eve subagents (use 'root' for the root agent)
   --all                  Shorthand for --skill '*' --agent '*' -y
@@ -107,7 +108,8 @@ Remove Options:
   --all                  Shorthand for --skill '*' --agent '*' -y
 ` + "  \n" + `Experimental Sync Options:
   -a, --agent <agents>   Specify agents to install to (use '*' for all agents)
-  -y, --yes              Skip confirmation prompts
+  -y, --yes              Skip ordinary confirmation prompts
+  --replace              Authorize replacing a skill installed from another source
 
 List Options:
   -g, --global           List global skills (default: project)

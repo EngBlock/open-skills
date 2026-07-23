@@ -82,6 +82,34 @@ func TestRecordInstallationWritesDeterministicTimestampFreeProjectState(t *testi
 	}
 }
 
+func TestRecordInstallationReusesExistingSanitizedNameKey(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "skills-lock.json")
+	if err := os.WriteFile(path, []byte(`{"version":1,"skills":{"Case Skill":{"source":"/old","sourceType":"local","computedHash":"old","vendorExtension":true}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	document, err := Read(path, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := document.RecordInstallation("case/skill", InstallationRecord{Source: "/new", SourceType: "local", InstalledContentHash: "new", OwnedFiles: []string{"SKILL.md"}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(document.Skills) != 1 {
+		t.Fatalf("recording normalized name created duplicate keys: %#v", document.Skills)
+	}
+	entry, ok := document.Skills["Case Skill"]
+	if !ok || entry.Source != "/new" || entry.ComputedHash != "new" {
+		t.Fatalf("existing normalized key was not updated: %#v", document.Skills)
+	}
+	data, err := document.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(data, []byte(`"vendorExtension": true`)) {
+		t.Fatalf("existing entry extensions were not retained: %s", data)
+	}
+}
+
 func TestProjectStateReadsAndWritesRecordedPlacements(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "skills-lock.json")
 	document, err := Read(path, 1)

@@ -56,6 +56,21 @@ is likewise preflighted before that source is changed. Local file/byte/count
 behavior stays compatible, while full-depth traversal always retains its finite
 ceiling.
 
+## D07: provenance-safe replacement
+
+An installed skill may be reinstalled or updated from the same credential-free,
+normalized source identity without additional authorization. Add and sync
+preflight every selected skill against the existing scope lock before changing
+any placement. A same-named skill owned by another source is rejected in
+automation unless `--replace` is passed explicitly; `--yes` does not imply that
+authorization. Interactive replacement displays the sanitized installed and
+incoming source types and identities before asking for confirmation.
+
+Rejected replacements leave content, placements, and lock state unchanged.
+Authorized replacements snapshot affected placements and restore them when a
+placement or atomic lock write fails. The broader crash-recovery and durable
+journal guarantees remain assigned to the later transaction milestone.
+
 ## D09: safe existing-state inspection
 
 `open-skills list` reads project state from `./skills-lock.json`. Global listing reads `$XDG_STATE_HOME/skills/.skill-lock.json` when `XDG_STATE_HOME` is set and otherwise uses `~/.agents/.skill-lock.json`. Existing project schema version 1 and global schema version 3 state from upstream skills v1.5.20 and npm open-skills 0.1.2 is used in place; no first-run migration occurs.

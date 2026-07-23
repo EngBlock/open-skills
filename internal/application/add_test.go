@@ -2,6 +2,7 @@ package application
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,6 +34,43 @@ func TestParseAddOptionsAcceptsDeterministicResourceOverrides(t *testing.T) {
 	}
 	if source != "owner/repository" || !options.Yes || options.Limits.MaxFileBytes != 11534336 || options.Limits.MaxTotalBytes != 209715200 || options.Limits.MaxFiles != 6000 || options.Limits.MaxDepth != 25 {
 		t.Fatalf("parsed add options = source %q options %#v", source, options)
+	}
+}
+
+func TestSameInstallationSourceUsesSanitizedStableIdentity(t *testing.T) {
+	project := t.TempDir()
+	local := filepath.Join(project, "source#one")
+	tests := []struct {
+		name     string
+		existing state.LockEntry
+		incoming installationProvenance
+		want     bool
+	}{
+		{
+			name:     "relative and absolute local aliases",
+			existing: state.LockEntry{Source: "source#one", SourceType: "local"},
+			incoming: installationProvenance{Identity: local, URL: local, Type: "local"},
+			want:     true,
+		},
+		{
+			name:     "local fragment characters remain identity",
+			existing: state.LockEntry{Source: local, SourceType: "local"},
+			incoming: installationProvenance{Identity: filepath.Join(project, "source#two"), Type: "local"},
+			want:     false,
+		},
+		{
+			name:     "source type remains identity",
+			existing: state.LockEntry{Source: "owner/repository", SourceType: "github"},
+			incoming: installationProvenance{Identity: "owner/repository", Type: "local"},
+			want:     false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := sameInstallationSource(test.existing, test.incoming, project); got != test.want {
+				t.Fatalf("sameInstallationSource = %v; want %v", got, test.want)
+			}
+		})
 	}
 }
 
@@ -185,6 +223,96 @@ func TestRunAddLetsInteractiveUserResolveAmbiguousNameByRepositoryPath(t *testin
 	}
 	if !strings.Contains(string(installed), "# second") {
 		t.Fatalf("wrong collision candidate installed: %q", installed)
+	}
+}
+
+func TestRunAddInteractiveReplacementDisplaysSanitizedSourcesAndCanReject(t *testing.T) {
+	project := t.TempDir()
+	source := filepath.Join(t.TempDir(), "replacement")
+	if err := os.MkdirAll(source, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "SKILL.md"), []byte("---\nname: provenance-skill\ndescription: replacement\n---\n# replacement\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	canonical := filepath.Join(project, ".agents", "skills", "provenance-skill")
+	if err := os.MkdirAll(canonical, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	prior := []byte("---\nname: provenance-skill\ndescription: prior\n---\n# prior\n")
+	if err := os.WriteFile(filepath.Join(canonical, "SKILL.md"), prior, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	lock := []byte(`{"version":1,"skills":{"provenance-skill":{"source":"old-source\u001b[31m","sourceType":"local","computedHash":"prior"}}}`)
+	lockPath := filepath.Join(project, "skills-lock.json")
+	if err := os.WriteFile(lockPath, lock, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(project)
+	var stdout, stderr bytes.Buffer
+	code := runAdd(Invocation{Stdin: bytes.NewBufferString("no\n"), Stdout: &stdout, Stderr: &stderr, Interactive: true}, []string{source, "--agent", "universal", "--yes"})
+	if code != 1 || !strings.Contains(stderr.String(), "replacement cancelled") {
+		t.Fatalf("rejected replacement = %d stdout %q stderr %q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Installed source (local): old-source\n") || !strings.Contains(stdout.String(), "Replacement source (local): "+source+"\n") || !strings.Contains(stdout.String(), "Replace provenance-skill? [y/N]") {
+		t.Fatalf("replacement prompt omitted sanitized provenance: %q", stdout.String())
+	}
+	if strings.Contains(stdout.String(), "\x1b") {
+		t.Fatalf("replacement prompt contains terminal escapes: %q", stdout.String())
+	}
+	if installed, err := os.ReadFile(filepath.Join(canonical, "SKILL.md")); err != nil || !bytes.Equal(installed, prior) {
+		t.Fatalf("rejected replacement changed prior content: %q, %v", installed, err)
+	}
+	if installedLock, err := os.ReadFile(lockPath); err != nil || !bytes.Equal(installedLock, lock) {
+		t.Fatalf("rejected replacement changed prior lock: %q, %v", installedLock, err)
+	}
+}
+
+func TestReplacementRollbackRestoresEveryPlacementAndLock(t *testing.T) {
+	root := t.TempDir()
+	first := filepath.Join(root, "first")
+	second := filepath.Join(root, "second")
+	lock := filepath.Join(root, "skills-lock.json")
+	for _, directory := range []string{first, second} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(directory, "SKILL.md"), []byte("prior"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(lock, []byte("prior lock"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	failure := errors.New("injected post-write failure")
+	err := withReplacementRollback([]string{first, second, lock}, func() error {
+		for _, directory := range []string{first, second} {
+			if err := os.RemoveAll(directory); err != nil {
+				return err
+			}
+			if err := os.MkdirAll(directory, 0o755); err != nil {
+				return err
+			}
+			if err := os.WriteFile(filepath.Join(directory, "SKILL.md"), []byte("replacement"), 0o644); err != nil {
+				return err
+			}
+		}
+		if err := os.WriteFile(lock, []byte("replacement lock"), 0o600); err != nil {
+			return err
+		}
+		return failure
+	})
+	if !errors.Is(err, failure) {
+		t.Fatalf("replacement failure = %v; want %v", err, failure)
+	}
+	for _, directory := range []string{first, second} {
+		data, err := os.ReadFile(filepath.Join(directory, "SKILL.md"))
+		if err != nil || string(data) != "prior" {
+			t.Fatalf("placement %s was not restored: %q, %v", directory, data, err)
+		}
+	}
+	if data, err := os.ReadFile(lock); err != nil || string(data) != "prior lock" {
+		t.Fatalf("lock was not restored: %q, %v", data, err)
 	}
 }
 

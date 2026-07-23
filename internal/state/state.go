@@ -411,7 +411,11 @@ func (document *Document) RecordInstallation(name string, record InstallationRec
 		document.raw = make(map[string]json.RawMessage)
 	}
 	record.Agents = normalizeAgentIDs(record.Agents)
-	entry := document.Skills[name]
+	key, existing := document.EntryWithName(name)
+	if existing == nil {
+		key = name
+	}
+	entry := document.Skills[key]
 	fields := cloneRawMap(entry.raw)
 	if fields == nil {
 		fields = make(map[string]json.RawMessage)
@@ -496,7 +500,7 @@ func (document *Document) RecordInstallation(name string, record InstallationRec
 		}
 		fields[field] = encoded
 	}
-	document.Skills[name] = LockEntry{
+	document.Skills[key] = LockEntry{
 		Source: record.Source, SourceURL: record.SourceURL, SourceType: record.SourceType,
 		Ref: record.Ref, SkillPath: record.SkillPath, ComputedHash: record.InstalledContentHash,
 		SkillFolderHash: record.SkillFolderHash, InstalledContentHash: record.InstalledContentHash,
