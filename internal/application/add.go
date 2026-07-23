@@ -314,9 +314,6 @@ func discoverLocalSkills(root string, fullDepth bool) ([]localSkill, error) {
 		return result, nil
 	}
 	maxDepth := 3 // root/skills/<category>/<skill> is the baseline local catalog layout.
-	if fullDepth {
-		maxDepth = 5
-	}
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -330,7 +327,7 @@ func discoverLocalSkills(root string, fullDepth bool) ([]localSkill, error) {
 		}
 		normalized := filepath.ToSlash(relative)
 		depth := len(strings.Split(normalized, "/"))
-		if entry.Name() == ".git" || entry.Name() == "node_modules" || entry.Name() == "dist" || entry.Name() == "build" || entry.Name() == "__pycache__" || depth > maxDepth {
+		if entry.Name() == ".git" || entry.Name() == "node_modules" || entry.Name() == "dist" || entry.Name() == "build" || entry.Name() == "__pycache__" || (!fullDepth && depth > maxDepth) {
 			return filepath.SkipDir
 		}
 		// Without --full-depth only conventional skills catalogs get a second

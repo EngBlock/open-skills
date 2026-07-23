@@ -77,6 +77,8 @@ func Run(ctx context.Context, invocation Invocation) int {
 		return runAdd(invocation, invocation.Args[1:])
 	case "add", "a":
 		return runAdd(invocation, invocation.Args[1:])
+	case "use":
+		return runUse(invocation, invocation.Args[1:])
 	default:
 		_, _ = fmt.Fprintf(invocation.Stdout, "Unknown command: %s\nRun open-skills --help for usage.\n", command)
 		return 1
