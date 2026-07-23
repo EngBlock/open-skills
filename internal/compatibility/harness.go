@@ -330,8 +330,8 @@ func createFixtureJunction(path, target string) error {
 	if runtime.GOOS != "windows" {
 		return os.Symlink(target, path)
 	}
-	commandLine := fmt.Sprintf(`mklink /J "%s" "%s"`, strings.ReplaceAll(path, `"`, `""`), strings.ReplaceAll(target, `"`, `""`))
-	command := exec.Command("cmd.exe", "/d", "/s", "/c", commandLine)
+	command := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", `New-Item -ItemType Junction -Path $env:OPEN_SKILLS_JUNCTION_PATH -Target $env:OPEN_SKILLS_JUNCTION_TARGET | Out-Null`)
+	command.Env = append(os.Environ(), "OPEN_SKILLS_JUNCTION_PATH="+path, "OPEN_SKILLS_JUNCTION_TARGET="+target)
 	if output, err := command.CombinedOutput(); err != nil {
 		return fmt.Errorf("create fixture junction: %w: %s", err, output)
 	}
