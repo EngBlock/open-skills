@@ -42,6 +42,41 @@ type localSkill struct {
 	content      *skillContent
 }
 
+type addJSONOutput struct {
+	SchemaVersion int                `json:"schemaVersion"`
+	Scope         state.Scope        `json:"scope"`
+	Available     []addJSONAvailable `json:"available,omitempty"`
+	Installed     []addJSONInstalled `json:"installed,omitempty"`
+}
+
+type addJSONAvailable struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
+type addJSONInstalled struct {
+	Name       string   `json:"name"`
+	Path       string   `json:"path"`
+	Agents     []string `json:"agents"`
+	Source     string   `json:"source"`
+	SourceType string   `json:"sourceType"`
+	Revision   *string  `json:"revision"`
+}
+
+func addJSONInstallationPath(name string, scope state.Scope, base, project, home string, agents []string) string {
+	canonical := filepath.Join(base, ".agents", "skills", state.SanitizeName(name))
+	candidates := []string{canonical}
+	for _, agent := range agents {
+		candidates = append(candidates, removalAgentPaths(agent, name, scope, project, home)...)
+	}
+	for _, candidate := range candidates {
+		if _, err := os.Lstat(candidate); err == nil {
+			return candidate
+		}
+	}
+	return canonical
+}
+
 func materializeWellKnownSkills(fetched []wellKnownFetchedSkill) (string, map[string]string, error) {
 	if len(fetched) == 0 {
 		return "", nil, fmt.Errorf("no skills to materialize")
@@ -99,6 +134,7 @@ func runAdd(invocation Invocation, arguments []string) int {
 	invocation.Stdin = bufio.NewReader(invocation.Stdin)
 	source, options, err := parseAddOptions(arguments)
 	if err != nil {
+		recordAutomationError(invocation, err, "invalid_arguments")
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
 	}
@@ -193,6 +229,18 @@ func runAdd(invocation Invocation, arguments []string) int {
 		return 1
 	}
 	if options.List {
+		if invocation.JSON {
+			scope := state.Project
+			if options.Global {
+				scope = state.Global
+			}
+			available := make([]addJSONAvailable, 0, len(skills))
+			for _, skill := range skills {
+				available = append(available, addJSONAvailable{Name: skill.Name, Path: skill.RelativePath})
+			}
+			recordAutomationSuccess(invocation, addJSONOutput{SchemaVersion: automationSchemaVersion, Scope: scope, Available: available})
+			return 0
+		}
 		colliding := collidingSkillPaths(skills)
 		for _, skill := range skills {
 			if colliding[normalizedSkillName(skill.Name)] {
@@ -206,6 +254,7 @@ func runAdd(invocation Invocation, arguments []string) int {
 
 	selected, err := selectLocalSkills(invocation, skills, options)
 	if err != nil {
+		recordAutomationError(invocation, err, "selection_failed")
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
 	}
@@ -261,10 +310,12 @@ func runAdd(invocation Invocation, arguments []string) int {
 	return runWithStateAndInstallationLocks(invocation, lockPath, installationBases, advisoryLockExclusive, func() int {
 		agents, err := selectInstallAgents(invocation, options, scope, project, home)
 		if err != nil {
+			recordAutomationError(invocation, err, "invalid_agent")
 			_, _ = fmt.Fprintln(invocation.Stderr, err)
 			return 1
 		}
 		if _, err := authorizeSourceReplacements(invocation, selected, provenance, scope, project, home, options); err != nil {
+			recordStateOrAutomationError(invocation, err, "replacement_requires_authorization")
 			_, _ = fmt.Fprintln(invocation.Stderr, err)
 			return 1
 		}
@@ -272,7 +323,9 @@ func runAdd(invocation Invocation, arguments []string) int {
 		_, lockVersion := installationLockLocation(scope, project, home)
 		installationState, err := state.Read(lockPath, lockVersion)
 		if err != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "read installation state: %v\n", err)
+			failure := fmt.Errorf("read installation state: %w", err)
+			recordStateOrAutomationError(invocation, failure, "operation_failed")
+			_, _ = fmt.Fprintln(invocation.Stderr, failure)
 			return 1
 		}
 		for _, skill := range selected {
@@ -305,6 +358,29 @@ func runAdd(invocation Invocation, arguments []string) int {
 		if err != nil {
 			_, _ = fmt.Fprintln(invocation.Stderr, err)
 			return 1
+		}
+		if invocation.JSON {
+			installed := make([]addJSONInstalled, 0, len(selected))
+			agents = orderedAgentIDs(agents)
+			var revision *string
+			if provenance.Ref != "" {
+				value := provenance.Ref
+				revision = &value
+			}
+			for _, skill := range selected {
+				installed = append(installed, addJSONInstalled{
+					Name: skill.Name, Path: addJSONInstallationPath(skill.Name, scope, base, project, home, agents),
+					Agents: append([]string(nil), agents...), Source: credentialFreeSource(provenance.Identity), SourceType: provenance.Type, Revision: revision,
+				})
+			}
+			sort.Slice(installed, func(i, j int) bool {
+				if installed[i].Name != installed[j].Name {
+					return installed[i].Name < installed[j].Name
+				}
+				return installed[i].Path < installed[j].Path
+			})
+			recordAutomationSuccess(invocation, addJSONOutput{SchemaVersion: automationSchemaVersion, Scope: scope, Installed: installed})
+			return 0
 		}
 		for _, skill := range selected {
 			_, _ = fmt.Fprintf(invocation.Stdout, "Installed %s\n", skill.Name)
@@ -671,7 +747,11 @@ func selectSkillNames(invocation Invocation, skills []localSkill, selectors []st
 		}
 		if len(matches) > 1 {
 			if !invocation.Interactive {
-				return nil, formatSkillAmbiguity(selector, matches)
+				failure := formatSkillAmbiguity(selector, matches)
+				if invocation.JSON {
+					return nil, automationError("selection_required", failure.Error())
+				}
+				return nil, failure
 			}
 			paths := make([]string, 0, len(matches))
 			for _, skill := range matches {
@@ -732,6 +812,9 @@ func selectLocalSkills(invocation Invocation, skills []localSkill, options addOp
 		}
 		return skills, nil
 	}
+	if invocation.JSON {
+		return nil, automationError("selection_required", "multiple skills are available; select skills with --skill or --skill-path")
+	}
 	labels := make([]string, 0, len(skills))
 	colliding := collidingSkillPaths(skills)
 	for _, skill := range skills {
@@ -791,6 +874,9 @@ func selectInstallAgents(invocation Invocation, options addOptions, scope state.
 			// npm automatically includes all universal consumers when it detects agents.
 			requested = append(requested, state.UniversalAgentIDs(scope)...)
 		} else {
+			if invocation.JSON {
+				return nil, automationError("selection_required", "no install agent was detected; select agents with --agent")
+			}
 			_, _ = fmt.Fprint(invocation.Stdout, "Select agents to install (or * for all): ")
 			line, err := readInputLine(invocation.Stdin)
 			if err != nil && err != io.EOF {

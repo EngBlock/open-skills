@@ -16,7 +16,9 @@ type Invocation struct {
 	Stdout      io.Writer
 	Stderr      io.Writer
 	Interactive bool
+	JSON        bool
 	context     context.Context
+	automation  *automationExecution
 }
 
 // Version is the native preview version. Release builds may replace it with
@@ -28,6 +30,15 @@ func Run(ctx context.Context, invocation Invocation) int {
 		ctx = context.Background()
 	}
 	invocation.context = ctx
+	arguments, jsonMode := normalizeJSONArguments(invocation.Args)
+	invocation.Args = arguments
+	if jsonMode {
+		return runJSON(invocation, runApplication)
+	}
+	return runApplication(invocation)
+}
+
+func runApplication(invocation Invocation) int {
 	if err := recoverPendingInstallations(invocation); err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Recover installation state: %v\n", err)
 		return 1

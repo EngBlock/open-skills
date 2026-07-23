@@ -47,7 +47,16 @@ type listJSONSkill struct {
 }
 
 func runList(invocation Invocation, arguments []string) int {
-	options := parseListOptions(arguments)
+	options, parseErr := parseListOptions(arguments)
+	jsonMode := options.JSON || invocation.JSON
+	if parseErr != nil {
+		recordAutomationError(invocation, parseErr, "invalid_arguments")
+		if jsonMode && invocation.automation == nil {
+			writeListJSONError(invocation, "invalid_arguments", parseErr.Error(), "")
+		}
+		_, _ = fmt.Fprintln(invocation.Stderr, parseErr)
+		return 1
+	}
 	validAgents := make(map[string]bool)
 	for _, id := range state.AgentIDs() {
 		validAgents[id] = true
@@ -60,7 +69,7 @@ func runList(invocation Invocation, arguments []string) int {
 	}
 	if len(invalidAgents) > 0 {
 		message := fmt.Sprintf("Invalid agents: %s", strings.Join(invalidAgents, ", "))
-		if options.JSON {
+		if jsonMode {
 			writeListJSONError(invocation, "invalid_agent", message, "")
 		}
 		_, _ = fmt.Fprintln(invocation.Stderr, message)
@@ -69,11 +78,11 @@ func runList(invocation Invocation, arguments []string) int {
 	}
 	project, err := os.Getwd()
 	if err != nil {
-		return listFailure(invocation, options.JSON, err)
+		return listFailure(invocation, jsonMode, err)
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return listFailure(invocation, options.JSON, err)
+		return listFailure(invocation, jsonMode, err)
 	}
 	scope := state.Project
 	if options.Global {
@@ -90,9 +99,9 @@ func runList(invocation Invocation, arguments []string) int {
 			AgentFilter:   options.Agents,
 		})
 		if err != nil {
-			return listFailure(invocation, options.JSON, err)
+			return listFailure(invocation, jsonMode, err)
 		}
-		if options.JSON {
+		if jsonMode {
 			output := listJSONOutput{SchemaVersion: 1, Scope: scope, Skills: make([]listJSONSkill, 0, len(snapshot.Skills))}
 			for _, skill := range snapshot.Skills {
 				item := listJSONSkill{Name: skill.Name, Path: skill.CanonicalPath, Scope: skill.Scope, Agents: displayAgentNames(skill.Agents)}
@@ -269,7 +278,7 @@ func sanitizeHuman(value string) string {
 	return strings.Join(strings.Fields(builder.String()), " ")
 }
 
-func parseListOptions(arguments []string) listOptions {
+func parseListOptions(arguments []string) (listOptions, error) {
 	options := listOptions{}
 	for index := 0; index < len(arguments); index++ {
 		switch arguments[index] {
@@ -278,13 +287,19 @@ func parseListOptions(arguments []string) listOptions {
 		case "--json":
 			options.JSON = true
 		case "-a", "--agent":
+			start := len(options.Agents)
 			for index+1 < len(arguments) && !strings.HasPrefix(arguments[index+1], "-") {
 				index++
 				options.Agents = append(options.Agents, arguments[index])
 			}
+			if len(options.Agents) == start {
+				return options, fmt.Errorf("%s requires at least one agent", arguments[index])
+			}
+		default:
+			return options, fmt.Errorf("Unknown option or argument: %s", arguments[index])
 		}
 	}
-	return options
+	return options, nil
 }
 
 func displayAgentNames(ids []string) []string {

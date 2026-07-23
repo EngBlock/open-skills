@@ -163,16 +163,10 @@ Native `open-skills use` supports local, Git, and well-known HTTPS sources. Remo
 
 Approvals are stored under the platform user configuration directory at `open-skills/trust.json` (honoring `XDG_CONFIG_HOME`). Each record contains only sanitized source identity, exact commit/content revision, and approval time. `open-skills trust list [--json]`, exact `trust revoke <source> --commit <revision>`, broad source revocation, and `trust clear` are offline. Broad revocation and clearing prompt in a terminal or require `--yes` in automation.
 
-## D11: versioned list JSON
+## D11: versioned JSON automation
 
-`open-skills list --json` writes only one JSON document to stdout and sends human diagnostics to stderr. Success uses schema version 1:
+`list`, `check`, `add`, `remove`, `update`, and `trust list` expose documented schema-versioned JSON. `--json` can be placed before the command or among its arguments. Each invocation writes exactly one machine-readable document to stdout; diagnostics and subprocess notices remain on stderr. Results use deterministic scope/name ordering and failures expose stable symbolic error codes.
 
-```json
-{
-  "schemaVersion": 1,
-  "scope": "project",
-  "skills": []
-}
-```
+JSON mode cannot prompt and does not grant ordinary or risk-specific authorization. Callers must supply explicit selection and authorization flags such as `--skill`, `--agent`, `--yes`, `--force`, `--replace`, or `--allow-insecure-transport` when the operation requires them. Existing numeric success/failure behavior is unchanged, and JSON remains unsupported for `use` so launched-agent stream and exit passthrough are preserved.
 
-Skills are ordered by name and agent names use deterministic baseline registry order. Failures retain the baseline numeric exit status and return a versioned `error` object with a symbolic code such as `state_malformed`, `state_version_older`, `state_version_newer`, or `invalid_agent`. JSON mode does not emit colors or prompts.
+The complete version 1 schemas, ordering rules, statuses, and symbolic code registry are defined in the [native JSON automation contract](json-contract.md).

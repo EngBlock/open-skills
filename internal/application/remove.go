@@ -25,14 +25,26 @@ type removalCandidate struct {
 	Name string
 }
 
+type removeJSONOutput struct {
+	SchemaVersion int                 `json:"schemaVersion"`
+	Scope         state.Scope         `json:"scope"`
+	Removed       []removeJSONRemoved `json:"removed"`
+}
+
+type removeJSONRemoved struct {
+	Name   string   `json:"name"`
+	Agents []string `json:"agents"`
+}
+
 func runRemove(invocation Invocation, arguments []string) int {
 	invocation.Stdin = bufio.NewReader(invocation.Stdin)
 	options, err := parseRemoveOptions(arguments)
 	if err != nil {
+		recordAutomationError(invocation, err, "invalid_arguments")
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
 		return 1
 	}
-	if runningInAgent() {
+	if runningInAgent() && !invocation.JSON {
 		options.Yes = true
 		_, _ = fmt.Fprintln(invocation.Stdout, "Agent detected — removing non-interactively")
 	}
@@ -54,6 +66,7 @@ func runRemove(invocation Invocation, arguments []string) int {
 	return runWithStateAndInstallationLocks(invocation, lockPath, removalSkillDirectories(scope, project, home), advisoryLockExclusive, func() int {
 		targetAgents, allAgents, err := selectRemoveAgents(options, scope)
 		if err != nil {
+			recordAutomationError(invocation, err, "invalid_agent")
 			_, _ = fmt.Fprintln(invocation.Stderr, err)
 			return 1
 		}
@@ -62,12 +75,16 @@ func runRemove(invocation Invocation, arguments []string) int {
 			Scope: scope, Project: project, Home: home, XDGStateHome: os.Getenv("XDG_STATE_HOME"), XDGConfigHome: os.Getenv("XDG_CONFIG_HOME"),
 		})
 		if err != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Failed to inspect skill state: %v\n", err)
+			message := fmt.Sprintf("Failed to inspect skill state: %v", err)
+			failure := stateAutomationError(err, message)
+			recordAutomationFailure(invocation, failure.Code, failure.Message, failure.Path)
+			_, _ = fmt.Fprintln(invocation.Stderr, message)
 			return 1
 		}
 		candidates := removalCandidates(snapshot, scope, project, home)
 		selected, cancelled, err := selectRemoveSkills(invocation, candidates, options)
 		if err != nil {
+			recordAutomationError(invocation, err, "selection_failed")
 			_, _ = fmt.Fprintln(invocation.Stderr, err)
 			return 1
 		}
@@ -76,7 +93,11 @@ func runRemove(invocation Invocation, arguments []string) int {
 			return 0
 		}
 		if len(selected) == 0 {
-			_, _ = fmt.Fprintln(invocation.Stdout, "No skills found to remove.")
+			if invocation.JSON {
+				recordAutomationSuccess(invocation, removeJSONOutput{SchemaVersion: automationSchemaVersion, Scope: scope, Removed: []removeJSONRemoved{}})
+			} else {
+				_, _ = fmt.Fprintln(invocation.Stdout, "No skills found to remove.")
+			}
 			return 0
 		}
 		localChanges := []localChange{}
@@ -94,6 +115,12 @@ func runRemove(invocation Invocation, arguments []string) int {
 		}
 
 		if !options.Yes {
+			if invocation.JSON {
+				message := "removal requires confirmation; re-run with --yes"
+				recordAutomationFailure(invocation, "confirmation_required", message, "")
+				_, _ = fmt.Fprintln(invocation.Stderr, message)
+				return 1
+			}
 			_, _ = fmt.Fprintln(invocation.Stdout, "Skills to remove:")
 			for _, skill := range selected {
 				_, _ = fmt.Fprintf(invocation.Stdout, "  - %s\n", skill.Name)
@@ -119,6 +146,16 @@ func runRemove(invocation Invocation, arguments []string) int {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Remove skills: %v\n", err)
 			_, _ = fmt.Fprintf(invocation.Stderr, "Failed to remove %d skill(s)\n", len(selected))
 			return 1
+		}
+		if invocation.JSON {
+			removed := make([]removeJSONRemoved, 0, len(selected))
+			agents := orderedAgentIDs(targetAgents)
+			for _, skill := range selected {
+				removed = append(removed, removeJSONRemoved{Name: skill.Name, Agents: append([]string(nil), agents...)})
+			}
+			sort.Slice(removed, func(i, j int) bool { return removed[i].Name < removed[j].Name })
+			recordAutomationSuccess(invocation, removeJSONOutput{SchemaVersion: automationSchemaVersion, Scope: scope, Removed: removed})
+			return 0
 		}
 		_, _ = fmt.Fprintf(invocation.Stdout, "Successfully removed %d skill(s)\n", len(selected))
 		_, _ = fmt.Fprintln(invocation.Stdout, "Done!")
@@ -238,10 +275,16 @@ func removalCandidates(snapshot state.Snapshot, scope state.Scope, project, home
 
 func selectRemoveSkills(invocation Invocation, candidates []removalCandidate, options removeOptions) ([]removalCandidate, bool, error) {
 	if len(candidates) == 0 {
+		if invocation.JSON && len(options.Skills) > 0 && !contains(options.Skills, "*") {
+			return nil, false, automationError("selection_failed", fmt.Sprintf("No matching skills found for: %s", strings.Join(options.Skills, ", ")))
+		}
 		return nil, false, nil
 	}
 	requested := append([]string(nil), options.Skills...)
 	if len(requested) == 0 {
+		if invocation.JSON {
+			return nil, false, automationError("selection_required", "select skills to remove by name, with --skill, or with --all")
+		}
 		names := make([]string, 0, len(candidates))
 		for _, candidate := range candidates {
 			names = append(names, candidate.Name)

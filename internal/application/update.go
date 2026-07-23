@@ -35,6 +35,29 @@ type updateResult struct {
 	checked int
 	updated int
 	failed  int
+	items   []updateJSONResult
+	failure *automationJSONError
+}
+
+type updateJSONOutput struct {
+	SchemaVersion int                  `json:"schemaVersion"`
+	Scope         updateScope          `json:"scope"`
+	Results       []updateJSONResult   `json:"results"`
+	Summary       updateJSONSummary    `json:"summary"`
+	Error         *automationJSONError `json:"error,omitempty"`
+}
+
+type updateJSONResult struct {
+	Name     string      `json:"name"`
+	Scope    state.Scope `json:"scope"`
+	Status   string      `json:"status"`
+	Revision *string     `json:"revision,omitempty"`
+}
+
+type updateJSONSummary struct {
+	Checked int `json:"checked"`
+	Updated int `json:"updated"`
+	Failed  int `json:"failed"`
 }
 
 type gitUpdateAction struct {
@@ -42,6 +65,34 @@ type gitUpdateAction struct {
 	entry  state.LockEntry
 	skill  localSkill
 	remove bool
+}
+
+func updateResults(names []string, scope state.Scope, status string) []updateJSONResult {
+	items := make([]updateJSONResult, 0, len(names))
+	for _, name := range names {
+		items = append(items, updateJSONResult{Name: name, Scope: scope, Status: status})
+	}
+	return items
+}
+
+func failedUpdateResult(names []string, scope state.Scope) updateResult {
+	return updateResult{checked: len(names), failed: len(names), items: updateResults(names, scope, "failed")}
+}
+
+func setUpdateStatus(items []updateJSONResult, name, status, revision string) {
+	for index := range items {
+		if items[index].Name != name {
+			continue
+		}
+		items[index].Status = status
+		if revision != "" {
+			value := revision
+			items[index].Revision = &value
+		} else {
+			items[index].Revision = nil
+		}
+		return
+	}
 }
 
 // materializeUpdateSource is a seam for controlled branch-movement tests. A
@@ -58,10 +109,11 @@ func runUpgrade(invocation Invocation, arguments []string) int {
 }
 
 func runUpdate(invocation Invocation, arguments []string, apply bool) int {
-	interactive := interactiveInput(invocation.Stdin)
+	interactive := !invocation.JSON && interactiveInput(invocation.Stdin)
 	invocation.Stdin = bufio.NewReader(invocation.Stdin)
 	options := parseUpdateOptions(arguments)
 	if options.ParseError != nil {
+		recordAutomationError(invocation, options.ParseError, "invalid_arguments")
 		_, _ = fmt.Fprintln(invocation.Stderr, options.ParseError)
 		return 1
 	}
@@ -91,7 +143,7 @@ func runUpdate(invocation Invocation, arguments []string, apply bool) int {
 		return 1
 	}
 
-	result := updateResult{}
+	result := updateResult{items: []updateJSONResult{}}
 	if scope == updateGlobal || scope == updateBoth {
 		if scope == updateBoth {
 			_, _ = fmt.Fprintln(invocation.Stdout, "Global skills")
@@ -100,6 +152,10 @@ func runUpdate(invocation Invocation, arguments []string, apply bool) int {
 		result.checked += current.checked
 		result.updated += current.updated
 		result.failed += current.failed
+		result.items = append(result.items, current.items...)
+		if result.failure == nil {
+			result.failure = current.failure
+		}
 	}
 	if scope == updateProject || scope == updateBoth {
 		if scope == updateBoth {
@@ -109,12 +165,36 @@ func runUpdate(invocation Invocation, arguments []string, apply bool) int {
 		result.checked += current.checked
 		result.updated += current.updated
 		result.failed += current.failed
+		result.items = append(result.items, current.items...)
+		if result.failure == nil {
+			result.failure = current.failure
+		}
 	}
 	if len(options.Skills) > 0 && result.checked == 0 {
 		_, _ = fmt.Fprintf(invocation.Stdout, "No installed skills found matching: %s\n", strings.Join(options.Skills, ", "))
 	}
 	if apply && result.updated > 0 {
 		_, _ = fmt.Fprintf(invocation.Stdout, "Updated %d skill(s)\n", result.updated)
+	}
+	sort.Slice(result.items, func(i, j int) bool {
+		if result.items[i].Scope != result.items[j].Scope {
+			return result.items[i].Scope < result.items[j].Scope
+		}
+		return result.items[i].Name < result.items[j].Name
+	})
+	if invocation.JSON {
+		if result.failure != nil && result.checked == 0 && len(result.items) == 0 {
+			recordAutomationFailure(invocation, result.failure.Code, result.failure.Message, result.failure.Path)
+		} else {
+			output := updateJSONOutput{
+				SchemaVersion: automationSchemaVersion, Scope: scope, Results: result.items,
+				Summary: updateJSONSummary{Checked: result.checked, Updated: result.updated, Failed: result.failed},
+			}
+			if result.failed > 0 {
+				output.Error = &automationJSONError{Code: "partial_failure", Message: fmt.Sprintf("Failed to check or update %d skill(s)", result.failed)}
+			}
+			recordAutomationSuccess(invocation, output)
+		}
 	}
 	if result.failed > 0 {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Failed to check or update %d skill(s)\n", result.failed)
@@ -241,8 +321,10 @@ func updateScopeSkills(invocation Invocation, options updateOptions, apply bool,
 		return nil
 	})
 	if err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Acquire advisory locks: %v\n", err)
-		return updateResult{failed: 1}
+		message := fmt.Sprintf("Acquire advisory locks: %v", err)
+		_, _ = fmt.Fprintln(invocation.Stderr, message)
+		failure := automationJSONError{Code: "operation_failed", Message: sanitizeHuman(message)}
+		return updateResult{failed: 1, failure: &failure}
 	}
 	return result
 }
@@ -252,8 +334,10 @@ func updateScopeSkillsLocked(invocation Invocation, options updateOptions, apply
 		Scope: scope, Project: project, Home: home, XDGStateHome: os.Getenv("XDG_STATE_HOME"), XDGConfigHome: os.Getenv("XDG_CONFIG_HOME"),
 	})
 	if err != nil {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Inspect %s skills: %v\n", scope, err)
-		return updateResult{failed: 1}
+		message := fmt.Sprintf("Inspect %s skills: %v", scope, err)
+		_, _ = fmt.Fprintln(invocation.Stderr, message)
+		failure := stateAutomationError(err, message)
+		return updateResult{failed: 1, failure: &failure}
 	}
 
 	groups := map[string][]string{}
@@ -281,12 +365,20 @@ func updateScopeSkillsLocked(invocation Invocation, options updateOptions, apply
 			result.checked += current.checked
 			result.updated += current.updated
 			result.failed += current.failed
+			result.items = append(result.items, current.items...)
+			if result.failure == nil {
+				result.failure = current.failure
+			}
 			continue
 		}
 		current := updateGitSource(invocation, snapshot, names, source, options, apply, scope, project, home)
 		result.checked += current.checked
 		result.updated += current.updated
 		result.failed += current.failed
+		result.items = append(result.items, current.items...)
+		if result.failure == nil {
+			result.failure = current.failure
+		}
 	}
 	return result
 }
@@ -331,19 +423,19 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 	git, err := parseGitSource(updateGitSourceInput(snapshot.Lock.Skills[names[0]], source))
 	if err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", displaySource, err)
-		return updateResult{checked: len(names), failed: len(names)}
+		return failedUpdateResult(names, scope)
 	}
 	workspace, err := materializeUpdateSource(git, options.Limits, gitAcquisitionPolicy{AllowInsecureTransport: options.AllowInsecureTransport, Notice: invocation.Stderr})
 	if err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", displaySource, err)
-		return updateResult{checked: len(names), failed: len(names)}
+		return failedUpdateResult(names, scope)
 	}
 	defer func() { _ = workspace.remove() }()
 
 	discovered, err := discoverLocalSkillsWithLimits(workspace.Root, true, options.Limits)
 	if err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Discover skills from %s: %v\n", displaySource, err)
-		return updateResult{checked: len(names), failed: len(names)}
+		return failedUpdateResult(names, scope)
 	}
 	byPath := make(map[string]localSkill, len(discovered))
 	for _, skill := range discovered {
@@ -360,7 +452,7 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 	}
 	if err := ensureNoSelectedCollisions(selected); err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", displaySource, err)
-		return updateResult{checked: len(names), failed: len(names)}
+		return failedUpdateResult(names, scope)
 	}
 	budget := newResourceBudget(options.Limits)
 	for _, skill := range selected {
@@ -370,19 +462,24 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 		}
 		if contentErr != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", skill.Name, contentErr)
-			return updateResult{checked: len(names), failed: len(names)}
+			return failedUpdateResult(names, scope)
 		}
 		skill.content = content
 		byPath[filepath.ToSlash(filepath.Join(skill.RelativePath, "SKILL.md"))] = skill
 	}
 
-	result := updateResult{checked: len(names)}
+	result := updateResult{checked: len(names), items: updateResults(names, scope, "unchanged")}
+	for index := range result.items {
+		value := workspace.Commit
+		result.items[index].Revision = &value
+	}
 	actions := []gitUpdateAction{}
 	for _, name := range names {
 		entry := snapshot.Lock.Skills[name]
 		skill, found := byPath[entry.SkillPath]
 		if !found {
-			remove := apply && !options.Yes && promptDeleteMissing(invocation, name, displaySource)
+			setUpdateStatus(result.items, name, "missing_upstream", workspace.Commit)
+			remove := apply && !options.Yes && !invocation.JSON && promptDeleteMissing(invocation, name, displaySource)
 			if !remove {
 				_, _ = fmt.Fprintf(invocation.Stdout, "Missing upstream skill: %s\n", name)
 			} else {
@@ -394,11 +491,13 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 		if err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", name, err)
 			result.failed++
+			setUpdateStatus(result.items, name, "failed", workspace.Commit)
 			continue
 		}
 		if !changed {
 			continue
 		}
+		setUpdateStatus(result.items, name, "update_available", workspace.Commit)
 		_, _ = fmt.Fprintf(invocation.Stdout, "Update available: %s (%s)\n", name, workspace.Commit)
 		if apply {
 			actions = append(actions, gitUpdateAction{name: name, entry: entry, skill: skill})
@@ -412,14 +511,20 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 		changes, err := updateActionLocalChanges(action, snapshot, scope, project, home)
 		if err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Inspect installed %s: %v\n", action.name, err)
-			result.failed++
+			result.failed += len(actions)
+			for _, pending := range actions {
+				setUpdateStatus(result.items, pending.name, "failed", workspace.Commit)
+			}
 			return result
 		}
 		localChanges = append(localChanges, changes...)
 	}
 	if err := authorizeLocalChanges(invocation, localChanges, options.Force); err != nil {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
-		result.failed++
+		result.failed += len(actions)
+		for _, action := range actions {
+			setUpdateStatus(result.items, action.name, "failed", workspace.Commit)
+		}
 		return result
 	}
 	updates := make([]updatedSkillInstallation, 0, len(actions))
@@ -430,6 +535,9 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 			if err != nil {
 				_, _ = fmt.Fprintf(invocation.Stderr, "Plan removal of missing %s: %v\n", action.name, err)
 				result.failed += len(actions)
+				for _, pending := range actions {
+					setUpdateStatus(result.items, pending.name, "failed", workspace.Commit)
+				}
 				return result
 			}
 			removals = append(removals, plan)
@@ -448,8 +556,18 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 	if err := installUpdatedSkills(updates, removals, scope, project, home); err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Update %s: %v\n", displaySource, err)
 		result.failed += len(actions)
+		for _, action := range actions {
+			setUpdateStatus(result.items, action.name, "failed", workspace.Commit)
+		}
 	} else {
 		result.updated += len(updates)
+		for _, action := range actions {
+			status := "updated"
+			if action.remove {
+				status = "removed"
+			}
+			setUpdateStatus(result.items, action.name, status, workspace.Commit)
+		}
 	}
 	return result
 }
@@ -598,23 +716,23 @@ func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names
 			err = fmt.Errorf("not a well-known source")
 		}
 		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", displaySource, err)
-		return updateResult{checked: len(names), failed: len(names)}
+		return failedUpdateResult(names, scope)
 	}
 	fetched, err := fetchWellKnownSkills(provider, options.Limits, names, newHTTPAcquisitionPolicy(options.AllowInsecureTransport, invocation.Stderr))
 	if err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", displaySource, err)
-		return updateResult{checked: len(names), failed: len(names)}
+		return failedUpdateResult(names, scope)
 	}
 	root, urls, err := materializeWellKnownSkills(fetched)
 	if err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Materialize %s: %v\n", displaySource, err)
-		return updateResult{checked: len(names), failed: len(names)}
+		return failedUpdateResult(names, scope)
 	}
 	defer os.RemoveAll(root)
 	discovered, err := discoverLocalSkillsWithLimits(root, true, options.Limits)
 	if err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Discover skills from %s: %v\n", displaySource, err)
-		return updateResult{checked: len(names), failed: len(names)}
+		return failedUpdateResult(names, scope)
 	}
 	byName := map[string]localSkill{}
 	for _, skill := range discovered {
@@ -628,30 +746,32 @@ func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names
 	}
 	if err := ensureNoSelectedCollisions(selected); err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", displaySource, err)
-		return updateResult{checked: len(names), failed: len(names)}
+		return failedUpdateResult(names, scope)
 	}
 	budget := newResourceBudget(options.Limits)
 	for _, skill := range selected {
 		content, contentErr := prepareSkillContentWithBudget(skill.Path, budget)
 		if contentErr != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Check %s: %v\n", skill.Name, contentErr)
-			return updateResult{checked: len(names), failed: len(names)}
+			return failedUpdateResult(names, scope)
 		}
 		skill.content = content
 		byName[skill.Name] = skill
 	}
-	result := updateResult{checked: len(names)}
+	result := updateResult{checked: len(names), items: updateResults(names, scope, "unchanged")}
 	actions := []gitUpdateAction{}
 	for _, name := range names {
 		entry := snapshot.Lock.Skills[name]
 		skill, found := byName[name]
 		if !found {
+			setUpdateStatus(result.items, name, "missing_upstream", "")
 			_, _ = fmt.Fprintf(invocation.Stdout, "Missing upstream skill: %s\n", name)
 			continue
 		}
 		hash, _, hashErr := contentIdentity(skill.Path)
 		if hashErr != nil {
 			result.failed++
+			setUpdateStatus(result.items, name, "failed", "")
 			continue
 		}
 		current := entry.ComputedHash
@@ -661,6 +781,7 @@ func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names
 		if hash == current {
 			continue
 		}
+		setUpdateStatus(result.items, name, "update_available", "")
 		_, _ = fmt.Fprintf(invocation.Stdout, "Update available: %s\n", name)
 		if apply {
 			actions = append(actions, gitUpdateAction{name: name, entry: entry, skill: skill})
@@ -674,14 +795,20 @@ func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names
 		changes, err := updateActionLocalChanges(action, snapshot, scope, project, home)
 		if err != nil {
 			_, _ = fmt.Fprintf(invocation.Stderr, "Inspect installed %s: %v\n", action.name, err)
-			result.failed++
+			result.failed += len(actions)
+			for _, pending := range actions {
+				setUpdateStatus(result.items, pending.name, "failed", "")
+			}
 			return result
 		}
 		localChanges = append(localChanges, changes...)
 	}
 	if err := authorizeLocalChanges(invocation, localChanges, options.Force); err != nil {
 		_, _ = fmt.Fprintln(invocation.Stderr, err)
-		result.failed++
+		result.failed += len(actions)
+		for _, action := range actions {
+			setUpdateStatus(result.items, action.name, "failed", "")
+		}
 		return result
 	}
 	updates := make([]updatedSkillInstallation, 0, len(actions))
@@ -699,8 +826,14 @@ func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names
 	if err := installUpdatedSkills(updates, nil, scope, project, home); err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Update %s: %v\n", displaySource, err)
 		result.failed += len(updates)
+		for _, action := range actions {
+			setUpdateStatus(result.items, action.name, "failed", "")
+		}
 	} else {
 		result.updated += len(updates)
+		for _, action := range actions {
+			setUpdateStatus(result.items, action.name, "updated", "")
+		}
 	}
 	return result
 }

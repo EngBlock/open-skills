@@ -55,13 +55,15 @@ func runTrust(invocation Invocation, arguments []string) int {
 }
 
 func runTrustList(invocation Invocation, store *truststore.Store, arguments []string) int {
-	jsonOutput := false
+	jsonOutput := invocation.JSON
 	for _, argument := range arguments {
 		if argument == "--json" {
 			jsonOutput = true
 			continue
 		}
-		_, _ = fmt.Fprintf(invocation.Stderr, "Unknown option: %s\n", argument)
+		message := fmt.Sprintf("Unknown option: %s", argument)
+		recordAutomationFailure(invocation, "invalid_arguments", message, "")
+		_, _ = fmt.Fprintln(invocation.Stderr, message)
 		return 1
 	}
 	approvals := store.Approvals()

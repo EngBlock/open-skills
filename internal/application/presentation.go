@@ -56,6 +56,7 @@ Update Options:
   --max-depth <n>        Full-depth traversal ceiling (default: 20)
   --allow-insecure-transport
                          Allow plaintext HTTP/Git sources with a warning
+  --json                 Emit the versioned update/check JSON schema
 
 Project:
   experimental_install Restore skills from skills-lock.json
@@ -81,6 +82,7 @@ Add Options:
   --max-depth <n>        Full-depth traversal ceiling (default: 20)
   --allow-insecure-transport
                          Allow plaintext HTTP/Git sources with a warning
+  --json                 Emit the versioned add JSON schema without prompts
 
 Use Options:
   -s, --skill <skill>    Specify the skill to use
@@ -109,6 +111,7 @@ Remove Options:
   -y, --yes              Skip confirmation prompts
   -f, --force            Authorize deleting locally modified installed content
   --all                  Shorthand for --skill '*' --agent '*' -y
+  --json                 Emit the versioned remove JSON schema without prompts
 ` + "  \n" + `Experimental Sync Options:
   -a, --agent <agents>   Specify agents to install to (use '*' for all agents)
   -y, --yes              Skip ordinary confirmation prompts
@@ -118,7 +121,13 @@ Remove Options:
 List Options:
   -g, --global           List global skills (default: project)
   -a, --agent <agents>   Filter by specific agents
-  --json                 Output as JSON (machine-readable, no ANSI codes)
+  --json                 Emit the versioned list JSON schema
+
+JSON Automation:
+  --json may appear before a supported command or among its arguments.
+  Supported commands: list, check, add, remove, update, and trust list.
+  stdout is one JSON document; diagnostics and subprocess notices use stderr.
+  See docs/json-contract.md for version 1 schemas and symbolic error codes.
 
 Options:
   --help, -h        Show this help message
@@ -166,6 +175,7 @@ Options:
   -y, --yes          Skip confirmation prompts
   -f, --force        Authorize deleting locally modified installed content
   --all              Shorthand for --skill '*' --agent '*' -y
+  --json             Emit the versioned remove JSON schema without prompts
 
 Examples:
   $ open-skills remove                           # interactive selection

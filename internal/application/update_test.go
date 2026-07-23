@@ -45,6 +45,68 @@ func TestCheckReportsUpdateWithoutChangingInstalledSkill(t *testing.T) {
 	}
 }
 
+func TestCheckAndUpdateJSONReportDeterministicStatuses(t *testing.T) {
+	repository, first, second := createGitFixture(t)
+	project, home := updateTestDirectories(t)
+	installGitFixture(t, project, home, repository, first, "universal")
+
+	for _, test := range []struct {
+		command, status string
+		updated         int
+	}{
+		{command: "check", status: "update_available"},
+		{command: "update", status: "updated", updated: 1},
+	} {
+		var stdout, stderr bytes.Buffer
+		exit := Run(nil, Invocation{Args: []string{test.command, "--project", "--json"}, Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr})
+		if exit != 0 || stderr.Len() != 0 {
+			t.Fatalf("%s JSON = %d stdout %q stderr %q", test.command, exit, stdout.String(), stderr.String())
+		}
+		var output struct {
+			SchemaVersion int         `json:"schemaVersion"`
+			Scope         updateScope `json:"scope"`
+			Results       []updateJSONResult
+			Summary       updateJSONSummary
+		}
+		if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
+			t.Fatalf("%s stdout is not JSON: %v: %q", test.command, err, stdout.String())
+		}
+		if output.SchemaVersion != 1 || output.Scope != updateProject || len(output.Results) != 1 || output.Results[0].Name != "fixture" || output.Results[0].Scope != state.Project || output.Results[0].Status != test.status || output.Results[0].Revision == nil || *output.Results[0].Revision != second {
+			t.Fatalf("%s result = %#v", test.command, output)
+		}
+		if output.Summary.Checked != 1 || output.Summary.Updated != test.updated || output.Summary.Failed != 0 {
+			t.Fatalf("%s summary = %#v", test.command, output.Summary)
+		}
+	}
+}
+
+func TestUpdateJSONUsesPartialFailureWhenAnotherScopeHasResults(t *testing.T) {
+	repository, _, latest := createGitFixture(t)
+	project, home := updateTestDirectories(t)
+	installGitFixture(t, project, home, repository, latest, "universal")
+
+	globalLock := filepath.Join(os.Getenv("XDG_STATE_HOME"), "skills", ".skill-lock.json")
+	if err := os.MkdirAll(filepath.Dir(globalLock), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(globalLock, []byte(`{"version":3,"skills":`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	exit := Run(nil, Invocation{Args: []string{"check", "--project", "--global", "--json"}, Stdin: bytes.NewReader(nil), Stdout: &stdout, Stderr: &stderr})
+	if exit != 1 || stderr.Len() == 0 {
+		t.Fatalf("mixed-scope check = %d stdout %q stderr %q", exit, stdout.String(), stderr.String())
+	}
+	var output updateJSONOutput
+	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
+		t.Fatalf("mixed-scope stdout is not JSON: %v: %q", err, stdout.String())
+	}
+	if output.SchemaVersion != 1 || output.Scope != updateBoth || len(output.Results) != 1 || output.Results[0].Name != "fixture" || output.Results[0].Status != "unchanged" || output.Error == nil || output.Error.Code != "partial_failure" || output.Summary.Checked != 1 || output.Summary.Failed != 1 {
+		t.Fatalf("mixed-scope output = %#v", output)
+	}
+}
+
 func TestMissingUpstreamUpdateProtectsUnrecordedEveCopies(t *testing.T) {
 	project, home := t.TempDir(), t.TempDir()
 	root := filepath.Join(project, "agent", "skills", "fixture")
