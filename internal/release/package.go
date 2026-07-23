@@ -4,6 +4,7 @@ package release
 import (
 	"archive/tar"
 	"archive/zip"
+	"bufio"
 	"compress/gzip"
 	"context"
 	"errors"
@@ -47,6 +48,7 @@ type target struct {
 }
 
 var previewVersion = regexp.MustCompile(`^0\.2\.0-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*$`)
+var sha256Checksum = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 var previewTargets = []target{
 	{goos: "darwin", goarch: "arm64", support: Supported, archiveType: "tar.gz"},
@@ -112,6 +114,56 @@ func ReleaseNotes(version string) (string, error) {
 	), nil
 }
 
+func HomebrewFormula(version string, checksums io.Reader) (string, error) {
+	if err := validateVersion(version); err != nil {
+		return "", err
+	}
+	filename := fmt.Sprintf("open-skills_%s_darwin_arm64.tar.gz", version)
+	checksum := ""
+	scanner := bufio.NewScanner(checksums)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) != 2 || fields[1] != filename {
+			continue
+		}
+		if checksum != "" {
+			return "", fmt.Errorf("checksums contain duplicate entries for %s", filename)
+		}
+		if !sha256Checksum.MatchString(fields[0]) {
+			return "", fmt.Errorf("checksum for %s is not a lowercase SHA-256 digest", filename)
+		}
+		checksum = fields[0]
+	}
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("read release checksums: %w", err)
+	}
+	if checksum == "" {
+		return "", fmt.Errorf("checksums do not cover canonical Homebrew artifact %s", filename)
+	}
+
+	return fmt.Sprintf(`class OpenSkills < Formula
+  desc "CLI for the open agent skills ecosystem"
+  homepage "https://github.com/EngBlock/open-skills"
+  url "https://github.com/EngBlock/open-skills/releases/download/v%[1]s/%[2]s"
+  version "%[1]s"
+  sha256 "%[3]s"
+  license "MIT"
+
+  depends_on arch: :arm64
+  depends_on :macos
+
+  def install
+    bin.install "open-skills"
+  end
+
+  test do
+    assert_equal version.to_s, shell_output("#{bin}/open-skills --version").strip
+    assert_match "Usage:", shell_output("#{bin}/open-skills --help")
+  end
+end
+`, version, filename, checksum), nil
+}
+
 func validateOptions(options PackageOptions) error {
 	if err := validateVersion(options.Version); err != nil {
 		return err
@@ -147,7 +199,7 @@ func packageTarget(ctx context.Context, options PackageOptions, selected target)
 		executable += ".exe"
 	}
 	executablePath := filepath.Join(stage, executable)
-	build := exec.CommandContext(ctx, "go", "build", "-trimpath", "-ldflags", "-s -w -X github.com/EngBlock/open-skills/internal/application.Version="+options.Version, "-o", executablePath, "./cmd/open-skills")
+	build := exec.CommandContext(ctx, "go", "build", "-buildvcs=false", "-trimpath", "-ldflags", "-s -w -X github.com/EngBlock/open-skills/internal/application.Version="+options.Version, "-o", executablePath, "./cmd/open-skills")
 	build.Dir = options.Root
 	build.Env = buildEnvironment(selected)
 	if output, err := build.CombinedOutput(); err != nil {

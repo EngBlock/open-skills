@@ -11,6 +11,26 @@ Supports **OpenCode**, **Claude Code**, **Codex**, **Cursor**, and [70 more](#su
 
 ## Install
 
+### Homebrew (macOS ARM64 native preview)
+
+The supported macOS ARM64 native preview is installed from its checksummed, immutable GitHub Release archive. It places only `open-skills` on PATH and requires system Git at runtime.
+
+```bash
+brew tap EngBlock/open-skills https://github.com/EngBlock/open-skills
+brew install EngBlock/open-skills/open-skills
+```
+
+Homebrew owns executable upgrades; `open-skills update` updates installed skills instead:
+
+```bash
+brew update
+brew upgrade EngBlock/open-skills/open-skills
+```
+
+The native build remains a prerelease until the production cutover gate is approved. The npm implementation remains the production distribution during the preview.
+
+### npm
+
 ```bash
 npm install --global @engblock/open-skills
 ```

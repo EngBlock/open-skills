@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"debug/buildinfo"
 	"io"
 	"os"
 	"path/filepath"
@@ -54,6 +55,24 @@ func TestPackageAllBuildsTheNativePreviewTargetSet(t *testing.T) {
 	if err := verifyChecksums(output, result); err != nil {
 		t.Fatalf("generated checksums do not cover the built archives: %v", err)
 	}
+	for _, artifact := range result {
+		if artifact.GOOS != runtime.GOOS || artifact.GOARCH != runtime.GOARCH {
+			continue
+		}
+		executable := filepath.Join(t.TempDir(), "open-skills")
+		if err := os.WriteFile(executable, archivePayload(t, filepath.Join(output, artifact.Filename)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		info, err := buildinfo.ReadFile(executable)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, setting := range info.Settings {
+			if strings.HasPrefix(setting.Key, "vcs") {
+				t.Errorf("release executable contains unstable build setting %s=%s", setting.Key, setting.Value)
+			}
+		}
+	}
 }
 
 func TestReleaseNotesDistinguishSupportAndKeepTheCutoverGateClosed(t *testing.T) {
@@ -77,6 +96,52 @@ func TestReleaseNotesDistinguishSupportAndKeepTheCutoverGateClosed(t *testing.T)
 		if !strings.Contains(notes, text) {
 			t.Errorf("release notes do not contain %q:\n%s", text, notes)
 		}
+	}
+}
+
+func TestHomebrewFormulaReferencesTheCanonicalMacOSARM64Artifact(t *testing.T) {
+	formula, err := HomebrewFormula("0.2.0-preview.7", strings.NewReader(
+		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.0-preview.7_linux_amd64.tar.gz\n"+
+			"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  open-skills_0.2.0-preview.7_darwin_arm64.tar.gz\n",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, text := range []string{
+		`url "https://github.com/EngBlock/open-skills/releases/download/v0.2.0-preview.7/open-skills_0.2.0-preview.7_darwin_arm64.tar.gz"`,
+		`sha256 "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"`,
+		`version "0.2.0-preview.7"`,
+		`depends_on arch: :arm64`,
+		`bin.install "open-skills"`,
+		`shell_output("#{bin}/open-skills --version")`,
+		`shell_output("#{bin}/open-skills --help")`,
+	} {
+		if !strings.Contains(formula, text) {
+			t.Errorf("Homebrew formula does not contain %q:\n%s", text, formula)
+		}
+	}
+	for _, forbidden := range []string{"npm", "node", "curl", "go build", `bin.install "skills"`, `bin.install "add-skill"`} {
+		if strings.Contains(strings.ToLower(formula), forbidden) {
+			t.Errorf("Homebrew formula unexpectedly contains %q:\n%s", forbidden, formula)
+		}
+	}
+}
+
+func TestHomebrewFormulaRequiresTheChecksummedCanonicalArtifact(t *testing.T) {
+	tests := []struct {
+		name      string
+		checksums string
+	}{
+		{name: "missing", checksums: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.0-preview.7_linux_amd64.tar.gz\n"},
+		{name: "malformed checksum", checksums: "not-a-sha  open-skills_0.2.0-preview.7_darwin_arm64.tar.gz\n"},
+		{name: "duplicate", checksums: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.0-preview.7_darwin_arm64.tar.gz\nbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  open-skills_0.2.0-preview.7_darwin_arm64.tar.gz\n"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := HomebrewFormula("0.2.0-preview.7", strings.NewReader(test.checksums)); err == nil {
+				t.Fatal("HomebrewFormula() succeeded; want checksummed canonical artifact failure")
+			}
+		})
 	}
 }
 
@@ -326,6 +391,50 @@ func writeTarModeFixture(t *testing.T, path string, mode int64) {
 type archiveEntry struct {
 	name string
 	size int64
+}
+
+func archivePayload(t *testing.T, path string) []byte {
+	t.Helper()
+	if strings.HasSuffix(path, ".zip") {
+		reader, err := zip.OpenReader(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer reader.Close()
+		if len(reader.File) != 1 {
+			t.Fatalf("%s contains %d entries; want one", path, len(reader.File))
+		}
+		entry, err := reader.File[0].Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer entry.Close()
+		payload, err := io.ReadAll(entry)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return payload
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	compressed, err := gzip.NewReader(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer compressed.Close()
+	reader := tar.NewReader(compressed)
+	if _, err := reader.Next(); err != nil {
+		t.Fatal(err)
+	}
+	payload, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return payload
 }
 
 func archiveEntries(t *testing.T, path string) []archiveEntry {
