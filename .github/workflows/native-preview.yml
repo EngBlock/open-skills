@@ -1,0 +1,56 @@
+name: Native preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '0.2.0 prerelease version without the v prefix (for example, 0.2.0-preview.1)'
+        required: true
+        type: string
+
+concurrency:
+  group: native-preview-${{ inputs.version }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish native preview
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test native preview packaging
+        run: go test ./internal/release
+
+      - name: Build CGO-disabled archives and smoke-test Linux x86-64
+        env:
+          CGO_ENABLED: '0'
+          VERSION: ${{ inputs.version }}
+        run: >-
+          go run ./internal/release/cmd/native-preview
+          --version "$VERSION"
+          --output native-dist
+          --notes native-preview-notes.md
+
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: >-
+          gh release create "v${VERSION}"
+          native-dist/*
+          --prerelease
+          --target "${GITHUB_SHA}"
+          --title "open-skills v${VERSION} native preview"
+          --notes-file native-preview-notes.md
