@@ -405,12 +405,16 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 		return result
 	}
 	updates := make([]updatedSkillInstallation, 0, len(actions))
+	removals := make([]skillRemovalPlan, 0, len(actions))
 	for _, action := range actions {
 		if action.remove {
-			if err := removeInstalledSkill(action.name, snapshot.Lock, scope, project, home); err != nil {
-				_, _ = fmt.Fprintf(invocation.Stderr, "Remove missing %s: %v\n", action.name, err)
-				result.failed++
+			plan, err := planSkillRemoval(action.name, snapshot.Lock, scope, project, home, action.entry.Agents, len(action.entry.Agents) == 0)
+			if err != nil {
+				_, _ = fmt.Fprintf(invocation.Stderr, "Plan removal of missing %s: %v\n", action.name, err)
+				result.failed += len(actions)
+				return result
 			}
+			removals = append(removals, plan)
 			continue
 		}
 		agents := append([]string(nil), action.entry.Agents...)
@@ -423,13 +427,11 @@ func updateGitSource(invocation Invocation, snapshot state.Snapshot, names []str
 			agents:     agents, copyMode: copiedPlacementExists(action.skill.Name, agents, scope, project, home), subagents: action.entry.Subagents,
 		})
 	}
-	if len(updates) > 0 {
-		if err := installUpdatedSkills(updates, scope, project, home); err != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Update %s: %v\n", displaySource, err)
-			result.failed += len(updates)
-		} else {
-			result.updated += len(updates)
-		}
+	if err := installUpdatedSkills(updates, removals, scope, project, home); err != nil {
+		_, _ = fmt.Fprintf(invocation.Stderr, "Update %s: %v\n", displaySource, err)
+		result.failed += len(actions)
+	} else {
+		result.updated += len(updates)
 	}
 	return result
 }
@@ -488,10 +490,13 @@ type updatedSkillInstallation struct {
 	subagents  []string
 }
 
-func installUpdatedSkills(updates []updatedSkillInstallation, scope state.Scope, project, home string) error {
+func installUpdatedSkills(updates []updatedSkillInstallation, removals []skillRemovalPlan, scope state.Scope, project, home string) error {
 	base := scopeBase(scope, project, home)
 	lockPath, _ := installationLockLocation(scope, project, home)
 	destinations := []string{}
+	for _, removal := range removals {
+		destinations = append(destinations, removal.paths...)
+	}
 	for _, update := range updates {
 		paths, err := replacementPathsForSkills([]localSkill{update.skill}, scope, base, project, home, update.agents, update.subagents, update.copyMode)
 		if err != nil {
@@ -500,6 +505,21 @@ func installUpdatedSkills(updates []updatedSkillInstallation, scope state.Scope,
 		destinations = append(destinations, paths...)
 	}
 	return withInstallationTransaction(lockPath, destinations, func(transaction *installationTransaction) error {
+		if len(removals) > 0 {
+			_, version := installationLockLocation(scope, project, home)
+			document, err := transaction.readState(lockPath, version)
+			if err != nil {
+				return err
+			}
+			for _, removal := range removals {
+				if err := applySkillRemoval(removal, document, transaction); err != nil {
+					return fmt.Errorf("remove %s: %w", removal.name, err)
+				}
+			}
+			if err := transaction.writeState(document, lockPath); err != nil {
+				return err
+			}
+		}
 		for _, update := range updates {
 			if err := installLocalSkillTransaction(update.skill, update.provenance, scope, base, project, home, update.agents, update.copyMode, update.subagents, transaction); err != nil {
 				return fmt.Errorf("install %s: %w", update.skill.Name, err)
@@ -550,14 +570,6 @@ func promptDeleteMissing(invocation Invocation, name, source string) bool {
 	}
 	answer := strings.ToLower(strings.TrimSpace(line))
 	return answer == "y" || answer == "yes"
-}
-
-func removeInstalledSkill(name string, lock *state.Document, scope state.Scope, project, home string) error {
-	entry := lock.Entry(name)
-	if entry == nil {
-		return nil
-	}
-	return removeSkill(name, lock, scope, project, home, entry.Agents, len(entry.Agents) == 0)
 }
 
 func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names []string, source string, options updateOptions, apply bool, scope state.Scope, project, home string) updateResult {
@@ -666,7 +678,7 @@ func updateWellKnownSource(invocation Invocation, snapshot state.Snapshot, names
 			agents:     agents, copyMode: copiedPlacementExists(action.skill.Name, agents, scope, project, home), subagents: action.entry.Subagents,
 		})
 	}
-	if err := installUpdatedSkills(updates, scope, project, home); err != nil {
+	if err := installUpdatedSkills(updates, nil, scope, project, home); err != nil {
 		_, _ = fmt.Fprintf(invocation.Stderr, "Update %s: %v\n", displaySource, err)
 		result.failed += len(updates)
 	} else {

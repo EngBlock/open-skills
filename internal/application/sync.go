@@ -309,15 +309,24 @@ func runInstallFromLock(invocation Invocation) int {
 		_, _ = fmt.Fprintln(invocation.Stdout, "No project skills found in skills-lock.json")
 		return 0
 	}
+	type recordedRestoration struct {
+		name      string
+		entry     state.LockEntry
+		skill     localSkill
+		agents    []string
+		subagents []string
+	}
 	names := make([]string, 0, len(lock.Skills))
 	for name := range lock.Skills {
 		names = append(names, name)
 	}
 	sort.Strings(names)
+	restorations := make([]recordedRestoration, 0, len(names))
+	destinations := []string{}
 	failed := false
 	for _, name := range names {
 		entry := lock.Skills[name]
-		agents := entry.Agents
+		agents := append([]string(nil), entry.Agents...)
 		if len(agents) == 0 {
 			agents = state.UniversalAgentIDs(state.Project)
 		}
@@ -330,15 +339,39 @@ func runInstallFromLock(invocation Invocation) int {
 			failed = true
 			continue
 		}
-		if err := installRecordedSkill(skill, entry.Source, entry.SourceType, project, agents, entry.Subagents); err != nil {
-			_, _ = fmt.Fprintf(invocation.Stderr, "Restore %s: %v\n", name, err)
+		content, contentErr := prepareSkillContent(skill.Path)
+		if contentErr != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Restore %s: %v\n", name, contentErr)
 			failed = true
 			continue
 		}
-		_, _ = fmt.Fprintf(invocation.Stdout, "Restored %s\n", name)
+		skill.content = content
+		paths, pathErr := replacementPathsForSkills([]localSkill{skill}, state.Project, project, project, "", agents, entry.Subagents, false)
+		if pathErr != nil {
+			_, _ = fmt.Fprintf(invocation.Stderr, "Restore %s: %v\n", name, pathErr)
+			failed = true
+			continue
+		}
+		destinations = append(destinations, paths...)
+		restorations = append(restorations, recordedRestoration{name: name, entry: entry, skill: skill, agents: agents, subagents: entry.Subagents})
 	}
 	if failed {
 		return 1
+	}
+	lockPath := filepath.Join(project, "skills-lock.json")
+	if err := withInstallationTransaction(lockPath, destinations, func(transaction *installationTransaction) error {
+		for _, restoration := range restorations {
+			if err := installRecordedSkillTransaction(restoration.skill, restoration.entry.Source, restoration.entry.SourceType, project, restoration.agents, restoration.subagents, transaction); err != nil {
+				return fmt.Errorf("Restore %s: %w", restoration.name, err)
+			}
+		}
+		return nil
+	}); err != nil {
+		_, _ = fmt.Fprintln(invocation.Stderr, err)
+		return 1
+	}
+	for _, restoration := range restorations {
+		_, _ = fmt.Fprintf(invocation.Stdout, "Restored %s\n", restoration.name)
 	}
 	return 0
 }
@@ -389,10 +422,6 @@ func localSkillNamed(source, name string) (localSkill, bool) {
 	return localSkill{}, false
 }
 
-func installRecordedSkill(skill localSkill, source, sourceType, project string, agents, subagents []string) error {
-	return installRecordedSkillTransaction(skill, source, sourceType, project, agents, subagents, nil)
-}
-
 func installRecordedSkillTransaction(skill localSkill, source, sourceType, project string, agents, subagents []string, transaction *installationTransaction) error {
 	provenance := installationProvenance{Identity: source, URL: source, Type: sourceType}
 	if err := installLocalSkillTransaction(skill, provenance, state.Project, project, project, "", agents, false, subagents, transaction); err != nil {
@@ -403,12 +432,7 @@ func installRecordedSkillTransaction(skill localSkill, source, sourceType, proje
 		return err
 	}
 	lockPath := filepath.Join(project, "skills-lock.json")
-	var lock *state.Document
-	if transaction != nil {
-		lock, err = transaction.readState(lockPath, 1)
-	} else {
-		lock, err = state.Read(lockPath, 1)
-	}
+	lock, err := transaction.readState(lockPath, 1)
 	if err != nil {
 		return err
 	}
@@ -422,16 +446,9 @@ func installRecordedSkillTransaction(skill localSkill, source, sourceType, proje
 	}, transaction)
 }
 
-func recordAndWrite(lock *state.Document, path, name string, record state.InstallationRecord) error {
-	return recordAndWriteTransaction(lock, path, name, record, nil)
-}
-
 func recordAndWriteTransaction(lock *state.Document, path, name string, record state.InstallationRecord, transaction *installationTransaction) error {
 	if err := lock.RecordInstallation(name, record); err != nil {
 		return err
 	}
-	if transaction != nil {
-		return transaction.writeState(lock, path)
-	}
-	return lock.Write(path)
+	return transaction.writeState(lock, path)
 }

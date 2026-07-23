@@ -45,14 +45,16 @@ type installationJournalTarget struct {
 	Backup      string `json:"backup"`
 	Existed     bool   `json:"existed"`
 	Staged      bool   `json:"staged"`
+	Deleted     bool   `json:"deleted,omitempty"`
 	Committed   bool   `json:"committed"`
 }
 
 type installationTransaction struct {
-	root       string
-	journal    installationJournal
-	byPath     map[string]int
-	stageCount int
+	root           string
+	journal        installationJournal
+	byPath         map[string]int
+	stageCount     int
+	lockWriteCount int
 }
 
 func withInstallationTransaction(lockPath string, destinations []string, operation func(*installationTransaction) error) error {
@@ -77,7 +79,7 @@ func withInstallationTransaction(lockPath string, destinations []string, operati
 		return err
 	}
 	for _, target := range transaction.journal.Targets {
-		if !target.Staged {
+		if !target.Staged || target.Deleted {
 			continue
 		}
 		if _, err := os.Lstat(target.Stage); err != nil {
@@ -294,8 +296,25 @@ func (transaction *installationTransaction) stageDirectory(content *skillContent
 	if err := content.replaceDirectory(target.Stage); err != nil {
 		return "", err
 	}
+	target.Deleted = false
 	target.Staged = true
 	return target.Stage, nil
+}
+
+func (transaction *installationTransaction) stageDelete(destination string) error {
+	target, err := transaction.target(destination)
+	if err != nil {
+		return err
+	}
+	if err := transaction.injectStageFault(); err != nil {
+		return err
+	}
+	if err := os.RemoveAll(target.Stage); err != nil {
+		return err
+	}
+	target.Deleted = true
+	target.Staged = true
+	return nil
 }
 
 func (transaction *installationTransaction) stageSymlink(source, destination string) error {
@@ -319,6 +338,7 @@ func (transaction *installationTransaction) stageSymlink(source, destination str
 	if err := os.Symlink(relative, target.Stage); err != nil {
 		return err
 	}
+	target.Deleted = false
 	target.Staged = true
 	return nil
 }
@@ -339,12 +359,27 @@ func (transaction *installationTransaction) readState(path string, version int) 
 	return state.Read(target.Stage, version)
 }
 
+func (transaction *installationTransaction) stagePreserve(path string) error {
+	target, err := transaction.target(path)
+	if err != nil {
+		return err
+	}
+	if err := transaction.injectLockWriteFault(); err != nil {
+		return err
+	}
+	if !target.Existed {
+		target.Deleted = true
+	}
+	target.Staged = true
+	return nil
+}
+
 func (transaction *installationTransaction) writeState(document *state.Document, path string) error {
 	target, err := transaction.target(path)
 	if err != nil {
 		return err
 	}
-	if err := injectInstallationFault("lock-write"); err != nil {
+	if err := transaction.injectLockWriteFault(); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(target.Stage), 0o755); err != nil {
@@ -353,6 +388,7 @@ func (transaction *installationTransaction) writeState(document *state.Document,
 	if err := document.Write(target.Stage); err != nil {
 		return err
 	}
+	target.Deleted = false
 	target.Staged = true
 	return nil
 }
@@ -372,6 +408,15 @@ func (transaction *installationTransaction) injectStageFault() error {
 	return injectInstallationFault(point)
 }
 
+func (transaction *installationTransaction) injectLockWriteFault() error {
+	point := "lock-write:" + strconv.Itoa(transaction.lockWriteCount)
+	transaction.lockWriteCount++
+	if err := injectInstallationFault("lock-write"); err != nil {
+		return err
+	}
+	return injectInstallationFault(point)
+}
+
 func injectInstallationFault(point string) error {
 	if installationFault == nil {
 		return nil
@@ -381,6 +426,13 @@ func injectInstallationFault(point string) error {
 
 func commitInstallationTarget(target installationJournalTarget) error {
 	if err := os.RemoveAll(target.Destination); err != nil {
+		return err
+	}
+	if target.Deleted {
+		err := syncDirectory(filepath.Dir(target.Destination))
+		if !target.Existed && errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
 		return err
 	}
 	if err := os.Rename(target.Stage, target.Destination); err != nil {
@@ -396,60 +448,55 @@ func (transaction *installationTransaction) rollback(cause error) error {
 	if err := restoreInstallationJournal(transaction.root, &transaction.journal); err != nil {
 		return unresolvedInstallationRecoveryError(transaction.root, err, cause)
 	}
+	if err := transaction.markRolledBack(); err != nil {
+		return unresolvedInstallationRecoveryError(transaction.root, err, cause)
+	}
 	if err := transaction.cleanupCommitted(); err != nil {
 		return unresolvedInstallationRecoveryError(transaction.root, err, cause)
 	}
 	return cause
 }
 
+func (transaction *installationTransaction) markRolledBack() error {
+	transaction.journal.State = "rolled-back"
+	transaction.journal.Current = -1
+	return transaction.writeJournal()
+}
+
 func (transaction *installationTransaction) cleanupUncommitted() error {
-	var failures []string
-	for _, target := range transaction.journal.Targets {
-		if err := os.RemoveAll(target.Stage); err != nil {
-			failures = append(failures, fmt.Sprintf("remove stage %s: %v", target.Stage, err))
-		}
-	}
-	if err := os.RemoveAll(transaction.root); err != nil {
-		failures = append(failures, fmt.Sprintf("remove journal %s: %v", transaction.root, err))
-	}
-	if len(failures) > 0 {
-		return errors.New(strings.Join(failures, "; "))
-	}
-	return nil
+	return transaction.cleanupTransactionArtifacts()
 }
 
 func (transaction *installationTransaction) cleanupCommitted() error {
+	return transaction.cleanupTransactionArtifacts()
+}
+
+func (transaction *installationTransaction) cleanupTransactionArtifacts() error {
 	var failures []string
 	for _, target := range transaction.journal.Targets {
 		if err := os.RemoveAll(target.Stage); err != nil {
 			failures = append(failures, fmt.Sprintf("remove stage %s: %v", target.Stage, err))
 		}
 	}
-	entries, readErr := os.ReadDir(transaction.root)
-	if readErr != nil && !errors.Is(readErr, fs.ErrNotExist) {
-		failures = append(failures, fmt.Sprintf("read journal directory %s: %v", transaction.root, readErr))
-	}
-	for _, entry := range entries {
-		if entry.Name() == installationJournalName {
-			continue
-		}
-		if err := os.RemoveAll(filepath.Join(transaction.root, entry.Name())); err != nil {
-			failures = append(failures, fmt.Sprintf("remove journal artifact %s: %v", entry.Name(), err))
-		}
-	}
 	if len(failures) > 0 {
 		return errors.New(strings.Join(failures, "; "))
 	}
-	if err := os.Remove(filepath.Join(transaction.root, installationJournalName)); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("remove journal: %w", err)
-	}
-	if err := os.Remove(transaction.root); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("remove journal directory: %w", err)
-	}
-	if base := filepath.Dir(transaction.root); base != transaction.root {
-		if err := syncDirectory(base); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("persist journal cleanup: %w", err)
+	base := filepath.Dir(transaction.root)
+	retired := filepath.Join(base, "cleanup-"+strings.TrimPrefix(filepath.Base(transaction.root), "transaction-"))
+	if err := os.Rename(transaction.root, retired); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
 		}
+		return fmt.Errorf("retire journal directory: %w", err)
+	}
+	if err := syncDirectory(base); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("persist retired journal: %w", err)
+	}
+	if err := os.RemoveAll(retired); err != nil {
+		return fmt.Errorf("remove retired journal: %w", err)
+	}
+	if err := syncDirectory(base); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("persist journal cleanup: %w", err)
 	}
 	return nil
 }
@@ -543,10 +590,13 @@ func recoverInstallationTransactions(lockPath string) error {
 				return unresolvedInstallationRecoveryError(directory, err, nil)
 			}
 			transaction := &installationTransaction{root: directory, journal: *journal}
+			if err := transaction.markRolledBack(); err != nil {
+				return unresolvedInstallationRecoveryError(directory, err, nil)
+			}
 			if err := transaction.cleanupCommitted(); err != nil {
 				return unresolvedInstallationRecoveryError(directory, err, nil)
 			}
-		case "committed":
+		case "rolled-back", "committed":
 			transaction := &installationTransaction{root: directory, journal: *journal}
 			if err := transaction.cleanupCommitted(); err != nil {
 				return unresolvedInstallationRecoveryError(directory, err, nil)
@@ -666,6 +716,9 @@ func validateInstallationJournalState(journal installationJournal) error {
 	}
 	seenPending := false
 	for index, target := range journal.Targets {
+		if target.Deleted && !target.Staged {
+			return errors.New("installation journal has an unstaged deletion")
+		}
 		if target.Committed && !target.Staged {
 			return errors.New("installation journal committed an unstaged target")
 		}
@@ -708,6 +761,10 @@ func validateInstallationJournalState(journal installationJournal) error {
 				return errors.New("committed journal has pending targets")
 			}
 		}
+	case "rolled-back":
+		if journal.Current != -1 {
+			return errors.New("rolled-back journal has a current step")
+		}
 	default:
 		return fmt.Errorf("unknown journal state %q", journal.State)
 	}
@@ -737,6 +794,20 @@ func installationTransactionDirectories(lockPath string) ([]string, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+	removedRetired := false
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), "cleanup-") {
+			if err := os.RemoveAll(filepath.Join(base, entry.Name())); err != nil {
+				return nil, fmt.Errorf("remove retired installation journal %s: %w", entry.Name(), err)
+			}
+			removedRetired = true
+		}
+	}
+	if removedRetired {
+		if err := syncDirectory(base); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return nil, fmt.Errorf("persist retired installation journal cleanup: %w", err)
+		}
 	}
 	result := make([]string, 0, len(entries))
 	for _, entry := range entries {

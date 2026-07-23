@@ -109,22 +109,16 @@ func runRemove(invocation Invocation, arguments []string) int {
 		}
 	}
 
-	removed, failures := 0, 0
+	names := make([]string, 0, len(selected))
 	for _, skill := range selected {
-		if err := removeSkill(skill.Name, snapshot.Lock, scope, project, home, targetAgents, allAgents); err != nil {
-			failures++
-			_, _ = fmt.Fprintf(invocation.Stderr, "Remove %s: %v\n", skill.Name, err)
-			continue
-		}
-		removed++
+		names = append(names, skill.Name)
 	}
-	if removed > 0 {
-		_, _ = fmt.Fprintf(invocation.Stdout, "Successfully removed %d skill(s)\n", removed)
-	}
-	if failures > 0 {
-		_, _ = fmt.Fprintf(invocation.Stderr, "Failed to remove %d skill(s)\n", failures)
+	if err := removeSkills(names, snapshot.Lock, scope, project, home, targetAgents, allAgents); err != nil {
+		_, _ = fmt.Fprintf(invocation.Stderr, "Remove skills: %v\n", err)
+		_, _ = fmt.Fprintf(invocation.Stderr, "Failed to remove %d skill(s)\n", len(selected))
 		return 1
 	}
+	_, _ = fmt.Fprintf(invocation.Stdout, "Successfully removed %d skill(s)\n", len(selected))
 	_, _ = fmt.Fprintln(invocation.Stdout, "Done!")
 	return 0
 }
@@ -296,20 +290,40 @@ func removalIsFinal(name string, entry *state.LockEntry, scope state.Scope, proj
 	return allAgents && !hasRemainingPlacement(name, scope, project, home, targetAgents)
 }
 
-func removeSkill(name string, document *state.Document, scope state.Scope, project, home string, targetAgents []string, allAgents bool) error {
+type skillRemovalPlan struct {
+	name               string
+	lockName           string
+	paths              []string
+	final              bool
+	remainingAgents    []string
+	remainingSubagents []string
+}
+
+func planSkillRemoval(name string, document *state.Document, scope state.Scope, project, home string, targetAgents []string, allAgents bool) (skillRemovalPlan, error) {
 	lockName, entry := document.EntryWithName(name)
 	canonicalBase := project
 	if scope == state.Global {
 		canonicalBase = home
 	}
 	canonical := filepath.Join(canonicalBase, ".agents", "skills", state.SanitizeName(name))
+	paths := []string{}
+	appendExisting := func(path string) error {
+		if _, err := os.Lstat(path); err == nil {
+			paths = append(paths, path)
+			return nil
+		} else if os.IsNotExist(err) {
+			return nil
+		} else {
+			return err
+		}
+	}
 	for _, agent := range targetAgents {
 		for _, placement := range removalAgentPaths(agent, name, scope, project, home) {
 			if sameLocalPath(placement, canonical) || pathSharedWithRemainingAgent(placement, name, scope, project, home, targetAgents, installedAgentOwnership(entry)) {
 				continue
 			}
-			if err := os.RemoveAll(placement); err != nil {
-				return err
+			if err := appendExisting(placement); err != nil {
+				return skillRemovalPlan{}, err
 			}
 		}
 	}
@@ -318,9 +332,7 @@ func removeSkill(name string, document *state.Document, scope state.Scope, proje
 	remainingSubagents := []string(nil)
 	if entry != nil {
 		remainingAgents = subtractStrings(entry.Agents, targetAgents)
-		if contains(targetAgents, "eve") {
-			remainingSubagents = nil
-		} else {
+		if !contains(targetAgents, "eve") {
 			remainingSubagents = append([]string(nil), entry.Subagents...)
 		}
 	}
@@ -328,28 +340,66 @@ func removeSkill(name string, document *state.Document, scope state.Scope, proje
 	// Keep canonical content and state even if older lock data did not record it.
 	final := removalIsFinal(name, entry, scope, project, home, targetAgents, allAgents)
 	if final {
-		if err := os.RemoveAll(canonical); err != nil {
-			return err
+		if err := appendExisting(canonical); err != nil {
+			return skillRemovalPlan{}, err
 		}
-		if lockName != "" {
-			document.RemoveInstallation(lockName)
-		}
-	} else if lockName != "" && entry != nil && len(entry.Agents) > 0 {
-		document.RetainInstallationPlacements(lockName, remainingAgents, remainingSubagents)
 	}
-	if lockName != "" {
-		lockPath := filepath.Join(project, "skills-lock.json")
-		if scope == state.Global {
-			lockPath = filepath.Join(os.Getenv("XDG_STATE_HOME"), "skills", ".skill-lock.json")
-			if os.Getenv("XDG_STATE_HOME") == "" {
-				lockPath = filepath.Join(home, ".agents", ".skill-lock.json")
-			}
-		}
-		if err := document.Write(lockPath); err != nil {
+	unique, err := uniqueReplacementPaths(paths)
+	if err != nil {
+		return skillRemovalPlan{}, err
+	}
+	return skillRemovalPlan{
+		name: name, lockName: lockName, paths: unique, final: final,
+		remainingAgents: remainingAgents, remainingSubagents: remainingSubagents,
+	}, nil
+}
+
+func applySkillRemoval(plan skillRemovalPlan, document *state.Document, transaction *installationTransaction) error {
+	for _, path := range plan.paths {
+		if err := transaction.stageDelete(path); err != nil {
 			return err
 		}
+	}
+	if plan.lockName == "" {
+		return nil
+	}
+	if plan.final {
+		document.RemoveInstallation(plan.lockName)
+	} else {
+		document.RetainInstallationPlacements(plan.lockName, plan.remainingAgents, plan.remainingSubagents)
 	}
 	return nil
+}
+
+func removeSkills(names []string, document *state.Document, scope state.Scope, project, home string, targetAgents []string, allAgents bool) error {
+	plans := make([]skillRemovalPlan, 0, len(names))
+	destinations := []string{}
+	lockChanged := false
+	for _, name := range names {
+		plan, err := planSkillRemoval(name, document, scope, project, home, targetAgents, allAgents)
+		if err != nil {
+			return err
+		}
+		plans = append(plans, plan)
+		destinations = append(destinations, plan.paths...)
+		lockChanged = lockChanged || plan.lockName != ""
+	}
+	lockPath, _ := installationLockLocation(scope, project, home)
+	return withInstallationTransaction(lockPath, destinations, func(transaction *installationTransaction) error {
+		for _, plan := range plans {
+			if err := applySkillRemoval(plan, document, transaction); err != nil {
+				return err
+			}
+		}
+		if lockChanged {
+			return transaction.writeState(document, lockPath)
+		}
+		return transaction.stagePreserve(lockPath)
+	})
+}
+
+func removeSkill(name string, document *state.Document, scope state.Scope, project, home string, targetAgents []string, allAgents bool) error {
+	return removeSkills([]string{name}, document, scope, project, home, targetAgents, allAgents)
 }
 
 func removalSkillDirectories(scope state.Scope, project, home string) []string {

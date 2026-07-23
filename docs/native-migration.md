@@ -83,14 +83,17 @@ Rejected replacements leave content, placements, and lock state unchanged.
 Authorized replacements snapshot affected placements and restore them when a
 placement or lock write fails.
 
-## D08: crash-recoverable installation transactions
+## D08: crash-recoverable mutation transactions
 
-Add, sync, and update finish source, content, destination, provenance, and
-local-change preflight before committing an installation placement. They stage
-every selected placement and the final lock beside its destination, then commit
-the declared write set in a deterministic order with the lock last. Fresh
-installs, same-source reinstalls, authorized cross-source replacements, and
-updates use the same transaction path.
+Add, remove, update, restore, and sync finish source, content, destination,
+provenance, and local-change preflight before committing user-visible state.
+They stage every selected placement and the final lock beside its destination,
+then commit the complete declared write set in a deterministic order with the
+lock last. Fresh installs, same-source reinstalls, authorized cross-source
+replacements, removals, missing-upstream deletions, lock restoration, and
+node_modules sync use the same transaction path. Deletions are explicit
+journaled targets rather than direct filesystem writes, so their prior content
+is backed up and recoverable like a replacement.
 
 Before staging, the executable writes a durable journal under
 `$XDG_STATE_HOME/open-skills/transactions` (or
@@ -98,12 +101,22 @@ Before staging, the executable writes a durable journal under
 the current commit step, and the exact destination/stage paths. An ordinary
 failure rolls back completed steps. After interruption, the next invocation in
 the affected project automatically restores the prior placements and lock before
-running its command; a completed transaction only needs journal cleanup.
+running its command; a completed transaction only needs journal cleanup. A
+successful rollback is durably marked before backups are retired, and the
+journal directory is atomically moved out of the recoverable namespace before
+its artifacts are deleted, making repeated cleanup safe after interruption.
+
+Restore resolves every recorded local source before changing any destination,
+and multi-skill remove, restore, and sync commands commit only after the whole
+selected write set has staged successfully. Update combines an approved
+missing-upstream removal with replacements from that source in one transaction.
+Success output is emitted only after commit, so a failed workflow does not
+silently report a partially applied result.
 
 If recovery cannot restore a recorded backup, the journal and remaining backups
 are preserved and the command stops with deterministic manual cleanup
-instructions. Each destination is staged beside itself so its final rename stays
-on that destination's filesystem. A transaction spanning several filesystems is
+instructions. Each replacement destination is staged beside itself so its final
+rename stays on that destination's filesystem. A transaction spanning several filesystems is
 therefore crash-recoverable through its journal and ordered rollback, but is
 **not atomic across filesystems**; the journal records that commit model
 explicitly. On Windows, Go cannot flush directory handles, so process-interruption
