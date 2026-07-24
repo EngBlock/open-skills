@@ -19,7 +19,7 @@ if ! git merge-base --is-ancestor origin/main "${GITHUB_SHA}"; then
   echo "release tag ${GITHUB_REF_NAME} does not descend from origin/main" >&2
   exit 1
 fi
-scripts/verify-release-rulesets.sh
+REQUIRE_RELEASE_CREATOR_BYPASS=false scripts/verify-release-rulesets.sh
 
 ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${GITHUB_REF_NAME}")"
 ref_type="$(jq -r '.object.type' <<<"${ref_json}")"

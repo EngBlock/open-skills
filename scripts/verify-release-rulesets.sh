@@ -3,6 +3,7 @@ set -euo pipefail
 
 repository="${GITHUB_REPOSITORY:-EngBlock/open-skills}"
 pattern='refs/tags/v*'
+require_creator_bypass="${REQUIRE_RELEASE_CREATOR_BYPASS:-true}"
 
 ruleset_ids="$(gh api --paginate "repos/${repository}/rulesets" --jq '.[].id')"
 immutable=false
@@ -28,14 +29,15 @@ while IFS= read -r ruleset_id; do
     immutable=true
   fi
 
-  if jq -e '
-    ((.rules // []) | map(.type) | index("creation") != null) and
-    ((.bypass_actors // []) | length == 1) and
-    (.bypass_actors[0].actor_type == "RepositoryRole") and
-    (.bypass_actors[0].actor_id == 5) and
-    (.bypass_actors[0].bypass_mode == "always")
-  ' <<<"${ruleset}" >/dev/null; then
-    restricted_creation=true
+  if jq -e '((.rules // []) | map(.type) | index("creation") != null)' <<<"${ruleset}" >/dev/null; then
+    if [[ "${require_creator_bypass}" == false ]] || jq -e '
+      ((.bypass_actors // []) | length == 1) and
+      (.bypass_actors[0].actor_type == "RepositoryRole") and
+      (.bypass_actors[0].actor_id == 5) and
+      (.bypass_actors[0].bypass_mode == "always")
+    ' <<<"${ruleset}" >/dev/null; then
+      restricted_creation=true
+    fi
   fi
 done <<<"${ruleset_ids}"
 

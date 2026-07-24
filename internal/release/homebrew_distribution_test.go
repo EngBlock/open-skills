@@ -122,7 +122,7 @@ func TestReleaseTagVerifierAcceptsCanonicalVersionTags(t *testing.T) {
 	if strings.Contains(verifier, `^v0\.2\.`) {
 		t.Fatal("release tag verifier is tied to one release line")
 	}
-	for _, text := range []string{"git merge-base --is-ancestor origin/main", "scripts/verify-release-rulesets.sh"} {
+	for _, text := range []string{"git merge-base --is-ancestor origin/main", "REQUIRE_RELEASE_CREATOR_BYPASS=false scripts/verify-release-rulesets.sh"} {
 		if !strings.Contains(verifier, text) {
 			t.Errorf("release tag verifier does not contain %q", text)
 		}
