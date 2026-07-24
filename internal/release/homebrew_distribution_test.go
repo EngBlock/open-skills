@@ -160,7 +160,9 @@ func TestReleaseScriptBuildsCommitsSignsAndAtomicallyPushesCandidate(t *testing.
 		`go vet ./...`,
 		`go test ./... -count=1`,
 		`git commit -m "Prepare ${tag} native release"`,
+		`metadata_commit="$(git log -1 --format=%s`,
 		`git tag -s "${tag}"`,
+		`gpg.ssh.allowedSignersFile`,
 		`git push --atomic origin`,
 	} {
 		if !strings.Contains(script, text) {

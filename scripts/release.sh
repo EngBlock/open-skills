@@ -69,10 +69,14 @@ go test ./... -count=1
 
 git add Formula/open-skills.rb bucket/open-skills.json
 if git diff --cached --quiet; then
-  echo "generated package metadata did not change" >&2
-  exit 1
+  metadata_commit="$(git log -1 --format=%s -- Formula/open-skills.rb bucket/open-skills.json)"
+  if [[ "${metadata_commit}" != "Prepare ${tag} native release" ]]; then
+    echo "generated package metadata did not change and no matching release metadata commit exists" >&2
+    exit 1
+  fi
+else
+  git commit -m "Prepare ${tag} native release"
 fi
-git commit -m "Prepare ${tag} native release"
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "release worktree is dirty after committing generated metadata" >&2
   git status --short >&2
@@ -84,7 +88,18 @@ if ! git merge-base --is-ancestor origin/main HEAD; then
   exit 1
 fi
 git tag -s "${tag}" -m "open-skills ${tag} native release"
-git verify-tag "${tag}"
+if [[ "$(git config --get gpg.format || true)" == "ssh" ]]; then
+  signing_key="$(git config --get user.signingkey)"
+  if [[ -f "${signing_key}" ]]; then
+    signing_key="$(cat "${signing_key}")"
+  fi
+  allowed_signers="$(mktemp)"
+  trap 'rm -f "${allowed_signers}"' EXIT
+  printf '%s %s\n' "$(git config user.email)" "${signing_key}" >"${allowed_signers}"
+  git -c gpg.ssh.allowedSignersFile="${allowed_signers}" verify-tag "${tag}"
+else
+  git verify-tag "${tag}"
+fi
 git push --atomic origin "HEAD:refs/heads/${branch}" "refs/tags/${tag}"
 
 printf 'pushed signed release candidate %s from %s\n' "${tag}" "${branch}"
