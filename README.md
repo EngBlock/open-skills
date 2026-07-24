@@ -69,14 +69,15 @@ open-skills add EngBlock/open-skills@find-skills
 
 ## Use a Skill Without Installing
 
-Generate a prompt for one skill, or start a supported coding agent interactively:
+Start a supported coding agent interactively with one skill:
 
 ```bash
-open-skills use owner/repo@web-design-guidelines | claude
-open-skills use owner/repo --skill web-design-guidelines --agent claude-code
+open-skills use owner/repo@web-design-guidelines --agent claude-code
+open-skills use owner/repo --skill web-design-guidelines --agent codex
+open-skills use owner/repo@web-design-guidelines --agent pi
 ```
 
-`open-skills use` resolves sources the same way as `open-skills add`, writes the selected skill files to a temporary directory, and prints only the generated prompt to stdout unless `--agent` is provided. With `--agent`, it starts one supported agent interactively with the generated prompt.
+`open-skills use` resolves sources the same way as `open-skills add` and writes the selected skill files to a temporary directory. Pass `--agent claude-code`, `--agent codex`, or `--agent pi` to start that agent interactively with the generated prompt. Without `--agent`, the generated prompt is printed to stdout.
 
 ### Source Formats
 

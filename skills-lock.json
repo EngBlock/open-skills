@@ -1,0 +1,31 @@
+{
+  "skills": {
+    "find-skills": {
+      "agents": [
+        "pi"
+      ],
+      "computedHash": "fae691a4170ad95250d76f8f7528d85dca150ad9435a882d1ec11322d8060072",
+      "installedContentHash": "fae691a4170ad95250d76f8f7528d85dca150ad9435a882d1ec11322d8060072",
+      "installedPlacements": {
+        "canonical": {
+          "kind": "canonical",
+          "paths": {
+            "SKILL.md": {
+              "kind": "file",
+              "hash": "db01b81626e1b46e5d203af7afa6ead2d91f098189b6186b11f15f9a094d1297"
+            }
+          }
+        }
+      },
+      "ownedFiles": [
+        "SKILL.md"
+      ],
+      "ref": "7de3917637fb750a19d006df4bba06bbab007717",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "source": "EngBlock/open-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/EngBlock/open-skills.git"
+    }
+  },
+  "version": 1
+}

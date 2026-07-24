@@ -36,6 +36,7 @@ type useAgentConfig struct {
 var useAgentConfigs = map[string]useAgentConfig{
 	"claude-code": {command: "claude"},
 	"codex":       {command: "codex"},
+	"pi":          {command: "pi"},
 }
 
 func runUse(invocation Invocation, arguments []string) int {
@@ -666,7 +667,7 @@ func launchUseAgent(invocation Invocation, agent, prompt string) int {
 }
 
 func formatUnsupportedUseAgent(agent string) string {
-	return fmt.Sprintf("Running %s is not supported yet.\nSupported agents for open-skills use --agent: claude-code, codex", state.AgentDisplayName(agent))
+	return fmt.Sprintf("Running %s is not supported yet.\nSupported agents for open-skills use --agent: claude-code, codex, pi", state.AgentDisplayName(agent))
 }
 
 const useHelp = `Usage: open-skills use <source>[@<skill>] [options]
@@ -676,7 +677,7 @@ Generate a prompt for using one skill without installing it.
 Options:
   -s, --skill <skill>   Select the skill to use
   --skill-path <path>   Select an exact repository-relative skill directory
-  -a, --agent <agent>   Start one supported agent interactively (claude-code, codex)
+  -a, --agent <agent>   Start one supported agent interactively (claude-code, codex, pi)
   --full-depth          Search nested directories like open-skills add --full-depth
   --max-file-bytes <n>  Remote per-file limit (default: 10485760)
   --max-total-bytes <n> Remote total-content limit (default: 104857600)
@@ -690,7 +691,7 @@ Options:
   -h, --help            Show this help message
 
 Examples:
-  open-skills use EngBlock/open-skills@find-skills | claude
-  open-skills use EngBlock/open-skills --skill find-skills --agent claude-code
-  open-skills use EngBlock/open-skills@find-skills --agent codex
+  open-skills use EngBlock/open-skills@find-skills --agent claude-code
+  open-skills use EngBlock/open-skills --skill find-skills --agent codex
+  open-skills use EngBlock/open-skills@find-skills --agent pi
 `
