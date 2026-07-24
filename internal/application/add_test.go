@@ -316,8 +316,10 @@ func TestRunAddInteractiveOutputReportsOnlyDetectedInstalledAgents(t *testing.T)
 	source := filepath.Join(t.TempDir(), "find-skills")
 	writeAddOutputSkill(t, source, "find-skills")
 	home := isolateAddOutputEnvironment(t)
-	if err := os.MkdirAll(filepath.Join(home, ".pi", "agent"), 0o755); err != nil {
-		t.Fatal(err)
+	for _, path := range []string{".junie", ".pi/agent"} {
+		if err := os.MkdirAll(filepath.Join(home, filepath.FromSlash(path)), 0o755); err != nil {
+			t.Fatal(err)
+		}
 	}
 	t.Chdir(project)
 
@@ -331,10 +333,6 @@ func TestRunAddInteractiveOutputReportsOnlyDetectedInstalledAgents(t *testing.T)
 		agents = "Codex, Pi"
 	}
 	want := "Installed find-skills\n  Agents: " + agents + "\n"
-	// Codex and ZCode have system-wide detectors outside the isolated test home.
-	if _, err := os.Stat("/Applications/ZCode.app"); err == nil {
-		want += "  Skipped: ZCode\n"
-	}
 	if got := stdout.String(); got != want {
 		t.Fatalf("stdout = %q; want %q", got, want)
 	}
@@ -365,9 +363,6 @@ func TestRunAddInteractiveOutputCompactsLargeDetectedAgentLists(t *testing.T) {
 		t.Fatalf("runAdd = %d stdout %q stderr %q", code, stdout.String(), stderr.String())
 	}
 	want := "Installed compact-output\n  Agents: Antigravity, Antigravity CLI, Cline, Codex, Cursor +2 more\n"
-	if _, err := os.Stat("/Applications/ZCode.app"); err == nil {
-		want += "  Skipped: ZCode\n"
-	}
 	if got := stdout.String(); got != want {
 		t.Fatalf("stdout = %q; want %q", got, want)
 	}

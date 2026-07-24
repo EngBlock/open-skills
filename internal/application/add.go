@@ -427,7 +427,7 @@ func runAdd(invocation Invocation, arguments []string) int {
 					skippedAgents = append(skippedAgents, agent)
 				}
 			}
-			if len(skippedAgents) > 0 {
+			if agentSelection.ReportSkipped && len(skippedAgents) > 0 {
 				_, _ = fmt.Fprintf(invocation.Stdout, "  Skipped: %s\n", formatAgentNames(displayAgentNames(skippedAgents)))
 			}
 		}
@@ -927,8 +927,9 @@ func readInputLine(input io.Reader) (string, error) {
 }
 
 type installAgentSelection struct {
-	Agents   []string
-	Reported []string
+	Agents        []string
+	Reported      []string
+	ReportSkipped bool
 }
 
 func selectInstallAgents(invocation Invocation, options addOptions, scope state.Scope, project, home string) ([]string, error) {
@@ -941,6 +942,7 @@ func selectInstallAgentSelection(invocation Invocation, options addOptions, scop
 		return installAgentSelection{}, fmt.Errorf("Eve subagents do not support global installation")
 	}
 	explicit := len(options.Agents) > 0 || len(options.Subagents) > 0
+	prompted := false
 	requested := append([]string(nil), options.Agents...)
 	if len(options.Subagents) > 0 && !contains(requested, "eve") && !contains(requested, "*") {
 		requested = append(requested, "eve")
@@ -968,6 +970,7 @@ func selectInstallAgentSelection(invocation Invocation, options addOptions, scop
 				return installAgentSelection{}, automationError("selection_required", "no install agent was detected; select agents with --agent")
 			}
 			_, _ = fmt.Fprint(invocation.Stdout, "Select agents to install (or * for all): ")
+			prompted = true
 			line, err := readInputLine(invocation.Stdin)
 			if err != nil && err != io.EOF {
 				return installAgentSelection{}, err
@@ -1014,7 +1017,7 @@ func selectInstallAgentSelection(invocation Invocation, options addOptions, scop
 			}
 		}
 	}
-	return installAgentSelection{Agents: selected, Reported: reported}, nil
+	return installAgentSelection{Agents: selected, Reported: reported, ReportSkipped: explicit || prompted}, nil
 }
 
 func contains(values []string, want string) bool {
