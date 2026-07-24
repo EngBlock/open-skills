@@ -27,10 +27,10 @@ $windows = $manifest.architecture.'64bit'
 $autoupdateUrl = 'https://github.com/EngBlock/open-skills/releases/download/v$version/open-skills_$version_windows_amd64.zip'
 $autoupdateHashes = 'https://github.com/EngBlock/open-skills/releases/download/v$version/checksums.txt'
 
-if ($version -notmatch '^0\.2\.0(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$') {
-    throw "manifest version '$version' is not a canonical native 0.2.0 release"
+if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$') {
+    throw "manifest version '$version' is not a canonical native release"
 }
-$isProduction = $version -ceq '0.2.0'
+$isProduction = $version -notmatch '-'
 if ($manifest.description -cnotmatch 'Experimental Windows x86-64') {
     throw 'manifest must label Windows x86-64 experimental'
 }
@@ -79,20 +79,25 @@ try {
 
     $upgradeManifest = Join-Path $work 'open-skills.json'
     $upgrade = Get-Content $manifestFile -Raw -Encoding UTF8 | ConvertFrom-Json
-    $olderVersion = '0.2.0-preview.0'
+    $baseVersion = ($version -split '-', 2)[0]
+    $olderVersion = "${baseVersion}-preview.0"
     $currentPrerelease = 'true'
     $olderPrerelease = 'true'
+    $decoyVersion = $baseVersion
+    $decoyPrerelease = 'false'
     if ($isProduction) {
-        $olderVersion = '0.1.9'
+        $olderVersion = '0.0.0'
         $currentPrerelease = 'false'
         $olderPrerelease = 'false'
+        $decoyVersion = "${baseVersion}-preview.0"
+        $decoyPrerelease = 'true'
     }
     $upgrade.version = $olderVersion
     $upgrade.architecture.'64bit'.url = "https://github.com/EngBlock/open-skills/releases/download/v${olderVersion}/open-skills_${olderVersion}_windows_amd64.zip"
     $upgrade.architecture.'64bit'.hash = '0000000000000000000000000000000000000000000000000000000000000000'
     $upgrade.autoupdate.architecture.'64bit'.hash.url = [Uri]::new($checksums, [UriKind]::Absolute).AbsoluteUri
     $releaseIndex = Join-Path $work 'releases.json'
-    "[{`"tag_name`":`"v${version}`",`"prerelease`":${currentPrerelease},`"draft`":false},{`"tag_name`":`"v${olderVersion}`",`"prerelease`":${olderPrerelease},`"draft`":false},{`"tag_name`":`"v0.2.0-preview.2`",`"prerelease`":true,`"draft`":false}]" | Set-Content $releaseIndex -Encoding utf8NoBOM
+    "[{`"tag_name`":`"v${decoyVersion}`",`"prerelease`":${decoyPrerelease},`"draft`":false},{`"tag_name`":`"v${version}`",`"prerelease`":${currentPrerelease},`"draft`":false},{`"tag_name`":`"v${olderVersion}`",`"prerelease`":${olderPrerelease},`"draft`":false}]" | Set-Content $releaseIndex -Encoding utf8NoBOM
     $upgrade.checkver.url = [Uri]::new($releaseIndex, [UriKind]::Absolute).AbsoluteUri
     $upgrade | ConvertTo-Json -Depth 20 | Set-Content $upgradeManifest -Encoding utf8NoBOM
 

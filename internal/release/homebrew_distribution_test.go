@@ -54,13 +54,13 @@ func TestNativePreviewWorkflowGatesPublicationOnHomebrewSmoke(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
 	workflow := readRepositoryFile(t, root, ".github", "workflows", "native-preview.yml")
 	for _, text := range []string{
-		"tags:\n      - 'v0.2.0'\n      - 'v0.2.0-*'",
+		"tags:\n      - 'v*'",
 		"permissions:\n  contents: read\n  id-token: write\n  attestations: write",
 		`go run ./internal/release/cmd/native-preview`,
 		`--version "${GITHUB_REF_NAME#v}"`,
 		"--homebrew-formula homebrew/open-skills.rb",
-		"name: Verify checked production package metadata",
-		"if: github.ref_name == 'v0.2.0'",
+		"name: Verify checked package metadata",
+		"if: ${{ !contains(github.ref_name, '-') }}",
 		"cmp Formula/open-skills.rb homebrew/open-skills.rb",
 		"subject-checksums: native-dist/checksums.txt",
 		"cosign sign-blob --yes --bundle",
@@ -73,7 +73,7 @@ func TestNativePreviewWorkflowGatesPublicationOnHomebrewSmoke(t *testing.T) {
 		"runs-on: macos-15",
 		`run: test "$(uname -m)" = arm64`,
 		`OPEN_SKILLS_HOMEBREW_ARTIFACT="$artifact" scripts/homebrew-smoke.sh homebrew/open-skills.rb`,
-		"name: Approve production native cutover",
+		"name: Approve production native release",
 		"needs: [build, homebrew, scoop]",
 		"environment: native-production",
 		"needs: [build, homebrew, scoop, production-approval]",
@@ -110,6 +110,62 @@ func TestNativePreviewWorkflowGatesPublicationOnHomebrewSmoke(t *testing.T) {
 	releaseIndex := strings.Index(workflow, "  release:")
 	if homebrewIndex < 0 || approvalIndex < 0 || releaseIndex < 0 || homebrewIndex >= approvalIndex || approvalIndex >= releaseIndex {
 		t.Fatal("Homebrew verification and human production approval must precede release publication")
+	}
+}
+
+func TestReleaseTagVerifierAcceptsCanonicalVersionTags(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	verifier := readRepositoryFile(t, root, "scripts", "verify-native-release-tag.sh")
+	if !strings.Contains(verifier, `^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`) {
+		t.Fatal("release tag verifier does not require a canonical version tag")
+	}
+	if strings.Contains(verifier, `^v0\.2\.`) {
+		t.Fatal("release tag verifier is tied to one release line")
+	}
+	for _, text := range []string{"git merge-base --is-ancestor origin/main", "scripts/verify-release-rulesets.sh"} {
+		if !strings.Contains(verifier, text) {
+			t.Errorf("release tag verifier does not contain %q", text)
+		}
+	}
+}
+
+func TestReleaseRulesetsRequireImmutableAdministratorCreatedTags(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	script := readRepositoryFile(t, root, "scripts", "verify-release-rulesets.sh")
+	for _, text := range []string{
+		`pattern='refs/tags/v*'`,
+		`index("update")`,
+		`index("deletion")`,
+		`.conditions.ref_name.exclude`,
+		`length == 0`,
+		`index("creation")`,
+		`.actor_type == "RepositoryRole"`,
+		`.actor_id == 5`,
+	} {
+		if !strings.Contains(script, text) {
+			t.Errorf("release ruleset verifier does not contain %q", text)
+		}
+	}
+}
+
+func TestReleaseScriptBuildsCommitsSignsAndAtomicallyPushesCandidate(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	script := readRepositoryFile(t, root, "scripts", "release.sh")
+	for _, text := range []string{
+		`: "${TAG:?TAG must be set`,
+		`release/v${version}`,
+		`scripts/verify-release-rulesets.sh`,
+		`export GOTOOLCHAIN="${required_go}"`,
+		`go run ./internal/release/cmd/native-preview`,
+		`go vet ./...`,
+		`go test ./... -count=1`,
+		`git commit -m "Prepare ${tag} native release"`,
+		`git tag -s "${tag}"`,
+		`git push --atomic origin`,
+	} {
+		if !strings.Contains(script, text) {
+			t.Errorf("release script does not contain %q", text)
+		}
 	}
 }
 

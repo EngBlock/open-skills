@@ -70,15 +70,10 @@ This online historical check requires GitHub authentication through `GITHUB_TOKE
 
 ## Native packaging and release
 
-Generate the reviewed native archives and package metadata through Go:
+Cut a release from a clean `release/v<version>` branch:
 
 ```sh
-GOTOOLCHAIN=go1.24.0 go run ./internal/release/cmd/native-preview \
-  --version 0.2.0 \
-  --output native-dist \
-  --homebrew-formula Formula/open-skills.rb \
-  --scoop-manifest bucket/open-skills.json \
-  --skip-linux-smoke
+TAG=0.2.1 scripts/release.sh
 ```
 
-Release builds are CGO-disabled archives containing only `open-skills` (`open-skills.exe` on Windows). The signed-tag workflow verifies checksums, keyless signatures, provenance, Homebrew, and Scoop before protected publication. Follow `docs/native-development.md` and `docs/native-production-gate.md`; do not publish or restore an npm workflow.
+The script generates reviewed native archives and package metadata, runs the complete Go gate, commits the metadata, creates a signed tag, and atomically pushes the release branch and tag. Release builds are CGO-disabled archives containing only `open-skills` (`open-skills.exe` on Windows). The signed-tag workflow verifies checksums, keyless signatures, provenance, Homebrew, and Scoop before protected publication. Follow `docs/native-development.md`; `docs/native-production-gate.md` is the historical 0.2.0 cutover record. Do not publish or restore an npm workflow.

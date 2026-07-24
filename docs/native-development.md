@@ -29,23 +29,20 @@ Ordinary CI has no OS or runtime matrix. It does not run duplicate full suites o
 
 The checked-in [`Formula/open-skills.rb`](../Formula/open-skills.rb) is the tap formula for the supported macOS ARM64 target. It installs only the `open-skills` payload from the canonical `darwin_arm64.tar.gz` GitHub Release asset; it does not build from source or download through npm. Because the tap lives in this repository rather than a separately named `homebrew-*` repository, users add its explicit Git URL before installing it.
 
-Before creating a signed native release tag, regenerate the archives and formula with the Go version declared by `go.mod`:
+Cut releases from a clean branch named `release/v<version>`:
 
 ```sh
-GOTOOLCHAIN=go1.24.0 go run ./internal/release/cmd/native-preview \
-  --version 0.2.0 \
-  --output native-dist \
-  --homebrew-formula Formula/open-skills.rb \
-  --scoop-manifest bucket/open-skills.json \
-  --skip-linux-smoke
+TAG=0.2.1 scripts/release.sh
 ```
 
-Commit the resulting formula and manifest in the release candidate before tagging. The formula generator selects the exact Darwin ARM64 digest from `checksums.txt` and embeds both the immutable release URL and SHA-256. Release builds disable mutable Go VCS metadata so a clean signed-tag build reproduces the formula digest. Follow the protected production sequence in the [native 0.2.0 production gate](native-production-gate.md): the signed tag workflow validates the candidate before approval, publishes the immutable release, and only then may the production metadata become available from the default branch.
+`TAG` omits the `v` prefix and accepts a stable version or prerelease. The release script verifies the active `refs/tags/v*` rulesets that restrict creation to repository administrators and prevent update or deletion without bypass, pins the exact Go toolchain declared by `go.mod`, generates all archives plus the Homebrew formula and Scoop manifest, runs formatting, vet, and the complete Go suite, commits the generated metadata, creates a signed annotated `v<version>` tag, and atomically pushes the release branch and tag. The formula generator selects the exact Darwin ARM64 digest from `checksums.txt` and embeds both the immutable release URL and SHA-256. Release builds disable mutable Go VCS metadata so the signed-tag workflow reproduces the formula digest.
+
+The tag workflow validates the candidate before approval and publishes the immutable release. Stable tags wait at the protected `native-production` environment after Homebrew and Scoop checks; prerelease tags publish as previews without production approval. Keep generated production metadata on the release branch until the release exists, then merge that branch to the default branch. The [native 0.2.0 production gate](native-production-gate.md) remains the historical cutover record.
 
 The release workflow rebuilds the artifacts, refuses to proceed unless its generated formula exactly matches the checked-in formula, and stages the verified bundle for `scripts/homebrew-smoke.sh` on macOS ARM64. That pre-publication check installs an older test keg, upgrades it to the exact archive pending publication, verifies the reported version and help output, confirms the keg exposes only `open-skills`, runs the formula test, and performs a clean install. Production publication also waits for protected `native-production` maintainer approval after Homebrew and Scoop checks pass. Maintainers can exercise the same seam locally:
 
 ```sh
-OPEN_SKILLS_HOMEBREW_ARTIFACT="$PWD/native-dist/open-skills_0.2.0_darwin_arm64.tar.gz" \
+OPEN_SKILLS_HOMEBREW_ARTIFACT="$PWD/.native-dist/open-skills_0.2.1_darwin_arm64.tar.gz" \
   scripts/homebrew-smoke.sh Formula/open-skills.rb
 ```
 

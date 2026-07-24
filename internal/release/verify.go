@@ -58,7 +58,7 @@ func VerifyReleaseBundle(options VerifyOptions) error {
 	}
 	version, ok := strings.CutPrefix(options.Tag, "v")
 	if !ok || validateVersion(version) != nil {
-		return fmt.Errorf("release tag %q must name 0.2.0 or a 0.2.0 prerelease", options.Tag)
+		return fmt.Errorf("release tag %q must name a canonical native release version", options.Tag)
 	}
 
 	expected := expectedArtifacts(version)

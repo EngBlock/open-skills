@@ -11,10 +11,15 @@ if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
   echo "native releases must run from a tag, got ${GITHUB_REF_TYPE}" >&2
   exit 1
 fi
-if [[ ! "${GITHUB_REF_NAME}" =~ ^v0\.2\.0(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
-  echo "native release tag ${GITHUB_REF_NAME} is not canonical v0.2.0 or a v0.2.0 prerelease tag" >&2
+if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+  echo "native release tag ${GITHUB_REF_NAME} is not a canonical version tag" >&2
   exit 1
 fi
+if ! git merge-base --is-ancestor origin/main "${GITHUB_SHA}"; then
+  echo "release tag ${GITHUB_REF_NAME} does not descend from origin/main" >&2
+  exit 1
+fi
+scripts/verify-release-rulesets.sh
 
 ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${GITHUB_REF_NAME}")"
 ref_type="$(jq -r '.object.type' <<<"${ref_json}")"

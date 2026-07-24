@@ -21,7 +21,7 @@ func TestPackageAllBuildsTheNativePreviewTargetSet(t *testing.T) {
 	result, err := PackageAll(context.Background(), PackageOptions{
 		Root:         root,
 		Output:       output,
-		Version:      "0.2.0-preview.1",
+		Version:      "0.2.1-preview.1",
 		RequireSmoke: runtime.GOOS == "linux" && runtime.GOARCH == "amd64",
 	})
 	if err != nil {
@@ -29,11 +29,11 @@ func TestPackageAllBuildsTheNativePreviewTargetSet(t *testing.T) {
 	}
 
 	want := []Artifact{
-		{Filename: "open-skills_0.2.0-preview.1_darwin_arm64.tar.gz", GOOS: "darwin", GOARCH: "arm64", Support: Supported},
-		{Filename: "open-skills_0.2.0-preview.1_darwin_amd64.tar.gz", GOOS: "darwin", GOARCH: "amd64", Support: Experimental},
-		{Filename: "open-skills_0.2.0-preview.1_linux_amd64.tar.gz", GOOS: "linux", GOARCH: "amd64", Support: Supported, SmokeTested: runtime.GOOS == "linux" && runtime.GOARCH == "amd64"},
-		{Filename: "open-skills_0.2.0-preview.1_linux_arm64.tar.gz", GOOS: "linux", GOARCH: "arm64", Support: Experimental},
-		{Filename: "open-skills_0.2.0-preview.1_windows_amd64.zip", GOOS: "windows", GOARCH: "amd64", Support: Experimental},
+		{Filename: "open-skills_0.2.1-preview.1_darwin_arm64.tar.gz", GOOS: "darwin", GOARCH: "arm64", Support: Supported},
+		{Filename: "open-skills_0.2.1-preview.1_darwin_amd64.tar.gz", GOOS: "darwin", GOARCH: "amd64", Support: Experimental},
+		{Filename: "open-skills_0.2.1-preview.1_linux_amd64.tar.gz", GOOS: "linux", GOARCH: "amd64", Support: Supported, SmokeTested: runtime.GOOS == "linux" && runtime.GOARCH == "amd64"},
+		{Filename: "open-skills_0.2.1-preview.1_linux_arm64.tar.gz", GOOS: "linux", GOARCH: "arm64", Support: Experimental},
+		{Filename: "open-skills_0.2.1-preview.1_windows_amd64.zip", GOOS: "windows", GOARCH: "amd64", Support: Experimental},
 	}
 	if len(result) != len(want) {
 		t.Fatalf("PackageAll() returned %d artifacts; want %d", len(result), len(want))
@@ -76,7 +76,7 @@ func TestPackageAllBuildsTheNativePreviewTargetSet(t *testing.T) {
 }
 
 func TestReleaseNotesDistinguishSupportAndKeepStableNativeProduction(t *testing.T) {
-	notes, err := ReleaseNotes("0.2.0-preview.7")
+	notes, err := ReleaseNotes("0.2.1-preview.7")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,12 +105,12 @@ func TestReleaseNotesDistinguishSupportAndKeepStableNativeProduction(t *testing.
 }
 
 func TestProductionReleaseNotesRecordTheApprovedCutover(t *testing.T) {
-	notes, err := ReleaseNotes("0.2.0")
+	notes, err := ReleaseNotes("0.2.1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, text := range []string{
-		"# open-skills v0.2.0 native release",
+		"# open-skills v0.2.1 native release",
 		"production-ready native release",
 		"macOS ARM64 | Supported",
 		"Linux x86-64 | Supported",
@@ -130,17 +130,17 @@ func TestProductionReleaseNotesRecordTheApprovedCutover(t *testing.T) {
 }
 
 func TestHomebrewFormulaReferencesTheCanonicalMacOSARM64Artifact(t *testing.T) {
-	formula, err := HomebrewFormula("0.2.0-preview.7", strings.NewReader(
-		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.0-preview.7_linux_amd64.tar.gz\n"+
-			"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  open-skills_0.2.0-preview.7_darwin_arm64.tar.gz\n",
+	formula, err := HomebrewFormula("0.2.1-preview.7", strings.NewReader(
+		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.1-preview.7_linux_amd64.tar.gz\n"+
+			"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  open-skills_0.2.1-preview.7_darwin_arm64.tar.gz\n",
 	))
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, text := range []string{
-		`url "https://github.com/EngBlock/open-skills/releases/download/v0.2.0-preview.7/open-skills_0.2.0-preview.7_darwin_arm64.tar.gz"`,
+		`url "https://github.com/EngBlock/open-skills/releases/download/v0.2.1-preview.7/open-skills_0.2.1-preview.7_darwin_arm64.tar.gz"`,
 		`sha256 "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"`,
-		`version "0.2.0-preview.7"`,
+		`version "0.2.1-preview.7"`,
 		`depends_on arch: :arm64`,
 		`bin.install "open-skills"`,
 		`shell_output("#{bin}/open-skills --version")`,
@@ -158,20 +158,20 @@ func TestHomebrewFormulaReferencesTheCanonicalMacOSARM64Artifact(t *testing.T) {
 }
 
 func TestScoopManifestReferencesTheCanonicalExperimentalWindowsArtifact(t *testing.T) {
-	manifest, err := ScoopManifest("0.2.0-preview.7", strings.NewReader(
-		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.0-preview.7_linux_amd64.tar.gz\n"+
-			"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  open-skills_0.2.0-preview.7_windows_amd64.zip\n",
+	manifest, err := ScoopManifest("0.2.1-preview.7", strings.NewReader(
+		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.1-preview.7_linux_amd64.tar.gz\n"+
+			"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  open-skills_0.2.1-preview.7_windows_amd64.zip\n",
 	))
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, text := range []string{
 		`"description": "Experimental Windows x86-64 native preview for the open agent skills ecosystem"`,
-		`"url": "https://github.com/EngBlock/open-skills/releases/download/v0.2.0-preview.7/open-skills_0.2.0-preview.7_windows_amd64.zip"`,
+		`"url": "https://github.com/EngBlock/open-skills/releases/download/v0.2.1-preview.7/open-skills_0.2.1-preview.7_windows_amd64.zip"`,
 		`"hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"`,
 		`"bin": "open-skills.exe"`,
 		`"url": "https://api.github.com/repos/EngBlock/open-skills/releases"`,
-		`"regex": "v(?<version>0\\.2\\.0-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)"`,
+		`"regex": "v(?<version>0\\.2\\.1-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)"`,
 		`"url": "https://github.com/EngBlock/open-skills/releases/download/v$version/open-skills_$version_windows_amd64.zip"`,
 		`"url": "https://github.com/EngBlock/open-skills/releases/download/v$version/checksums.txt"`,
 	} {
@@ -187,15 +187,15 @@ func TestScoopManifestReferencesTheCanonicalExperimentalWindowsArtifact(t *testi
 }
 
 func TestProductionScoopManifestTracksStableCanonicalReleases(t *testing.T) {
-	manifest, err := ScoopManifest("0.2.0", strings.NewReader(
-		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  open-skills_0.2.0_windows_amd64.zip\n",
+	manifest, err := ScoopManifest("0.2.1", strings.NewReader(
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  open-skills_0.2.1_windows_amd64.zip\n",
 	))
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, text := range []string{
 		`"description": "Experimental Windows x86-64 native release for the open agent skills ecosystem"`,
-		`"url": "https://github.com/EngBlock/open-skills/releases/download/v0.2.0/open-skills_0.2.0_windows_amd64.zip"`,
+		`"url": "https://github.com/EngBlock/open-skills/releases/download/v0.2.1/open-skills_0.2.1_windows_amd64.zip"`,
 		`"jsonpath": "$[?(@.prerelease == false && @.draft == false)].tag_name"`,
 		`"regex": "v(?<version>[0-9]+\\.[0-9]+\\.[0-9]+)"`,
 	} {
@@ -213,13 +213,13 @@ func TestScoopManifestRequiresTheChecksummedCanonicalArtifact(t *testing.T) {
 		name      string
 		checksums string
 	}{
-		{name: "missing", checksums: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.0-preview.7_linux_amd64.tar.gz\n"},
-		{name: "malformed checksum", checksums: "not-a-sha  open-skills_0.2.0-preview.7_windows_amd64.zip\n"},
-		{name: "duplicate", checksums: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.0-preview.7_windows_amd64.zip\nbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  open-skills_0.2.0-preview.7_windows_amd64.zip\n"},
+		{name: "missing", checksums: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.1-preview.7_linux_amd64.tar.gz\n"},
+		{name: "malformed checksum", checksums: "not-a-sha  open-skills_0.2.1-preview.7_windows_amd64.zip\n"},
+		{name: "duplicate", checksums: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.1-preview.7_windows_amd64.zip\nbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  open-skills_0.2.1-preview.7_windows_amd64.zip\n"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if _, err := ScoopManifest("0.2.0-preview.7", strings.NewReader(test.checksums)); err == nil {
+			if _, err := ScoopManifest("0.2.1-preview.7", strings.NewReader(test.checksums)); err == nil {
 				t.Fatal("ScoopManifest() succeeded; want checksummed canonical artifact failure")
 			}
 		})
@@ -231,62 +231,64 @@ func TestHomebrewFormulaRequiresTheChecksummedCanonicalArtifact(t *testing.T) {
 		name      string
 		checksums string
 	}{
-		{name: "missing", checksums: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.0-preview.7_linux_amd64.tar.gz\n"},
-		{name: "malformed checksum", checksums: "not-a-sha  open-skills_0.2.0-preview.7_darwin_arm64.tar.gz\n"},
-		{name: "duplicate", checksums: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.0-preview.7_darwin_arm64.tar.gz\nbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  open-skills_0.2.0-preview.7_darwin_arm64.tar.gz\n"},
+		{name: "missing", checksums: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.1-preview.7_linux_amd64.tar.gz\n"},
+		{name: "malformed checksum", checksums: "not-a-sha  open-skills_0.2.1-preview.7_darwin_arm64.tar.gz\n"},
+		{name: "duplicate", checksums: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  open-skills_0.2.1-preview.7_darwin_arm64.tar.gz\nbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  open-skills_0.2.1-preview.7_darwin_arm64.tar.gz\n"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if _, err := HomebrewFormula("0.2.0-preview.7", strings.NewReader(test.checksums)); err == nil {
+			if _, err := HomebrewFormula("0.2.1-preview.7", strings.NewReader(test.checksums)); err == nil {
 				t.Fatal("HomebrewFormula() succeeded; want checksummed canonical artifact failure")
 			}
 		})
 	}
 }
 
-func TestPackageAllAcceptsTheProductionVersion(t *testing.T) {
-	if err := validateVersion("0.2.0"); err != nil {
-		t.Fatalf("validateVersion(0.2.0) = %v; want production release accepted", err)
+func TestPackageAllAcceptsCanonicalReleaseVersions(t *testing.T) {
+	for _, version := range []string{"0.2.1", "0.2.1-preview.1", "1.0.0", "1.0.0-rc.1"} {
+		if err := validateVersion(version); err != nil {
+			t.Errorf("validateVersion(%q) = %v; want canonical release accepted", version, err)
+		}
 	}
 }
 
-func TestPackageAllRejectsVersionsOutsideTheNativeReleaseLine(t *testing.T) {
-	for _, version := range []string{"0.1.2", "0.2.1", "0.2.0+metadata"} {
+func TestPackageAllRejectsMalformedReleaseVersions(t *testing.T) {
+	for _, version := range []string{"", "v0.2.1", "0.2", "0.2.1+metadata", "0.2.1-", "next"} {
 		if err := validateVersion(version); err == nil {
-			t.Errorf("validateVersion(%q) succeeded; want canonical 0.2.0 release validation", version)
+			t.Errorf("validateVersion(%q) succeeded; want canonical release validation", version)
 		}
 	}
 }
 
 func TestVerifyReleaseBundleAcceptsCanonicalArtifacts(t *testing.T) {
-	output := releaseBundleFixture(t, "0.2.0-preview.1")
-	if err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.0-preview.1"}); err != nil {
+	output := releaseBundleFixture(t, "0.2.1-preview.1")
+	if err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.1-preview.1"}); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestVerifyReleaseBundleAcceptsCanonicalProductionArtifacts(t *testing.T) {
-	output := releaseBundleFixture(t, "0.2.0")
-	if err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.0"}); err != nil {
+	output := releaseBundleFixture(t, "0.2.1")
+	if err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.1"}); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestVerifyReleaseBundleRejectsMissingTarget(t *testing.T) {
-	output := releaseBundleFixture(t, "0.2.0-preview.1")
-	if err := os.Remove(filepath.Join(output, "open-skills_0.2.0-preview.1_linux_arm64.tar.gz")); err != nil {
+	output := releaseBundleFixture(t, "0.2.1-preview.1")
+	if err := os.Remove(filepath.Join(output, "open-skills_0.2.1-preview.1_linux_arm64.tar.gz")); err != nil {
 		t.Fatal(err)
 	}
 
-	err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.0-preview.1"})
+	err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.1-preview.1"})
 	if err == nil || !strings.Contains(err.Error(), "missing release target") {
 		t.Fatalf("VerifyReleaseBundle() error = %v; want missing release target", err)
 	}
 }
 
 func TestVerifyReleaseBundleRejectsExecutableAliases(t *testing.T) {
-	output := releaseBundleFixture(t, "0.2.0-preview.1")
-	archive := filepath.Join(output, "open-skills_0.2.0-preview.1_darwin_arm64.tar.gz")
+	output := releaseBundleFixture(t, "0.2.1-preview.1")
+	archive := filepath.Join(output, "open-skills_0.2.1-preview.1_darwin_arm64.tar.gz")
 	executable := filepath.Join(t.TempDir(), "skills")
 	if err := os.WriteFile(executable, []byte("alias"), 0o755); err != nil {
 		t.Fatal(err)
@@ -294,19 +296,19 @@ func TestVerifyReleaseBundleRejectsExecutableAliases(t *testing.T) {
 	if err := writeTarGzip(archive, executable, "skills"); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteChecksums(output, expectedArtifacts("0.2.0-preview.1")); err != nil {
+	if err := WriteChecksums(output, expectedArtifacts("0.2.1-preview.1")); err != nil {
 		t.Fatal(err)
 	}
 
-	err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.0-preview.1"})
+	err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.1-preview.1"})
 	if err == nil || !strings.Contains(err.Error(), "canonical executable") {
 		t.Fatalf("VerifyReleaseBundle() error = %v; want canonical executable rejection", err)
 	}
 }
 
 func TestVerifyReleaseBundleRejectsMismatchedChecksum(t *testing.T) {
-	output := releaseBundleFixture(t, "0.2.0-preview.1")
-	archive := filepath.Join(output, "open-skills_0.2.0-preview.1_windows_amd64.zip")
+	output := releaseBundleFixture(t, "0.2.1-preview.1")
+	archive := filepath.Join(output, "open-skills_0.2.1-preview.1_windows_amd64.zip")
 	file, err := os.OpenFile(archive, os.O_APPEND|os.O_WRONLY, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -319,63 +321,63 @@ func TestVerifyReleaseBundleRejectsMismatchedChecksum(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.0-preview.1"})
+	err = VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.1-preview.1"})
 	if err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
 		t.Fatalf("VerifyReleaseBundle() error = %v; want checksum mismatch", err)
 	}
 }
 
 func TestVerifyReleaseBundleRejectsArtifactsForAnotherTag(t *testing.T) {
-	output := releaseBundleFixture(t, "0.2.0-preview.1")
-	err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.0-preview.2"})
+	output := releaseBundleFixture(t, "0.2.1-preview.1")
+	err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.1-preview.2"})
 	if err == nil || !strings.Contains(err.Error(), "does not correspond to release tag") {
 		t.Fatalf("VerifyReleaseBundle() error = %v; want release tag mismatch", err)
 	}
 }
 
 func TestVerifyReleaseBundleRejectsUnexpectedArchives(t *testing.T) {
-	output := releaseBundleFixture(t, "0.2.0-preview.1")
+	output := releaseBundleFixture(t, "0.2.1-preview.1")
 	if err := os.WriteFile(filepath.Join(output, "unrelated.tar.gz"), []byte("not a release target"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.0-preview.1"})
+	err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.1-preview.1"})
 	if err == nil || !strings.Contains(err.Error(), "does not correspond to release tag") {
 		t.Fatalf("VerifyReleaseBundle() error = %v; want unexpected archive rejection", err)
 	}
 }
 
 func TestVerifyReleaseBundleRejectsUnexpectedNonArchiveAssets(t *testing.T) {
-	output := releaseBundleFixture(t, "0.2.0-preview.1")
+	output := releaseBundleFixture(t, "0.2.1-preview.1")
 	if err := os.WriteFile(filepath.Join(output, "skills"), []byte("alias executable"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.0-preview.1"})
+	err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.1-preview.1"})
 	if err == nil || !strings.Contains(err.Error(), "unexpected release asset") {
 		t.Fatalf("VerifyReleaseBundle() error = %v; want unexpected asset rejection", err)
 	}
 }
 
 func TestVerifyReleaseBundleReadsZipPayload(t *testing.T) {
-	output := releaseBundleFixture(t, "0.2.0-preview.1")
-	archive := filepath.Join(output, "open-skills_0.2.0-preview.1_windows_amd64.zip")
+	output := releaseBundleFixture(t, "0.2.1-preview.1")
+	archive := filepath.Join(output, "open-skills_0.2.1-preview.1_windows_amd64.zip")
 	writeCorruptZipFixture(t, archive)
-	if err := WriteChecksums(output, expectedArtifacts("0.2.0-preview.1")); err != nil {
+	if err := WriteChecksums(output, expectedArtifacts("0.2.1-preview.1")); err != nil {
 		t.Fatal(err)
 	}
-	err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.0-preview.1"})
+	err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.1-preview.1"})
 	if err == nil || !strings.Contains(err.Error(), "read canonical executable") {
 		t.Fatalf("VerifyReleaseBundle() error = %v; want corrupt ZIP rejection", err)
 	}
 }
 
 func TestVerifyReleaseBundleRequiresExecutableUnixPayload(t *testing.T) {
-	output := releaseBundleFixture(t, "0.2.0-preview.1")
-	archive := filepath.Join(output, "open-skills_0.2.0-preview.1_linux_arm64.tar.gz")
+	output := releaseBundleFixture(t, "0.2.1-preview.1")
+	archive := filepath.Join(output, "open-skills_0.2.1-preview.1_linux_arm64.tar.gz")
 	writeTarModeFixture(t, archive, 0o644)
-	if err := WriteChecksums(output, expectedArtifacts("0.2.0-preview.1")); err != nil {
+	if err := WriteChecksums(output, expectedArtifacts("0.2.1-preview.1")); err != nil {
 		t.Fatal(err)
 	}
-	err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.0-preview.1"})
+	err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.1-preview.1"})
 	if err == nil || !strings.Contains(err.Error(), "must be executable") {
 		t.Fatalf("VerifyReleaseBundle() error = %v; want non-executable payload rejection", err)
 	}
@@ -387,17 +389,17 @@ func TestVerifyReleaseBundleRequiresSignaturesAndProvenance(t *testing.T) {
 		file string
 		want string
 	}{
-		{name: "archive signature", file: "open-skills_0.2.0-preview.1_linux_amd64.tar.gz.sigstore.json", want: "missing keyless signature"},
+		{name: "archive signature", file: "open-skills_0.2.1-preview.1_linux_amd64.tar.gz.sigstore.json", want: "missing keyless signature"},
 		{name: "checksum signature", file: "checksums.txt.sigstore.json", want: "missing keyless signature"},
 		{name: "provenance", file: "provenance.sigstore.json", want: "missing build provenance"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			output := releaseBundleFixture(t, "0.2.0-preview.1")
+			output := releaseBundleFixture(t, "0.2.1-preview.1")
 			if err := os.Remove(filepath.Join(output, test.file)); err != nil {
 				t.Fatal(err)
 			}
-			err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.0-preview.1"})
+			err := VerifyReleaseBundle(VerifyOptions{Output: output, Tag: "v0.2.1-preview.1"})
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("VerifyReleaseBundle() error = %v; want %s", err, test.want)
 			}

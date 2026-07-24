@@ -47,7 +47,7 @@ type target struct {
 	smoke       bool
 }
 
-var nativeReleaseVersion = regexp.MustCompile(`^0\.2\.0(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$`)
+var nativeReleaseVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$`)
 var sha256Checksum = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 var previewTargets = []target{
@@ -90,9 +90,9 @@ func ReleaseNotes(version string) (string, error) {
 	title := fmt.Sprintf("# open-skills v%s native preview\n\n", version)
 	introduction := "This prerelease makes self-contained native archives available for early testing. Prerelease availability does not replace the supported stable native release or its protected publication gate.\n\n"
 	supportStatement := "Supported targets are maintainer-supported preview platforms. Experimental targets are compile-checked but are not yet represented as fully tested.\n\n"
-	if version == "0.2.0" {
-		title = "# open-skills v0.2.0 native release\n\n"
-		introduction = "This is the approved production-ready native release of open-skills. It passed the reviewed compatibility, security, state-safety, platform, and release-supply-chain cutover gate. Migration guidance for npm users is available in `docs/native-migration.md`.\n\n"
+	if !strings.Contains(version, "-") {
+		title = fmt.Sprintf("# open-skills v%s native release\n\n", version)
+		introduction = "This is the production-ready native release of open-skills. It passed the reviewed compatibility, security, state-safety, platform, and release-supply-chain gate. Migration guidance for npm users is available in `docs/native-migration.md`.\n\n"
 		supportStatement = "macOS ARM64 and Linux x86-64 are supported production platforms. Experimental targets are compile-checked but are not represented as fully tested.\n\n"
 	}
 	return fmt.Sprintf(
@@ -164,8 +164,9 @@ func ScoopManifest(version string, checksums io.Reader) (string, error) {
 	}
 	description := "Experimental Windows x86-64 native preview for the open agent skills ecosystem"
 	jsonpath := "$[?(@.prerelease == true && @.draft == false)].tag_name"
-	versionPattern := `0\\.2\\.0-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*`
-	if version == "0.2.0" {
+	baseVersion, _, prerelease := strings.Cut(version, "-")
+	versionPattern := strings.ReplaceAll(baseVersion, ".", `\\.`) + `-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*`
+	if !prerelease {
 		description = "Experimental Windows x86-64 native release for the open agent skills ecosystem"
 		jsonpath = "$[?(@.prerelease == false && @.draft == false)].tag_name"
 		versionPattern = `[0-9]+\\.[0-9]+\\.[0-9]+`
@@ -245,7 +246,7 @@ func validateOptions(options PackageOptions) error {
 
 func validateVersion(version string) error {
 	if !nativeReleaseVersion.MatchString(version) {
-		return fmt.Errorf("native release version %q must be 0.2.0 or a 0.2.0 prerelease such as 0.2.0-preview.1", version)
+		return fmt.Errorf("native release version %q must be a canonical version such as 0.2.1 or 0.2.1-preview.1", version)
 	}
 	return nil
 }
