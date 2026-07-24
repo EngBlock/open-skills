@@ -43,7 +43,7 @@ brew update
 brew upgrade EngBlock/open-skills/open-skills
 ```
 
-Native 0.2.1 is the production release.
+Native 0.2.2 is the production release.
 
 ### Verified direct archives
 
